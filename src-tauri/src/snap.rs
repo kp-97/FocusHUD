@@ -2,25 +2,25 @@
 use std::sync::atomic::Ordering;
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::{CloseHandle, BOOL, HWND, LPARAM, POINT, RECT};
+use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HWND, LPARAM, POINT, RECT};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Dwm::{
-    DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS,
+    DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+    OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetAncestor, GetClassNameW, GetCursorPos, GetWindowLongW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SetWindowPos, ShowWindow,
     EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_MOVESIZEEND, GA_ROOT, GA_ROOTOWNER, GWL_EXSTYLE,
-    GWL_STYLE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE,
-    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WS_CAPTION, WS_CHILD,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_THICKFRAME,
+    GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos, GetWindowLongW, GetWindowRect,
+    GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SW_RESTORE, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT,
+    WINEVENT_SKIPOWNPROCESS, WS_CAPTION, WS_CHILD, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_THICKFRAME,
 };
 
 #[cfg(target_os = "windows")]
@@ -54,7 +54,12 @@ pub unsafe fn is_webview_or_own_process(pid: u32) -> bool {
 
 #[cfg(target_os = "windows")]
 pub unsafe fn get_visible_window_rect(hwnd: HWND) -> Option<RECT> {
-    let mut win_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let mut win_rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
     if unsafe { GetWindowRect(hwnd, &mut win_rect) } == 0 {
         return None;
     }
@@ -77,7 +82,12 @@ pub unsafe fn get_visible_window_rect(hwnd: HWND) -> Option<RECT> {
 
 #[cfg(target_os = "windows")]
 pub unsafe fn fit_window_to_visible_rect(hwnd: HWND, target: RECT) {
-    let mut win_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let mut win_rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
     if unsafe { GetWindowRect(hwnd, &mut win_rect) } == 0 {
         return;
     }
@@ -268,8 +278,7 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             return 1;
         }
 
-        let was_left_docked =
-            vis.left < work_rect.left || (vis.left - prev_rect.left).abs() <= 32;
+        let was_left_docked = vis.left < work_rect.left || (vis.left - prev_rect.left).abs() <= 32;
         let was_right_docked =
             vis.right > work_rect.right || (vis.right - prev_rect.right).abs() <= 32;
 

@@ -2,12 +2,12 @@ use std::sync::atomic::Ordering;
 use tauri::Manager;
 
 use crate::dock::{
-    apply_dock_geometry, update_dock_work_area, CURRENT_LEFT_WIDTH, CURRENT_RIGHT_WIDTH,
-    HANDLE_GUTTER_LOGICAL_PX, LEFT_DRAG_ACTIVE, RIGHT_DRAG_ACTIVE,
+    CURRENT_LEFT_WIDTH, CURRENT_RIGHT_WIDTH, HANDLE_GUTTER_LOGICAL_PX, LEFT_DRAG_ACTIVE,
+    RIGHT_DRAG_ACTIVE, apply_dock_geometry, update_dock_work_area,
 };
 use crate::monitor::{
-    get_original_work_area, get_primary_monitor_rects, restore_work_area as restore_monitor_work_area,
-    ScreenMetrics,
+    ScreenMetrics, get_original_work_area, get_primary_monitor_rects,
+    restore_work_area as restore_monitor_work_area,
 };
 
 #[tauri::command]

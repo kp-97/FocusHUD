@@ -1,9 +1,9 @@
+use nvml_wrapper::Nvml;
+use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
+use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{OnceLock, RwLock};
 use std::time::Duration;
-use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
-use nvml_wrapper::Nvml;
-use serde::Serialize;
 use sysinfo::System;
 
 #[derive(Serialize, Clone, Debug)]
