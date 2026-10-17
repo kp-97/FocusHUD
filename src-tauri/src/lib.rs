@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc, clippy::collapsible_if)]
+
 pub mod commands;
 pub mod diagnostics;
 pub mod dock;
@@ -44,8 +46,10 @@ pub fn run() {
                         .and_then(|w| w.current_monitor().ok().flatten())
                 });
                 let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
-                let phys_left = (((left_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-                let phys_right = (((right_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+                let phys_left =
+                    (((left_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+                let phys_right =
+                    (((right_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
                 dock::update_dock_work_area(orig_work, phys_left, phys_right, true);
 
                 // Install lightweight WinEventHooks to snap external user windows

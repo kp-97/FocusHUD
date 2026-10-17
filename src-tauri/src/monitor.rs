@@ -5,15 +5,15 @@ use std::sync::Mutex;
 use windows_sys::Win32::Foundation::{POINT, RECT};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
+    GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::HiDpi::{
-    SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    SystemParametersInfoW, SPIF_SENDCHANGE, SPI_SETWORKAREA,
+    SPI_SETWORKAREA, SPIF_SENDCHANGE, SystemParametersInfoW,
 };
 
 #[cfg(target_os = "windows")]
@@ -55,8 +55,18 @@ pub unsafe fn get_primary_monitor_rects() -> (RECT, RECT) {
             (mi.rcMonitor, mi.rcWork)
         } else {
             (
-                RECT { left: 0, top: 0, right: 3440, bottom: 1440 },
-                RECT { left: 0, top: 0, right: 3440, bottom: 1356 },
+                RECT {
+                    left: 0,
+                    top: 0,
+                    right: 3440,
+                    bottom: 1440,
+                },
+                RECT {
+                    left: 0,
+                    top: 0,
+                    right: 3440,
+                    bottom: 1356,
+                },
             )
         }
     }

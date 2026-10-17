@@ -10,8 +10,16 @@ fn main() {
         } else {
             "Unknown panic payload".to_string()
         };
-        let location = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
-        let msg = format!("PANIC at {} [{}] - {}", chrono_like_now(), location, payload);
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_default();
+        let msg = format!(
+            "PANIC at {} [{}] - {}",
+            chrono_like_now(),
+            location,
+            payload
+        );
         let _ = std::fs::write("crash.log", msg);
     }));
     tauri_app_lib::run()

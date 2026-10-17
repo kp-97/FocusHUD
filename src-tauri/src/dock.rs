@@ -7,13 +7,11 @@ use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows_sys::Win32::Graphics::Gdi::{CreateRectRgn, SetWindowRgn};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindowRect, SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE,
+    EnumWindows, GetWindowRect, HWND_TOPMOST, SWP_NOACTIVATE, SetWindowPos,
 };
 
 #[cfg(target_os = "windows")]
-use crate::monitor::{
-    apply_system_work_area, get_primary_monitor_rects, set_work_area_cache,
-};
+use crate::monitor::{apply_system_work_area, get_primary_monitor_rects, set_work_area_cache};
 #[cfg(target_os = "windows")]
 use crate::snap::enum_windows_snap_callback;
 
@@ -38,7 +36,12 @@ static LAST_RIGHT_REGION: AtomicI64 = AtomicI64::new(-1);
 /// Position/size the window only if it differs from the target (no-op otherwise).
 #[cfg(target_os = "windows")]
 pub unsafe fn ensure_window_rect(h: HWND, x: i32, y: i32, w: i32, hgt: i32) {
-    let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let mut r = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
     unsafe {
         GetWindowRect(h, &mut r);
         if r.left != x || r.top != y || (r.right - r.left) != w || (r.bottom - r.top) != hgt {
@@ -61,6 +64,36 @@ pub unsafe fn set_clip_region(h: HWND, last: &AtomicI64, left: i32, right: i32, 
     }
 }
 
+/// Calculates physical canvas width given a DPI scaling factor
+pub fn calculate_canvas_width(scale: f64) -> i32 {
+    ((MAX_DOCK_LOGICAL_WIDTH as f64) * scale).round() as i32
+}
+
+/// Calculates visible physical width for a dock considering dragging state and DPI scale
+pub fn calculate_visible_width(logical_width: i32, is_drag_active: bool, scale: f64) -> i32 {
+    let phys_canvas = calculate_canvas_width(scale);
+    if is_drag_active {
+        phys_canvas
+    } else {
+        (((logical_width + HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32
+    }
+}
+
+/// Computes the X coordinate of the right-side dock window
+pub fn calculate_right_dock_x(mon_left: i32, mon_width: i32, phys_canvas: i32) -> i32 {
+    mon_left + mon_width - phys_canvas
+}
+
+/// Computes desktop work area margins for left and right docks
+pub fn calculate_work_area_margins(
+    orig_left: i32,
+    orig_right: i32,
+    phys_left: i32,
+    phys_right: i32,
+) -> (i32, i32) {
+    (orig_left + phys_left, orig_right - phys_right)
+}
+
 /// Computes physical dock layout, synchronizing both Tauri window positioning
 /// and Win32 stationary canvas clipping.
 #[cfg(target_os = "windows")]
@@ -81,23 +114,18 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
     let right_drag = RIGHT_DRAG_ACTIVE.load(Ordering::Relaxed);
 
     // The OS windows are ALWAYS the full canvas size and never move/resize during drag.
-    let phys_canvas = ((MAX_DOCK_LOGICAL_WIDTH as f64) * scale).round() as i32;
+    let phys_canvas = calculate_canvas_width(scale);
 
     // Visible + clickable area is clipped with a window region.
-    let left_visible = if left_drag {
-        phys_canvas
-    } else {
-        (((left_width + HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32
-    };
-    let right_visible = if right_drag {
-        phys_canvas
-    } else {
-        (((right_width + HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32
-    };
+    let left_visible = calculate_visible_width(left_width, left_drag, scale);
+    let right_visible = calculate_visible_width(right_width, right_drag, scale);
 
     if let Some(left_win) = app.get_webview_window("left-dock") {
         let _ = left_win.set_position(tauri::PhysicalPosition::new(mon_left, top_y));
-        let _ = left_win.set_size(tauri::PhysicalSize::new(phys_canvas as u32, dock_height as u32));
+        let _ = left_win.set_size(tauri::PhysicalSize::new(
+            phys_canvas as u32,
+            dock_height as u32,
+        ));
         if let Ok(hwnd) = left_win.hwnd() {
             let h = hwnd.0 as HWND;
             LEFT_DOCK_HWND.store(h as isize, Ordering::Relaxed);
@@ -112,9 +140,12 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
     }
 
     if let Some(right_win) = app.get_webview_window("right-dock") {
-        let right_x = mon_left + mon_width - phys_canvas;
+        let right_x = calculate_right_dock_x(mon_left, mon_width, phys_canvas);
         let _ = right_win.set_position(tauri::PhysicalPosition::new(right_x, top_y));
-        let _ = right_win.set_size(tauri::PhysicalSize::new(phys_canvas as u32, dock_height as u32));
+        let _ = right_win.set_size(tauri::PhysicalSize::new(
+            phys_canvas as u32,
+            dock_height as u32,
+        ));
         if let Ok(hwnd) = right_win.hwnd() {
             let h = hwnd.0 as HWND;
             RIGHT_DOCK_HWND.store(h as isize, Ordering::Relaxed);
@@ -143,10 +174,12 @@ pub unsafe fn update_dock_work_area(
     phys_right: i32,
     snap_open_windows: bool,
 ) {
+    let (new_left, new_right) =
+        calculate_work_area_margins(orig.left, orig.right, phys_left, phys_right);
     let new_rect = RECT {
-        left: orig.left + phys_left,
+        left: new_left,
         top: orig.top,
-        right: orig.right - phys_right,
+        right: new_right,
         bottom: orig.bottom,
     };
 
@@ -161,5 +194,44 @@ pub unsafe fn update_dock_work_area(
                 &new_rect as *const _ as LPARAM,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_canvas_width_scaling() {
+        assert_eq!(calculate_canvas_width(1.0), 520);
+        assert_eq!(calculate_canvas_width(1.25), 650);
+        assert_eq!(calculate_canvas_width(1.5), 780);
+    }
+
+    #[test]
+    fn test_visible_width_drag_vs_idle() {
+        let scale = 1.0;
+        let idle = calculate_visible_width(280, false, scale);
+        assert_eq!(idle, 280);
+
+        let dragging = calculate_visible_width(280, true, scale);
+        assert_eq!(dragging, 520);
+    }
+
+    #[test]
+    fn test_right_dock_x_position() {
+        // Ultrawide 3440x1440
+        let mon_left = 0;
+        let mon_width = 3440;
+        let canvas = 520;
+        let right_x = calculate_right_dock_x(mon_left, mon_width, canvas);
+        assert_eq!(right_x, 2920);
+    }
+
+    #[test]
+    fn test_work_area_margins() {
+        let (new_left, new_right) = calculate_work_area_margins(0, 3440, 280, 280);
+        assert_eq!(new_left, 280);
+        assert_eq!(new_right, 3160);
     }
 }
