@@ -1,0 +1,114 @@
+use std::sync::atomic::Ordering;
+use tauri::Manager;
+
+use crate::dock::{
+    apply_dock_geometry, update_dock_work_area, CURRENT_LEFT_WIDTH, CURRENT_RIGHT_WIDTH,
+    HANDLE_GUTTER_LOGICAL_PX, LEFT_DRAG_ACTIVE, RIGHT_DRAG_ACTIVE,
+};
+use crate::monitor::{
+    get_original_work_area, get_primary_monitor_rects, restore_work_area as restore_monitor_work_area,
+    ScreenMetrics,
+};
+
+#[tauri::command]
+pub fn get_screen_metrics(_app: tauri::AppHandle) -> Result<ScreenMetrics, String> {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let (rc_monitor, rc_work) = get_primary_monitor_rects();
+        let orig = get_original_work_area().unwrap_or(rc_work);
+
+        Ok(ScreenMetrics {
+            screen_width: rc_monitor.right - rc_monitor.left,
+            screen_height: rc_monitor.bottom - rc_monitor.top,
+            original_left: orig.left,
+            original_top: orig.top,
+            original_right: orig.right,
+            original_bottom: orig.bottom,
+        })
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    Ok(ScreenMetrics {
+        screen_width: 3440,
+        screen_height: 1440,
+        original_left: 0,
+        original_top: 0,
+        original_right: 3440,
+        original_bottom: 1356,
+    })
+}
+
+#[tauri::command]
+pub fn set_dock_drag_mode(app: tauri::AppHandle, side: String, active: bool) -> Result<(), String> {
+    if side == "left" {
+        LEFT_DRAG_ACTIVE.store(active, Ordering::Relaxed);
+    } else if side == "right" {
+        RIGHT_DRAG_ACTIVE.store(active, Ordering::Relaxed);
+    }
+
+    let l_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
+    let r_w = CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
+
+    #[cfg(target_os = "windows")]
+    apply_dock_geometry(&app, l_w, r_w);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_dock_sizes(
+    app: tauri::AppHandle,
+    left_width: Option<i32>,
+    right_width: Option<i32>,
+    commit: bool,
+) -> Result<(), String> {
+    let l_w = left_width.unwrap_or_else(|| CURRENT_LEFT_WIDTH.load(Ordering::Relaxed));
+    let r_w = right_width.unwrap_or_else(|| CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed));
+
+    CURRENT_LEFT_WIDTH.store(l_w, Ordering::Relaxed);
+    CURRENT_RIGHT_WIDTH.store(r_w, Ordering::Relaxed);
+
+    #[cfg(target_os = "windows")]
+    {
+        if commit {
+            LEFT_DRAG_ACTIVE.store(false, Ordering::Relaxed);
+            RIGHT_DRAG_ACTIVE.store(false, Ordering::Relaxed);
+        }
+
+        apply_dock_geometry(&app, l_w, r_w);
+
+        if commit {
+            if let Some(orig) = get_original_work_area() {
+                let monitor = app.primary_monitor().ok().flatten().or_else(|| {
+                    app.get_webview_window("left-dock")
+                        .and_then(|w| w.current_monitor().ok().flatten())
+                });
+                let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
+                let phys_left = (((l_w + HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+                let phys_right = (((r_w + HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+
+                unsafe {
+                    update_dock_work_area(orig, phys_left, phys_right, true);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn restore_work_area() -> Result<(), String> {
+    restore_monitor_work_area()
+}
+
+#[tauri::command]
+pub fn exit_app(app: tauri::AppHandle) {
+    let _ = restore_monitor_work_area();
+    app.exit(0);
+}
+
+#[tauri::command]
+pub fn get_system_diagnostics() -> Result<crate::diagnostics::SystemDiagnostics, String> {
+    Ok(crate::diagnostics::get_latest_diagnostics())
+}
