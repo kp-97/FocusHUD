@@ -1,84 +1,33 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Play, Pause, RotateCcw, Timer, Plus, Minus, Check, X, Sliders } from "lucide-react";
+import { usePomodoro } from "../utils/pomodoroStore";
 
 interface PomodoroDialProps {
   isCompact?: boolean;
 }
 
-type Mode = "focus" | "short_break" | "long_break";
 type AdjustTarget = "focus" | "short_break" | "long_break" | "cycles" | null;
 
-interface DailyStats {
-  date: string;
-  completedPomodoros: number;
-  totalFocusMinutes: number;
-}
-
-const getTodayDateString = () => {
-  return new Date().toISOString().split("T")[0];
-};
-
 export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false }) => {
-  // Configured durations (in minutes), persisted in localStorage
-  const [focusMinutes, setFocusMinutes] = useState<number>(() => {
-    const saved = localStorage.getItem("focushud_pomodoro_focus_min") || localStorage.getItem("focusdock_pomodoro_focus_min");
-    return saved ? parseInt(saved, 10) : 25;
-  });
-
-  const [shortBreakMinutes, setShortBreakMinutes] = useState<number>(() => {
-    const saved = localStorage.getItem("focushud_pomodoro_short_min") || localStorage.getItem("focusdock_pomodoro_short_min");
-    return saved ? parseInt(saved, 10) : 5;
-  });
-
-  const [longBreakMinutes, setLongBreakMinutes] = useState<number>(() => {
-    const saved = localStorage.getItem("focushud_pomodoro_long_min") || localStorage.getItem("focusdock_pomodoro_long_min");
-    return saved ? parseInt(saved, 10) : 15;
-  });
-
-  const [totalCycles, setTotalCycles] = useState<number>(() => {
-    const saved = localStorage.getItem("focushud_pomodoro_total_cycles") || localStorage.getItem("focusdock_pomodoro_total_cycles");
-    return saved ? parseInt(saved, 10) : 4;
-  });
-
-  // Current session mode
-  const [mode, setMode] = useState<Mode>("focus");
-  const [cycle, setCycle] = useState<number>(1);
-
-  // Active timer state
-  const [totalSeconds, setTotalSeconds] = useState<number>(focusMinutes * 60);
-  const [timeLeft, setTimeLeft] = useState<number>(focusMinutes * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-
-  // Daily statistics
-  const [dailyStats, setDailyStats] = useState<DailyStats>(() => {
-    const today = getTodayDateString();
-    const raw = localStorage.getItem("focushud_pomodoro_daily") || localStorage.getItem("focusdock_pomodoro_daily");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as DailyStats;
-        if (parsed.date === today) {
-          return parsed;
-        }
-      } catch {
-        // Fallback to fresh stats
-      }
-    }
-    return { date: today, completedPomodoros: 0, totalFocusMinutes: 0 };
-  });
-
-  // Save daily stats helper
-  const updateDailyStats = (completedInc: number, focusMinutesInc: number) => {
-    const today = getTodayDateString();
-    setDailyStats((prev) => {
-      const next: DailyStats = {
-        date: today,
-        completedPomodoros: (prev.date === today ? prev.completedPomodoros : 0) + completedInc,
-        totalFocusMinutes: (prev.date === today ? prev.totalFocusMinutes : 0) + focusMinutesInc,
-      };
-      localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(next));
-      return next;
-    });
-  };
+  const {
+    focusMinutes,
+    shortBreakMinutes,
+    longBreakMinutes,
+    totalCycles,
+    mode,
+    cycle,
+    totalSeconds,
+    timeLeft,
+    isRunning,
+    dailyStats,
+    toggleRun,
+    reset: resetTimer,
+    adjustMinutes,
+    setFocusMinutes,
+    setShortBreakMinutes,
+    setLongBreakMinutes,
+    setTotalCycles,
+  } = usePomodoro();
 
   // Adjust scroll modal state
   const [adjustTarget, setAdjustTarget] = useState<AdjustTarget>(null);
@@ -103,76 +52,6 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
     }
   };
 
-  // Switch session mode
-  const switchMode = (newMode: Mode) => {
-    setIsRunning(false);
-    setMode(newMode);
-    let mins = focusMinutes;
-    if (newMode === "short_break") mins = shortBreakMinutes;
-    if (newMode === "long_break") mins = longBreakMinutes;
-    setTotalSeconds(mins * 60);
-    setTimeLeft(mins * 60);
-  };
-
-  // Timer countdown loop
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            handleSessionCompleted();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning, timeLeft, mode, cycle, focusMinutes, shortBreakMinutes, longBreakMinutes, totalCycles]);
-
-  const handleSessionCompleted = () => {
-    if (mode === "focus") {
-      updateDailyStats(1, focusMinutes);
-      if (cycle >= totalCycles) {
-        setCycle(1);
-        switchMode("long_break");
-      } else {
-        setCycle((c) => c + 1);
-        switchMode("short_break");
-      }
-    } else {
-      // Break finished -> back to focus
-      switchMode("focus");
-    }
-  };
-
-  const toggleRun = () => setIsRunning(!isRunning);
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    let mins = focusMinutes;
-    if (mode === "short_break") mins = shortBreakMinutes;
-    if (mode === "long_break") mins = longBreakMinutes;
-    setTotalSeconds(mins * 60);
-    setTimeLeft(mins * 60);
-  };
-
-  // Increment / Decrement by 1 minute (User Requirement #4)
-  const adjustMinutes = (delta: number) => {
-    const newTotal = Math.max(60, Math.min(3600 * 2, totalSeconds + delta * 60));
-    setTotalSeconds(newTotal);
-    setTimeLeft(newTotal);
-    if (!isRunning && mode === "focus") {
-      const newMins = Math.round(newTotal / 60);
-      setFocusMinutes(newMins);
-      localStorage.setItem("focushud_pomodoro_focus_min", String(newMins));
-    }
-  };
-
   // Open adjustment scroll modal
   const openAdjust = (target: AdjustTarget) => {
     setAdjustTarget(target);
@@ -193,31 +72,12 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
 
     if (adjustTarget === "focus") {
       setFocusMinutes(clamped);
-      localStorage.setItem("focushud_pomodoro_focus_min", String(clamped));
-      if (mode === "focus" && !isRunning) {
-        setTotalSeconds(clamped * 60);
-        setTimeLeft(clamped * 60);
-      }
     } else if (adjustTarget === "short_break") {
       setShortBreakMinutes(clamped);
-      localStorage.setItem("focushud_pomodoro_short_min", String(clamped));
-      if (mode === "short_break" && !isRunning) {
-        setTotalSeconds(clamped * 60);
-        setTimeLeft(clamped * 60);
-      }
     } else if (adjustTarget === "long_break") {
       setLongBreakMinutes(clamped);
-      localStorage.setItem("focushud_pomodoro_long_min", String(clamped));
-      if (mode === "long_break" && !isRunning) {
-        setTotalSeconds(clamped * 60);
-        setTimeLeft(clamped * 60);
-      }
     } else if (adjustTarget === "cycles") {
       setTotalCycles(clamped);
-      localStorage.setItem("focushud_pomodoro_total_cycles", String(clamped));
-      if (cycle > clamped) {
-        setCycle(1);
-      }
     }
     setAdjustTarget(null);
   };
