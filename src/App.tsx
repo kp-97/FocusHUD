@@ -211,6 +211,7 @@ export default function App() {
             activeNav={activeNav}
             isCompact={rightWidth < 220}
             isDockMode={true}
+            onExpand={() => handleRightDoubleClick()}
           />
         </div>
       </div>
@@ -284,6 +285,7 @@ export default function App() {
           width={rightWidth}
           activeNav={activeNav}
           isCompact={rightWidth < 220}
+          onExpand={() => handleRightDoubleClick()}
         />
       </div>
 
