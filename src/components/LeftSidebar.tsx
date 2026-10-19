@@ -115,39 +115,30 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className={`h-full shrink-0 flex flex-col ${
-        isIconOnly ? "p-1.5" : "p-2.5"
-      } bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10`}
+      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10"
     >
       <HudBrackets
         className={`h-full flex flex-col justify-between ${
-          isIconOnly ? "p-1.5 items-center" : "p-3"
+          isIconOnly ? "p-1.5 items-center" : "p-2"
         } overflow-hidden`}
       >
         {/* Top Header: FocusHUD & Controls (Pinned) */}
-        <div className="shrink-0 flex flex-col gap-2 w-full relative">
-          <div className="flex items-center justify-between border-b border-cyan-500/30 pb-2">
-            {!isIconOnly ? (
-              <>
+        <div className="shrink-0 flex flex-col w-full relative">
+          {!isIconOnly ? (
+            /* Expanded Header (width >= 120px) */
+            <div className="border-b border-cyan-500/30 pb-2 mb-1">
+              {/* Row 1: Diamond + Brand Title + Settings & Menu */}
+              <div className="flex items-center justify-between h-7">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-                  <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan">
+                  <div className="w-8 flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
+                  </div>
+                  <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan truncate">
                     FocusHUD
                   </h1>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  {/* Left Pane Sidebar Toggle Icon */}
-                  {onToggleCollapse && (
-                    <SidebarToggleIcon
-                      side="left"
-                      isCollapsed={false}
-                      onToggle={onToggleCollapse}
-                      theme="cyan"
-                    />
-                  )}
-
-                  {/* Settings Button */}
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={onOpenSettings}
                     title="Settings"
@@ -157,7 +148,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     <Settings className="w-3.5 h-3.5" />
                   </button>
 
-                  {/* Hamburger Menu Button */}
                   <button
                     onClick={() => setIsMenuOpen((prev) => !prev)}
                     title="System Menu"
@@ -168,9 +158,35 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     <Menu className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </>
-            ) : (
-              <div className="w-full flex flex-col items-center gap-1.5 py-0.5">
+              </div>
+
+              {/* Row 2: Fixed Left Toggle Button directly below Diamond + Waveform */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-8 flex items-center justify-center shrink-0">
+                  {onToggleCollapse && (
+                    <SidebarToggleIcon
+                      side="left"
+                      isCollapsed={false}
+                      onToggle={onToggleCollapse}
+                      theme="cyan"
+                    />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 pr-1">
+                  <WaveformVisualizer isCompact={compactMode} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Collapsed Header (width < 120px / 68px rail) */
+            <div className="w-full flex flex-col items-center border-b border-cyan-500/30 pb-2 mb-1">
+              {/* Row 1: Diamond */}
+              <div className="h-7 w-8 flex items-center justify-center">
+                <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
+              </div>
+
+              {/* Row 2: Fixed Left Toggle Button directly below Diamond */}
+              <div className="w-8 flex items-center justify-center my-0.5">
                 {onToggleCollapse && (
                   <SidebarToggleIcon
                     side="left"
@@ -179,24 +195,25 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     theme="cyan"
                   />
                 )}
-                <div className="w-2 h-2 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-                <button
-                  onClick={() => setIsMenuOpen((prev) => !prev)}
-                  title="System Menu"
-                  aria-label="System Menu"
-                  className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-                >
-                  <Menu className="w-3 h-3" />
-                </button>
               </div>
-            )}
-          </div>
+
+              {/* Row 3: Compact Menu button */}
+              <button
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                title="System Menu"
+                aria-label="System Menu"
+                className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer mt-0.5"
+              >
+                <Menu className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Floating Hamburger Dropdown Menu */}
           {isMenuOpen && (
             <div
               ref={menuRef}
-              className={`absolute top-10 ${
+              className={`absolute top-9 ${
                 isIconOnly ? "left-12" : "right-0"
               } w-52 bg-[#040d1a]/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150`}
               role="menu"
@@ -269,13 +286,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   <span className="text-[9px] font-tech text-red-400/60">Lock HUD & Exit</span>
                 </div>
               </button>
-            </div>
-          )}
-
-          {/* Diagnostic Waveform Banner */}
-          {!isIconOnly && (
-            <div className="my-0.5">
-              <WaveformVisualizer isCompact={compactMode} />
             </div>
           )}
         </div>

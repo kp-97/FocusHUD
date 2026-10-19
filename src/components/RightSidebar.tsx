@@ -80,9 +80,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className={`h-full shrink-0 flex flex-col ${
-        isIconOnly ? "p-1.5" : "p-2"
-      } bg-[#03070d] border-l border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10`}
+      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-l border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10"
     >
       {isIconOnly ? (
         <RightSidebarCompactRail
@@ -91,18 +89,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         />
       ) : (
         <>
-          {/* Pinned Top Bar with Toggle Icon, Title, and Window Controls */}
-          <div className="flex items-center justify-between px-1 pb-1 mb-1 border-b border-cyan-500/20 text-[10px] font-tech text-cyan-400/80">
-            {/* Left section: Toggle Icon + View Title */}
+          {/* Pinned Top Bar with View Title and Window Controls */}
+          <div className="flex items-center justify-between px-1 pb-1.5 border-b border-amber-500/20 text-[10px] font-tech text-cyan-400/80">
+            {/* Left section: View Title */}
             <div className="flex items-center gap-1.5 truncate">
-              {onCollapse && (
-                <SidebarToggleIcon
-                  side="right"
-                  isCollapsed={false}
-                  onToggle={onCollapse}
-                  theme="cyan"
-                />
-              )}
               <span className="w-1.5 h-1.5 bg-amber-400 rotate-45 shadow-[0_0_6px_#ffb300]" />
               <span className="font-bold tracking-widest text-amber-200 uppercase truncate">
                 VIEW: {currentNav.replace("_", " ")}
@@ -143,6 +133,18 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             </div>
           </div>
 
+          {/* Sub-bar below the line: Right Sidebar Toggle Button aligned with Exit button */}
+          <div className="flex items-center justify-end px-1 py-1 mb-1">
+            {onCollapse && (
+              <SidebarToggleIcon
+                side="right"
+                isCollapsed={false}
+                onToggle={onCollapse}
+                theme="amber"
+              />
+            )}
+          </div>
+
           {/* Main Content View Container */}
           <div className="flex-1 w-full min-h-0 overflow-hidden relative">
             {renderActiveView()}
@@ -152,5 +154,3 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     </aside>
   );
 };
-
-
