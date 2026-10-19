@@ -22,8 +22,10 @@ pub fn restore_from_tray(app: &tauri::AppHandle) {
                     .and_then(|w| w.current_monitor().ok().flatten())
             });
             let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
-            let phys_left = (((l_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-            let phys_right = (((r_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+            let phys_left =
+                (((l_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+            let phys_right =
+                (((r_w + dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
             unsafe {
                 dock::update_dock_work_area(orig, phys_left, phys_right, true);
             }
