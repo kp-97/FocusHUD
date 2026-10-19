@@ -291,6 +291,7 @@ const layoutChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastCha
 
 export type LayoutAction =
   | { type: "MAXIMIZE_PANES" }
+  | { type: "SET_PANES_WIDTH"; leftWidth: number; rightWidth: number }
   | { type: "SET_LEFT_WIDTH"; width: number }
   | { type: "SET_RIGHT_WIDTH"; width: number };
 
