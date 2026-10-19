@@ -7,8 +7,12 @@ import { TopNavHUD } from "./components/TopNavHUD";
 import { SettingsModal } from "./components/SettingsModal";
 import { updateDockSizes, restoreWorkArea } from "./utils/tauriBridge";
 import {
-  getMaxLeftWidth,
-  getMaxRightWidth,
+  getRememberedLeftWidth,
+  getRememberedRightWidth,
+  setRememberedLeftWidth,
+  setRememberedRightWidth,
+  DEFAULT_LEFT_WIDTH,
+  DEFAULT_RIGHT_WIDTH,
   broadcastLayoutAction,
   subscribeLayoutAction,
 } from "./utils/store";
@@ -66,13 +70,19 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Save widths to localStorage
+  // Save widths to localStorage and remember expanded widths when >= 120px
   useEffect(() => {
     localStorage.setItem("hud_left_width", String(leftWidth));
+    if (leftWidth >= 120) {
+      setRememberedLeftWidth(leftWidth);
+    }
   }, [leftWidth]);
 
   useEffect(() => {
     localStorage.setItem("hud_right_width", String(rightWidth));
+    if (rightWidth >= 120) {
+      setRememberedRightWidth(rightWidth);
+    }
   }, [rightWidth]);
 
   // Initial sync of dock sizes on startup
@@ -90,12 +100,12 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeLayoutAction((action) => {
       if (action.type === "MAXIMIZE_PANES") {
-        const maxL = getMaxLeftWidth();
-        const maxR = getMaxRightWidth();
-        setLeftWidth(maxL);
-        setRightWidth(maxR);
+        const prevL = getRememberedLeftWidth();
+        const prevR = getRememberedRightWidth();
+        setLeftWidth(prevL);
+        setRightWidth(prevR);
         if (dockWindowType !== "full" || desktopDockActive) {
-          updateDockSizes(maxL, maxR, true);
+          updateDockSizes(prevL, prevR, true);
         }
       } else if (action.type === "SET_LEFT_WIDTH") {
         setLeftWidth(action.width);
@@ -129,49 +139,80 @@ export default function App() {
 
   const handleLeftDragEnd = (finalWidth: number) => {
     setLeftWidth(finalWidth);
+    if (finalWidth >= 120) {
+      setRememberedLeftWidth(finalWidth);
+    }
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(finalWidth, null, true);
     }
   };
 
   const handleLeftDoubleClick = () => {
-    const next = leftWidth <= 70 ? 280 : 68;
-    setLeftWidth(next);
-    if (dockWindowType !== "full" || desktopDockActive) {
-      updateDockSizes(next, null, true);
+    if (leftWidth <= 70) {
+      const next = getRememberedLeftWidth();
+      setLeftWidth(next);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(next, null, true);
+      }
+    } else {
+      setRememberedLeftWidth(leftWidth);
+      setLeftWidth(68);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(68, null, true);
+      }
     }
   };
 
-  // Sidebar toggle expand / collapse:
-  // If collapsed (< 120px), expand to max configured width (default 360).
-  // If expanded, collapse to 68px.
-  const handleLeftToggleCollapse = () => {
-    const maxLeft = getMaxLeftWidth();
-    const next = leftWidth < 120 ? maxLeft : 68;
-    setLeftWidth(next);
-    if (dockWindowType !== "full" || desktopDockActive) {
-      updateDockSizes(next, null, true);
+  // Sidebar toggle expand / collapse both panes simultaneously:
+  // If either pane is collapsed (< 120px), expand both to their previous (remembered) widths.
+  // If both are expanded, collapse both to 68px.
+  const handleToggleBothPanes = () => {
+    if (leftWidth < 120 || rightWidth < 120) {
+      const prevLeft = getRememberedLeftWidth();
+      const prevRight = getRememberedRightWidth();
+      setLeftWidth(prevLeft);
+      setRightWidth(prevRight);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(prevLeft, prevRight, true);
+      }
+    } else {
+      setRememberedLeftWidth(leftWidth);
+      setRememberedRightWidth(rightWidth);
+      setLeftWidth(68);
+      setRightWidth(68);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(68, 68, true);
+      }
     }
   };
+
+  const handleLeftToggleCollapse = handleToggleBothPanes;
 
   const handleRightToggleCollapse = () => {
-    const maxRight = getMaxRightWidth();
-    const next = rightWidth < 120 ? maxRight : 68;
-    setRightWidth(next);
-    if (dockWindowType !== "full" || desktopDockActive) {
-      updateDockSizes(null, next, true);
+    if (rightWidth < 120) {
+      const next = getRememberedRightWidth();
+      setRightWidth(next);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(null, next, true);
+      }
+    } else {
+      setRememberedRightWidth(rightWidth);
+      setRightWidth(68);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(null, 68, true);
+      }
     }
   };
 
-  // Maximize both left and right panes simultaneously
+  // Maximize both left and right panes to their previous (remembered) widths
   const handleMaximizePanes = () => {
-    const maxLeft = getMaxLeftWidth();
-    const maxRight = getMaxRightWidth();
-    setLeftWidth(maxLeft);
-    setRightWidth(maxRight);
+    const prevLeft = getRememberedLeftWidth();
+    const prevRight = getRememberedRightWidth();
+    setLeftWidth(prevLeft);
+    setRightWidth(prevRight);
     broadcastLayoutAction({ type: "MAXIMIZE_PANES" });
     if (dockWindowType !== "full" || desktopDockActive) {
-      updateDockSizes(maxLeft, maxRight, true);
+      updateDockSizes(prevLeft, prevRight, true);
     }
   };
 
@@ -182,16 +223,37 @@ export default function App() {
 
   const handleRightDragEnd = (finalWidth: number) => {
     setRightWidth(finalWidth);
+    if (finalWidth >= 120) {
+      setRememberedRightWidth(finalWidth);
+    }
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(null, finalWidth, true);
     }
   };
 
   const handleRightDoubleClick = () => {
-    const next = rightWidth <= 70 ? 280 : 68;
-    setRightWidth(next);
+    if (rightWidth <= 70) {
+      const next = getRememberedRightWidth();
+      setRightWidth(next);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(null, next, true);
+      }
+    } else {
+      setRememberedRightWidth(rightWidth);
+      setRightWidth(68);
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(null, 68, true);
+      }
+    }
+  };
+
+  const handleResetWidths = () => {
+    setRememberedLeftWidth(DEFAULT_LEFT_WIDTH);
+    setRememberedRightWidth(DEFAULT_RIGHT_WIDTH);
+    setLeftWidth(DEFAULT_LEFT_WIDTH);
+    setRightWidth(DEFAULT_RIGHT_WIDTH);
     if (dockWindowType !== "full" || desktopDockActive) {
-      updateDockSizes(null, next, true);
+      updateDockSizes(DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH, true);
     }
   };
 
@@ -251,12 +313,7 @@ export default function App() {
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
-          onApplyMaxDimensions={(maxL) => {
-            if (leftWidth > maxL) {
-              setLeftWidth(maxL);
-              updateDockSizes(maxL, null, true);
-            }
-          }}
+          onResetWidths={handleResetWidths}
         />
       </div>
     );
@@ -291,18 +348,14 @@ export default function App() {
             onExpand={handleRightToggleCollapse}
             onCollapse={handleRightToggleCollapse}
             onMaximizePanes={handleMaximizePanes}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
         </div>
 
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
-          onApplyMaxDimensions={(_, maxR) => {
-            if (rightWidth > maxR) {
-              setRightWidth(maxR);
-              updateDockSizes(null, maxR, true);
-            }
-          }}
+          onResetWidths={handleResetWidths}
         />
       </div>
     );
@@ -380,6 +433,7 @@ export default function App() {
           onExpand={handleRightToggleCollapse}
           onCollapse={handleRightToggleCollapse}
           onMaximizePanes={handleMaximizePanes}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       </div>
 
@@ -387,17 +441,7 @@ export default function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        onApplyMaxDimensions={(maxL, maxR) => {
-          if (leftWidth > maxL) setLeftWidth(maxL);
-          if (rightWidth > maxR) setRightWidth(maxR);
-          if (dockWindowType !== "full" || desktopDockActive) {
-            updateDockSizes(
-              leftWidth > maxL ? maxL : leftWidth,
-              rightWidth > maxR ? maxR : rightWidth,
-              true
-            );
-          }
-        }}
+        onResetWidths={handleResetWidths}
       />
 
       {/* Outer Sci-Fi Crosshairs overlay (matching picture crosshairs) */}

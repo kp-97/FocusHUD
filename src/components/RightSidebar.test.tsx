@@ -25,38 +25,32 @@ describe("RightSidebar component", () => {
 
   it("renders standard view when expanded (width >= 120)", () => {
     render(<RightSidebar width={280} activeNav="home" />);
-    expect(screen.getByText(/VIEW: HOME/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Close FocusHUD/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/POMODORO TIMER/i).length).toBeGreaterThan(0);
   });
 
   it("renders window controls in expanded header and triggers actions", () => {
-    const handleCollapse = vi.fn();
     const handleMaximize = vi.fn();
 
     render(
       <RightSidebar
         width={280}
         activeNav="home"
-        onCollapse={handleCollapse}
         onMaximizePanes={handleMaximize}
       />
     );
 
-    // 1. Right toggle button calls onCollapse
-    const toggleBtn = screen.getByTestId("sidebar-toggle-right");
-    fireEvent.click(toggleBtn);
-    expect(handleCollapse).toHaveBeenCalledTimes(1);
-
-    // 2. Minimize to tray button
+    // 1. Minimize to tray button
     const minBtn = screen.getByLabelText(/Minimize FocusHUD to Tray/i);
     fireEvent.click(minBtn);
     expect(tauriBridge.minimizeToTray).toHaveBeenCalledTimes(1);
 
-    // 3. Maximize panes button
+    // 2. Maximize panes button
     const maxBtn = screen.getByLabelText(/Maximize Left & Right Panes/i);
     fireEvent.click(maxBtn);
     expect(handleMaximize).toHaveBeenCalledTimes(1);
 
-    // 4. Exit button
+    // 3. Exit button
     const exitBtn = screen.getByLabelText(/Close FocusHUD/i);
     fireEvent.click(exitBtn);
     expect(tauriBridge.exitApp).toHaveBeenCalledTimes(1);
@@ -70,38 +64,29 @@ describe("RightSidebar component", () => {
     expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
   });
 
-  it("renders compact window controls in compact mini HUD rail", () => {
-    const handleExpand = vi.fn();
-    const handleMaximize = vi.fn();
+  it("renders compact controls in compact mini HUD rail", () => {
+    const handleSettings = vi.fn();
 
     render(
       <RightSidebar
         width={68}
         activeNav="home"
-        onExpand={handleExpand}
-        onMaximizePanes={handleMaximize}
+        onOpenSettings={handleSettings}
       />
     );
 
-    // Toggle button in compact rail triggers onExpand
-    const toggleBtn = screen.getByTestId("sidebar-toggle-right");
-    fireEvent.click(toggleBtn);
-    expect(handleExpand).toHaveBeenCalledTimes(1);
+    // Hamburger menu button in compact rail
+    const menuBtn = screen.getByLabelText(/System Menu/i);
+    expect(menuBtn).toBeInTheDocument();
+    act(() => {
+      fireEvent.click(menuBtn);
+    });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.getByText("SYSTEM MENU")).toBeInTheDocument();
 
-    // Minimize in compact rail
-    const minBtn = screen.getByLabelText(/Minimize to Tray/i);
-    fireEvent.click(minBtn);
-    expect(tauriBridge.minimizeToTray).toHaveBeenCalledTimes(1);
-
-    // Maximize in compact rail
-    const maxBtn = screen.getByLabelText(/Maximize Panes/i);
-    fireEvent.click(maxBtn);
-    expect(handleMaximize).toHaveBeenCalledTimes(1);
-
-    // Exit in compact rail
-    const exitBtn = screen.getByLabelText(/Close FocusHUD/i);
-    fireEvent.click(exitBtn);
-    expect(tauriBridge.exitApp).toHaveBeenCalledTimes(1);
+    // Minimize and Exit buttons should NOT exist in compact rail
+    expect(screen.queryByLabelText(/Minimize to Tray/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Close FocusHUD/i)).not.toBeInTheDocument();
   });
 
   it("toggles timer directly from compact rail", () => {
@@ -119,14 +104,8 @@ describe("RightSidebar component", () => {
     expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
   });
 
-  it("triggers onExpand when clicking the expand button in compact rail", () => {
-    const handleExpand = vi.fn();
-    render(<RightSidebar width={68} activeNav="home" onExpand={handleExpand} />);
-
-    const expandBtn = screen.getByTitle(/Expand Right Panel/i);
-    act(() => {
-      fireEvent.click(expandBtn);
-    });
-    expect(handleExpand).toHaveBeenCalledTimes(1);
+  it("does not render the expand right panel button in compact rail", () => {
+    render(<RightSidebar width={68} activeNav="home" />);
+    expect(screen.queryByTitle(/Expand Right Panel/i)).not.toBeInTheDocument();
   });
 });

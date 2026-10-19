@@ -2,32 +2,28 @@ import React, { useState, useEffect } from "react";
 import { X, Settings, Sliders, Check, RotateCcw } from "lucide-react";
 import { HudBrackets } from "./HudBrackets";
 import {
-  getMaxLeftWidth,
-  getMaxRightWidth,
-  setMaxLeftWidth,
-  setMaxRightWidth,
+  DEFAULT_LEFT_WIDTH,
+  DEFAULT_RIGHT_WIDTH,
+  setRememberedLeftWidth,
+  setRememberedRightWidth,
 } from "../utils/store";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApplyMaxDimensions?: (maxLeft: number, maxRight: number) => void;
+  onResetWidths?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
-  onApplyMaxDimensions,
+  onResetWidths,
 }) => {
-  const [leftMax, setLeftMax] = useState<number>(getMaxLeftWidth());
-  const [rightMax, setRightMax] = useState<number>(getMaxRightWidth());
-  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [resetSuccess, setResetSuccess] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
-      setLeftMax(getMaxLeftWidth());
-      setRightMax(getMaxRightWidth());
-      setSavedSuccess(false);
+      setResetSuccess(false);
     }
   }, [isOpen]);
 
@@ -43,34 +39,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleApply = () => {
-    const validLeft = Math.max(220, Math.min(500, Math.round(leftMax)));
-    const validRight = Math.max(220, Math.min(500, Math.round(rightMax)));
-
-    setMaxLeftWidth(validLeft);
-    setMaxRightWidth(validRight);
-
-    setLeftMax(validLeft);
-    setRightMax(validRight);
-
-    if (onApplyMaxDimensions) {
-      onApplyMaxDimensions(validLeft, validRight);
-    }
-
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
-  };
-
   const handleResetDefaults = () => {
-    setLeftMax(360);
-    setRightMax(360);
-    setMaxLeftWidth(360);
-    setMaxRightWidth(360);
-    if (onApplyMaxDimensions) {
-      onApplyMaxDimensions(360, 360);
+    setRememberedLeftWidth(DEFAULT_LEFT_WIDTH);
+    setRememberedRightWidth(DEFAULT_RIGHT_WIDTH);
+
+    if (onResetWidths) {
+      onResetWidths();
     }
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
+
+    setResetSuccess(true);
+    setTimeout(() => setResetSuccess(false), 2000);
   };
 
   return (
@@ -107,73 +85,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Body Content */}
           <div className="space-y-4 text-xs font-tech">
-            {/* Maximum Pane Width Configuration */}
+            {/* Automatic Pane Sizing & Memory */}
             <div className="bg-cyan-950/40 border border-cyan-500/20 rounded p-3 space-y-3">
               <div className="flex items-center justify-between text-cyan-300 font-bold uppercase tracking-wider">
                 <span className="flex items-center gap-1.5">
                   <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                  MAXIMUM PANE WIDTHS
+                  PANE SIZING & MEMORY
                 </span>
-                <span className="text-[10px] text-cyan-400/60">220px - 500px</span>
+                <span className="text-[10px] text-cyan-400/70 font-tech">AUTO-MEMORY ACTIVE</span>
               </div>
 
-              {/* Left Sidebar Max Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-cyan-300/80">
-                  <span>Left Sidebar Max Width:</span>
-                  <span className="font-bold text-cyan-100 font-tech">{leftMax}px</span>
+              <p className="text-[11.5px] leading-relaxed text-cyan-200/80">
+                FocusHUD automatically remembers your customized left and right pane widths when resizing.
+                Expanding either pane seamlessly restores it to the exact width you last adjusted it to.
+              </p>
+
+              {/* Reset to Defaults Option */}
+              <div className="flex items-center justify-between pt-2 border-t border-cyan-500/20">
+                <div className="text-[10px] text-cyan-400/60">
+                  Defaults: {DEFAULT_LEFT_WIDTH}px (Left) / {DEFAULT_RIGHT_WIDTH}px (Right)
                 </div>
-                <input
-                  type="range"
-                  min="220"
-                  max="500"
-                  step="10"
-                  value={leftMax}
-                  onChange={(e) => setLeftMax(Number(e.target.value))}
-                  className="w-full accent-cyan-400 cursor-pointer"
-                />
-              </div>
 
-              {/* Right Sidebar Max Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-cyan-300/80">
-                  <span>Right Sidebar Max Width:</span>
-                  <span className="font-bold text-cyan-100 font-tech">{rightMax}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="220"
-                  max="500"
-                  step="10"
-                  value={rightMax}
-                  onChange={(e) => setRightMax(Number(e.target.value))}
-                  className="w-full accent-cyan-400 cursor-pointer"
-                />
-              </div>
-
-              {/* Action Buttons for Max Width */}
-              <div className="flex items-center justify-between pt-1">
                 <button
                   type="button"
                   onClick={handleResetDefaults}
-                  className="hud-btn px-2.5 py-1 rounded text-[10.5px] font-tech text-cyan-400/70 hover:text-cyan-200 border-cyan-500/30 flex items-center gap-1.5 cursor-pointer"
+                  className="hud-btn px-2.5 py-1 rounded text-[10.5px] font-tech text-cyan-300 hover:text-cyan-100 border-cyan-500/40 flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RotateCcw className="w-3 h-3" />
-                  Default (360px)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleApply}
-                  className="hud-btn hud-btn-active px-3 py-1 rounded text-[11px] font-tech font-bold text-cyan-100 border-cyan-400 flex items-center gap-1.5 cursor-pointer shadow-[0_0_10px_rgba(0,229,255,0.3)]"
-                >
-                  {savedSuccess ? (
+                  {resetSuccess ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-cyan-300" />
-                      Applied!
+                      Reset to Defaults!
                     </>
                   ) : (
-                    "Apply Widths"
+                    <>
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Widths
+                    </>
                   )}
                 </button>
               </div>

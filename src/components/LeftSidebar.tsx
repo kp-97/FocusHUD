@@ -115,51 +115,29 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10"
+      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
     >
       <HudBrackets
-        className="h-full flex flex-col justify-between p-2 overflow-hidden"
+        className="h-full flex flex-col justify-between p-2 overflow-visible"
       >
         {/* Top Header: FocusHUD & Controls (Pinned) */}
         <div className="shrink-0 flex flex-col w-full relative">
-          {/* Header Divider & Shared Left Rail */}
+          {/* Header Row: Dual Expand/Collapse Button + Title & Controls */}
           <div className="border-b border-cyan-500/30 pb-1 mb-1">
-            <div className="flex items-start">
-              {/* SHARED LEFT RAIL: Stays completely static in both modes */}
-              <div className="w-8 shrink-0 flex flex-col items-center">
-                {/* Row 1: Diamond */}
-                <div className="h-7 w-8 flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-                </div>
-
-                {/* Row 2: Fixed Left Toggle Button directly below Diamond */}
-                <div className="h-7 w-8 flex items-center justify-center">
-                  {onToggleCollapse && (
-                    <SidebarToggleIcon
-                      side="left"
-                      isCollapsed={isIconOnly}
-                      onToggle={onToggleCollapse}
-                      theme="cyan"
-                    />
-                  )}
-                </div>
-
-                {/* Row 3: Compact Menu button (only in collapsed rail) */}
-                {isIconOnly && (
-                  <div className="h-7 w-8 flex items-center justify-center">
-                    <button
-                      onClick={() => setIsMenuOpen((prev) => !prev)}
-                      title="System Menu"
-                      aria-label="System Menu"
-                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-                    >
-                      <Menu className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+            <div className="flex items-center">
+              {/* Left Column: Fixed Left-Right Pane Expand/Collapse Button (Replaced Diamond) */}
+              <div className="w-8 shrink-0 flex items-center justify-center h-7">
+                {onToggleCollapse && (
+                  <SidebarToggleIcon
+                    side="both"
+                    isCollapsed={isIconOnly}
+                    onToggle={onToggleCollapse}
+                    theme="cyan"
+                  />
                 )}
               </div>
 
-              {/* EXPANDED SECTION: Title + Settings + Menu (only in expanded mode) */}
+              {/* Expanded Section: FocusHUD Title + Settings + Menu */}
               {!isIconOnly && (
                 <div className="flex-1 min-w-0 flex items-center justify-between h-7 pl-2">
                   <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan truncate">
@@ -167,15 +145,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   </h1>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={onOpenSettings}
-                      title="Settings"
-                      aria-label="Settings"
-                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                    </button>
-
                     <button
                       onClick={() => setIsMenuOpen((prev) => !prev)}
                       title="System Menu"
@@ -191,15 +160,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </div>
           </div>
 
-          {/* Floating Hamburger Dropdown Menu */}
+          {/* Floating Hamburger Dropdown Menu (Spills to the right into the center pane) */}
           {isMenuOpen && (
             <div
               ref={menuRef}
-              className={`absolute ${isIconOnly ? "top-20 left-12" : "top-8 right-0"
-                } w-52 bg-[#040d1a]/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150`}
+              className="absolute top-1 left-[calc(100%+24px)] w-52 bg-[#040d1a]/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150"
               role="menu"
               aria-label="System Menu"
             >
+              {/* Pointing notch back to sidebar */}
+              <div className="absolute -left-1.5 top-3 w-2.5 h-2.5 bg-[#040d1a] rotate-45 border-l border-b border-cyan-500/50" />
               <div className="px-2.5 py-1 text-[9px] font-tech text-cyan-400/60 uppercase tracking-widest border-b border-cyan-500/20">
                 SYSTEM MENU
               </div>
@@ -310,20 +280,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </nav>
         </div>
 
-        {/* Bottom Diagnostics / Telemetry Info (Pinned) */}
-        {!isIconOnly && (
-          <div className="shrink-0 w-full border-t border-cyan-500/30 pt-2 text-[11px] font-tech text-cyan-400/80">
+        {/* Bottom Section: System Stats (when expanded) & Settings Button (always at bottom left) */}
+        <div className="shrink-0 w-full flex flex-col border-t border-cyan-500/30 pt-2">
+          {!isIconOnly && (
+            <div className="w-full text-[11px] font-tech text-cyan-400/80 mb-2">
             {/* Header with collapse toggle */}
             <div
               onClick={toggleDiagnosticsCollapsed}
               className={`flex items-center justify-between text-[10.5px] text-cyan-300 font-hud tracking-wider uppercase cursor-pointer select-none group ${diagnosticsCollapsed ? "pb-0.5" : "border-b border-cyan-500/30 pb-1.5 mb-2.5"
                 }`}
-              title={diagnosticsCollapsed ? "Expand Diagnostics" : "Collapse Diagnostics"}
+              title={diagnosticsCollapsed ? "Expand System Stats" : "Collapse System Stats"}
             >
               <div className="flex items-center gap-1.5 overflow-hidden">
                 <div className="w-1.5 h-1.5 bg-cyan-400 rotate-45 shadow-[0_0_5px_#00e5ff]" />
                 <span className="font-bold tracking-widest text-cyan-200 group-hover:text-cyan-100 transition-colors">
-                  DIAGNOSTICS
+                  SYSTEM STATS
                 </span>
                 {diagnosticsCollapsed && diag && (
                   <span className="text-[9px] font-tech text-cyan-400/70 normal-case ml-1 truncate">
@@ -455,6 +426,26 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             )}
           </div>
         )}
+
+        {/* Pinned Bottom Left Settings Button (both contracted and expanded views) */}
+        <div className={`w-full flex items-center ${isIconOnly ? "justify-center pt-0" : "justify-start border-t border-cyan-500/20 pt-1.5"}`}>
+          <button
+            onClick={onOpenSettings}
+            title="Settings"
+            aria-label="Settings"
+            className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-500/20 ${
+              isIconOnly
+                ? "w-full aspect-square justify-center p-0 max-w-[44px]"
+                : "w-full justify-start px-2.5 py-1.5"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-cyan-400 shrink-0" />
+              {!isIconOnly && <span className="font-semibold text-xs tracking-wider">SETTINGS</span>}
+            </div>
+          </button>
+        </div>
+      </div>
       </HudBrackets>
     </aside >
   );

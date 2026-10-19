@@ -5,7 +5,6 @@ import { exitApp, minimizeToTray } from "../utils/tauriBridge";
 import { NavViewId } from "../types/hud";
 import { getInitialNav, subscribeNavChange } from "../utils/store";
 import { RightSidebarCompactRail } from "./RightSidebarCompactRail";
-import { SidebarToggleIcon } from "./SidebarToggleIcon";
 
 // View components
 import { HomeView } from "./views/HomeView";
@@ -25,14 +24,14 @@ interface RightSidebarProps {
   onExpand?: () => void;
   onCollapse?: () => void;
   onMaximizePanes?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
   width,
   activeNav: propActiveNav,
-  onExpand,
-  onCollapse,
   onMaximizePanes,
+  onOpenSettings,
 }) => {
   // Real-time synchronization across windows & props
   const [currentNav, setCurrentNav] = useState<NavViewId>(() => {
@@ -81,31 +80,23 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-l border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10"
+      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-l border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
     >
       <HudBrackets
         variant="amber"
         showTicks={false}
-        className="h-full w-full flex flex-col justify-between p-1 overflow-hidden select-none"
+        className="h-full w-full flex flex-col justify-between p-1 overflow-visible select-none"
       >
         {isIconOnly ? (
           <RightSidebarCompactRail
-            onExpand={onExpand}
-            onMaximizePanes={onMaximizePanes}
+            onOpenSettings={onOpenSettings}
           />
         ) : (
           <>
-            {/* Pinned Top Bar with View Title, Window Controls, and Toggle Button */}
+            {/* Pinned Top Bar with Window Controls */}
             <div className="shrink-0 w-full flex flex-col border-b border-amber-500/20 pb-1 mb-1">
-              {/* Row 1: View Title + Window Controls (Exit at far right) */}
-              <div className="flex items-center justify-between h-7 px-1 text-[10px] font-tech text-cyan-400/80">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="w-1.5 h-1.5 bg-amber-400 rotate-45 shadow-[0_0_6px_#ffb300]" />
-                  <span className="font-bold tracking-widest text-amber-200 uppercase truncate">
-                    VIEW: {currentNav.replace("_", " ")}
-                  </span>
-                </div>
-
+              {/* Row 1: Window Controls (Exit at far right) */}
+              <div className="flex items-center justify-end h-7 px-1 text-[10px] font-tech text-cyan-400/80">
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => minimizeToTray()}
@@ -131,20 +122,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              </div>
-
-              {/* Row 2: Right Sidebar Toggle Button centered in the 68px rail slot */}
-              <div className="flex items-center justify-end h-7">
-                <div className="w-[44px] flex items-center justify-center h-7 px-1">
-                  {onCollapse && (
-                    <SidebarToggleIcon
-                      side="right"
-                      isCollapsed={false}
-                      onToggle={onCollapse}
-                      theme="amber"
-                    />
-                  )}
                 </div>
               </div>
             </div>

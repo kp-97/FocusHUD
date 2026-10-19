@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { LeftSidebar } from "./LeftSidebar";
 import * as tauriBridge from "../utils/tauriBridge";
 
@@ -30,8 +30,8 @@ describe("LeftSidebar component", () => {
 
     expect(screen.getByText("FocusHUD")).toBeInTheDocument();
 
-    // 1. Sidebar toggle button
-    const toggleBtn = screen.getByTestId("sidebar-toggle-left");
+    // 1. Dual pane sidebar toggle button
+    const toggleBtn = screen.getByTestId("sidebar-toggle-both");
     expect(toggleBtn).toBeInTheDocument();
     fireEvent.click(toggleBtn);
     expect(handleToggle).toHaveBeenCalledTimes(1);
@@ -78,8 +78,8 @@ describe("LeftSidebar component", () => {
     expect(screen.getByText("EXTENSIONS")).toBeInTheDocument();
     expect(screen.getByText("LOG OUT")).toBeInTheDocument();
 
-    // Clicking Settings menuitem
-    const settingsItem = screen.getByText("SETTINGS");
+    // Clicking Settings menuitem inside menu
+    const settingsItem = within(menu).getByText("SETTINGS");
     act(() => {
       fireEvent.click(settingsItem);
     });
@@ -121,24 +121,32 @@ describe("LeftSidebar component", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("renders compact mode with toggle button when width < 120", () => {
+  it("renders compact mode with dual toggle button and bottom settings button when width < 120", () => {
     const handleToggle = vi.fn();
+    const handleSettings = vi.fn();
     render(
       <LeftSidebar
         width={68}
         activeNav="home"
         onSelectNav={vi.fn()}
         onToggleCollapse={handleToggle}
+        onOpenSettings={handleSettings}
       />
     );
 
     // Text label hidden
     expect(screen.queryByText("FocusHUD")).not.toBeInTheDocument();
 
-    // Toggle button exists and triggers onToggleCollapse
-    const toggleBtn = screen.getByTestId("sidebar-toggle-left");
+    // Dual toggle button exists and triggers onToggleCollapse
+    const toggleBtn = screen.getByTestId("sidebar-toggle-both");
     expect(toggleBtn).toBeInTheDocument();
     fireEvent.click(toggleBtn);
     expect(handleToggle).toHaveBeenCalledTimes(1);
+
+    // Settings button appears at the bottom of the left pane
+    const settingsBtn = screen.getByLabelText("Settings");
+    expect(settingsBtn).toBeInTheDocument();
+    fireEvent.click(settingsBtn);
+    expect(handleSettings).toHaveBeenCalledTimes(1);
   });
 });

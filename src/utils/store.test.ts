@@ -11,6 +11,12 @@ import {
   saveActionPlans,
   getInitialNav,
   broadcastNavChange,
+  getRememberedLeftWidth,
+  setRememberedLeftWidth,
+  getRememberedRightWidth,
+  setRememberedRightWidth,
+  DEFAULT_LEFT_WIDTH,
+  DEFAULT_RIGHT_WIDTH,
 } from "./store";
 import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode } from "../types/hud";
 
@@ -121,6 +127,32 @@ describe("store utility module", () => {
       broadcastNavChange("calendar");
       expect(localStorage.getItem("focushud_active_nav")).toBe("calendar");
       expect(getInitialNav()).toBe("calendar");
+    });
+  });
+
+  describe("pane width memory", () => {
+    it("returns default widths when no previous width is stored", () => {
+      expect(getRememberedLeftWidth()).toBe(DEFAULT_LEFT_WIDTH);
+      expect(getRememberedRightWidth()).toBe(DEFAULT_RIGHT_WIDTH);
+    });
+
+    it("saves and retrieves remembered left and right widths", () => {
+      setRememberedLeftWidth(420);
+      setRememberedRightWidth(340);
+      expect(getRememberedLeftWidth()).toBe(420);
+      expect(getRememberedRightWidth()).toBe(340);
+    });
+
+    it("ignores width values below collapsed threshold (<120)", () => {
+      setRememberedLeftWidth(450);
+      setRememberedLeftWidth(68);
+      // Still remembers 450
+      expect(getRememberedLeftWidth()).toBe(450);
+    });
+
+    it("falls back to hud_left_width if it was an expanded width", () => {
+      localStorage.setItem("hud_left_width", "380");
+      expect(getRememberedLeftWidth()).toBe(380);
     });
   });
 });

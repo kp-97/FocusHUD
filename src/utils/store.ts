@@ -235,24 +235,55 @@ export const saveEvents = (events: CalendarEvent[]) => {
   localStorage.setItem("focushud_events", JSON.stringify(events));
 };
 
-// Maximum width settings for left and right panes
-export const getMaxLeftWidth = (): number => {
-  const saved = localStorage.getItem("hud_left_max_width");
-  return saved ? Math.max(280, Number(saved)) : 360;
+// Remembered expanded widths for left and right panes (used when expanding from collapsed mode)
+export const DEFAULT_LEFT_WIDTH = 360;
+export const DEFAULT_RIGHT_WIDTH = 280;
+
+export const getRememberedLeftWidth = (): number => {
+  const saved = localStorage.getItem("hud_left_remembered_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  const current = localStorage.getItem("hud_left_width");
+  if (current) {
+    const val = Math.round(Number(current));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  return DEFAULT_LEFT_WIDTH;
 };
 
-export const setMaxLeftWidth = (width: number) => {
-  localStorage.setItem("hud_left_max_width", String(width));
+export const setRememberedLeftWidth = (width: number) => {
+  if (width >= 120) {
+    localStorage.setItem("hud_left_remembered_width", String(Math.round(width)));
+  }
 };
 
-export const getMaxRightWidth = (): number => {
-  const saved = localStorage.getItem("hud_right_max_width");
-  return saved ? Math.max(280, Number(saved)) : 360;
+export const getRememberedRightWidth = (): number => {
+  const saved = localStorage.getItem("hud_right_remembered_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  const current = localStorage.getItem("hud_right_width");
+  if (current) {
+    const val = Math.round(Number(current));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  return DEFAULT_RIGHT_WIDTH;
 };
 
-export const setMaxRightWidth = (width: number) => {
-  localStorage.setItem("hud_right_max_width", String(width));
+export const setRememberedRightWidth = (width: number) => {
+  if (width >= 120) {
+    localStorage.setItem("hud_right_remembered_width", String(Math.round(width)));
+  }
 };
+
+// Aliases for compatibility
+export const getMaxLeftWidth = getRememberedLeftWidth;
+export const setMaxLeftWidth = setRememberedLeftWidth;
+export const getMaxRightWidth = getRememberedRightWidth;
+export const setMaxRightWidth = setRememberedRightWidth;
 
 // Cross-window layout command synchronization
 const LAYOUT_CHANNEL_NAME = "focushud_layout_channel";

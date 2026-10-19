@@ -20,54 +20,30 @@ describe("SettingsModal component", () => {
     expect(
       screen.getByRole("heading", { name: /HUD PREFERENCES & SETTINGS/i })
     ).toBeInTheDocument();
-    expect(screen.getByText(/MAXIMUM PANE WIDTHS/i)).toBeInTheDocument();
+    expect(screen.getByText(/PANE SIZING & MEMORY/i)).toBeInTheDocument();
+    expect(screen.getByText(/AUTO-MEMORY ACTIVE/i)).toBeInTheDocument();
   });
 
-  it("adjusts max width sliders and applies dimensions", () => {
-    const handleApply = vi.fn();
-    render(
-      <SettingsModal
-        isOpen={true}
-        onClose={vi.fn()}
-        onApplyMaxDimensions={handleApply}
-      />
-    );
-
-    const sliders = screen.getAllByRole("slider");
-    expect(sliders).toHaveLength(2);
-
-    // Change left slider to 400
-    fireEvent.change(sliders[0], { target: { value: "400" } });
-    // Change right slider to 420
-    fireEvent.change(sliders[1], { target: { value: "420" } });
-
-    const applyBtn = screen.getByRole("button", { name: /Apply Widths/i });
-    fireEvent.click(applyBtn);
-
-    expect(handleApply).toHaveBeenCalledWith(400, 420);
-    expect(store.getMaxLeftWidth()).toBe(400);
-    expect(store.getMaxRightWidth()).toBe(420);
-  });
-
-  it("resets to defaults when clicking Default button", () => {
-    const handleApply = vi.fn();
-    store.setMaxLeftWidth(450);
-    store.setMaxRightWidth(450);
+  it("resets remembered widths to defaults when clicking Reset Widths button", () => {
+    const handleReset = vi.fn();
+    store.setRememberedLeftWidth(450);
+    store.setRememberedRightWidth(420);
 
     render(
       <SettingsModal
         isOpen={true}
         onClose={vi.fn()}
-        onApplyMaxDimensions={handleApply}
+        onResetWidths={handleReset}
       />
     );
 
-    const resetBtn = screen.getByRole("button", { name: /Default \(360px\)/i });
+    const resetBtn = screen.getByRole("button", { name: /Reset Widths/i });
     fireEvent.click(resetBtn);
 
-    expect(handleApply).toHaveBeenCalledWith(360, 360);
-    expect(store.getMaxLeftWidth()).toBe(360);
-    expect(store.getMaxRightWidth()).toBe(360);
+    expect(handleReset).toHaveBeenCalledTimes(1);
+    expect(store.getRememberedLeftWidth()).toBe(store.DEFAULT_LEFT_WIDTH);
+    expect(store.getRememberedRightWidth()).toBe(store.DEFAULT_RIGHT_WIDTH);
+    expect(screen.getByText(/Reset to Defaults!/i)).toBeInTheDocument();
   });
 
   it("closes modal on Done or close button click", () => {
@@ -81,5 +57,13 @@ describe("SettingsModal component", () => {
     const closeBtn = screen.getByTitle(/Close Settings \(Esc\)/i);
     fireEvent.click(closeBtn);
     expect(handleClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes modal when pressing Escape key", () => {
+    const handleClose = vi.fn();
+    render(<SettingsModal isOpen={true} onClose={handleClose} />);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(handleClose).toHaveBeenCalledTimes(1);
   });
 });

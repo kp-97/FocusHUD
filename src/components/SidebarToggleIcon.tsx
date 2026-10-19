@@ -1,7 +1,7 @@
 import React, { useState, useId } from "react";
 
 export interface SidebarToggleIconProps {
-  side: "left" | "right";
+  side: "left" | "right" | "both";
   isCollapsed: boolean;
   onToggle: () => void;
   className?: string;
@@ -24,10 +24,18 @@ export const SidebarToggleIcon: React.FC<SidebarToggleIconProps> = ({
 
   const title = isCollapsed
     ? isHovered
-      ? `Click to expand ${side} panel to maximum width`
+      ? side === "both"
+        ? "Click to expand left and right panels"
+        : `Click to expand ${side} panel to previous width`
+      : side === "both"
+      ? "Panels collapsed (hover to preview expand)"
       : `${side === "left" ? "Left" : "Right"} panel collapsed (hover to preview expand)`
     : isHovered
-    ? `Click to collapse ${side} panel to 68px`
+    ? side === "both"
+      ? "Click to collapse left and right panels to 68px"
+      : `Click to collapse ${side} panel to 68px`
+    : side === "both"
+    ? "Panels expanded (hover to preview collapse)"
     : `${side === "left" ? "Left" : "Right"} panel expanded (hover to preview collapse)`;
 
   const themeClasses =
@@ -71,20 +79,21 @@ export const SidebarToggleIcon: React.FC<SidebarToggleIconProps> = ({
 
         {/* Filled sidebar bar inside clipped rounded rectangle */}
         <g clipPath={`url(#${clipId})`}>
-          {side === "left" ? (
+          {(side === "left" || side === "both") && (
             <rect
               x="1"
               y="1"
-              width={visuallyExpanded ? 7 : 4}
+              width={side === "both" ? (visuallyExpanded ? 4.5 : 2.5) : (visuallyExpanded ? 7 : 4)}
               height="12"
               fill="currentColor"
               className="transition-all duration-150"
             />
-          ) : (
+          )}
+          {(side === "right" || side === "both") && (
             <rect
-              x={visuallyExpanded ? 10 : 13}
+              x={side === "both" ? (visuallyExpanded ? 12.5 : 14.5) : (visuallyExpanded ? 10 : 13)}
               y="1"
-              width={visuallyExpanded ? 7 : 4}
+              width={side === "both" ? (visuallyExpanded ? 4.5 : 2.5) : (visuallyExpanded ? 7 : 4)}
               height="12"
               fill="currentColor"
               className="transition-all duration-150"
