@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut } from "lucide-react";
+import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
 import { usePomodoro } from "../utils/pomodoroStore";
 import { exitApp } from "../utils/tauriBridge";
 
@@ -43,6 +43,7 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
     isRunning,
     dailyStats,
     toggleRun,
+    stop,
     reset,
   } = usePomodoro();
 
@@ -221,13 +222,22 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
           {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
         </button>
 
-        <button
-          onClick={reset}
-          title="Reset Timer"
-          className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/30 text-amber-400/70 hover:text-amber-200 hover:border-amber-400"
-        >
-          <RotateCcw className="w-3 h-3" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={stop}
+            title="Stop Timer (Next Phase)"
+            className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-red-500/30 text-red-400/70 hover:text-red-200 hover:border-red-400"
+          >
+            <Square className="w-2.5 h-2.5 fill-red-400" />
+          </button>
+          <button
+            onClick={reset}
+            title="Reset Timer"
+            className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/30 text-amber-400/70 hover:text-amber-200 hover:border-amber-400"
+          >
+            <RotateCcw className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {/* 4. Session Cycles / Pips */}
