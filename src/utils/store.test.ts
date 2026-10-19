@@ -17,6 +17,9 @@ import {
   setRememberedRightWidth,
   DEFAULT_LEFT_WIDTH,
   DEFAULT_RIGHT_WIDTH,
+  broadcastLayoutAction,
+  subscribeLayoutAction,
+  LayoutAction,
 } from "./store";
 import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode } from "../types/hud";
 
@@ -153,6 +156,51 @@ describe("store utility module", () => {
     it("falls back to hud_left_width if it was an expanded width", () => {
       localStorage.setItem("hud_left_width", "380");
       expect(getRememberedLeftWidth()).toBe(380);
+    });
+  });
+
+  describe("layout action synchronization", () => {
+    it("persists broadcast layout action to localStorage", () => {
+      broadcastLayoutAction({
+        type: "SET_PANES_WIDTH",
+        leftWidth: 68,
+        rightWidth: 68,
+      });
+
+      const raw = localStorage.getItem("focushud_last_layout_action");
+      expect(raw).toBeTruthy();
+      const parsed = JSON.parse(raw!);
+      expect(parsed.action).toEqual({
+        type: "SET_PANES_WIDTH",
+        leftWidth: 68,
+        rightWidth: 68,
+      });
+    });
+
+    it("triggers subscribeLayoutAction callback on storage event", () => {
+      const received: LayoutAction[] = [];
+      const unsubscribe = subscribeLayoutAction((action) => {
+        received.push(action);
+      });
+
+      const actionData = {
+        action: { type: "SET_PANES_WIDTH", leftWidth: 68, rightWidth: 68 } as LayoutAction,
+        timestamp: Date.now(),
+      };
+
+      // Simulate a storage event from another window
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "focushud_last_layout_action",
+          newValue: JSON.stringify(actionData),
+        })
+      );
+
+      expect(received).toEqual([
+        { type: "SET_PANES_WIDTH", leftWidth: 68, rightWidth: 68 },
+      ]);
+
+      unsubscribe();
     });
   });
 });
