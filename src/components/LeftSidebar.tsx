@@ -118,104 +118,85 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10"
     >
       <HudBrackets
-        className={`h-full flex flex-col justify-between ${
-          isIconOnly ? "p-1.5 items-center" : "p-2"
-        } overflow-hidden`}
+        className="h-full flex flex-col justify-between p-2 overflow-hidden"
       >
         {/* Top Header: FocusHUD & Controls (Pinned) */}
         <div className="shrink-0 flex flex-col w-full relative">
-          {!isIconOnly ? (
-            /* Expanded Header (width >= 120px) */
-            <div className="border-b border-cyan-500/30 pb-2 mb-1">
-              {/* Row 1: Diamond + Brand Title + Settings & Menu */}
-              <div className="flex items-center justify-between h-7">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 flex items-center justify-center">
-                    <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-                  </div>
-                  <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan truncate">
-                    FocusHUD
-                  </h1>
+          {/* Header Divider & Shared Left Rail */}
+          <div className="border-b border-cyan-500/30 pb-1 mb-1">
+            <div className="flex items-start">
+              {/* SHARED LEFT RAIL: Stays completely static in both modes */}
+              <div className="w-8 shrink-0 flex flex-col items-center">
+                {/* Row 1: Diamond */}
+                <div className="h-7 w-8 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={onOpenSettings}
-                    title="Settings"
-                    aria-label="Settings"
-                    className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    onClick={() => setIsMenuOpen((prev) => !prev)}
-                    title="System Menu"
-                    aria-label="System Menu"
-                    aria-expanded={isMenuOpen}
-                    className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-                  >
-                    <Menu className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Row 2: Fixed Left Toggle Button directly below Diamond + Waveform */}
-              <div className="flex items-center gap-2 mt-1">
-                <div className="w-8 flex items-center justify-center shrink-0">
+                {/* Row 2: Fixed Left Toggle Button directly below Diamond */}
+                <div className="h-7 w-8 flex items-center justify-center">
                   {onToggleCollapse && (
                     <SidebarToggleIcon
                       side="left"
-                      isCollapsed={false}
+                      isCollapsed={isIconOnly}
                       onToggle={onToggleCollapse}
                       theme="cyan"
                     />
                   )}
                 </div>
-                <div className="flex-1 min-w-0 pr-1">
-                  <WaveformVisualizer isCompact={compactMode} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Collapsed Header (width < 120px / 68px rail) */
-            <div className="w-full flex flex-col items-center border-b border-cyan-500/30 pb-2 mb-1">
-              {/* Row 1: Diamond */}
-              <div className="h-7 w-8 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-              </div>
 
-              {/* Row 2: Fixed Left Toggle Button directly below Diamond */}
-              <div className="w-8 flex items-center justify-center my-0.5">
-                {onToggleCollapse && (
-                  <SidebarToggleIcon
-                    side="left"
-                    isCollapsed={true}
-                    onToggle={onToggleCollapse}
-                    theme="cyan"
-                  />
+                {/* Row 3: Compact Menu button (only in collapsed rail) */}
+                {isIconOnly && (
+                  <div className="h-7 w-8 flex items-center justify-center">
+                    <button
+                      onClick={() => setIsMenuOpen((prev) => !prev)}
+                      title="System Menu"
+                      aria-label="System Menu"
+                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                    >
+                      <Menu className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {/* Row 3: Compact Menu button */}
-              <button
-                onClick={() => setIsMenuOpen((prev) => !prev)}
-                title="System Menu"
-                aria-label="System Menu"
-                className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer mt-0.5"
-              >
-                <Menu className="w-3.5 h-3.5" />
-              </button>
+              {/* EXPANDED SECTION: Title + Settings + Menu (only in expanded mode) */}
+              {!isIconOnly && (
+                <div className="flex-1 min-w-0 flex items-center justify-between h-7 pl-2">
+                  <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan truncate">
+                    FocusHUD
+                  </h1>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={onOpenSettings}
+                      title="Settings"
+                      aria-label="Settings"
+                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => setIsMenuOpen((prev) => !prev)}
+                      title="System Menu"
+                      aria-label="System Menu"
+                      aria-expanded={isMenuOpen}
+                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                    >
+                      <Menu className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Floating Hamburger Dropdown Menu */}
           {isMenuOpen && (
             <div
               ref={menuRef}
-              className={`absolute top-9 ${
-                isIconOnly ? "left-12" : "right-0"
-              } w-52 bg-[#040d1a]/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150`}
+              className={`absolute ${isIconOnly ? "top-20 left-12" : "top-8 right-0"
+                } w-52 bg-[#040d1a]/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150`}
               role="menu"
               aria-label="System Menu"
             >
@@ -288,6 +269,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               </button>
             </div>
           )}
+
+          {/* Diagnostic Waveform Banner */}
+          {!isIconOnly && (
+            <div className="my-1">
+              <WaveformVisualizer isCompact={compactMode} />
+            </div>
+          )}
         </div>
 
         {/* Scrollable Navigation Views: Starts at HOME and ends above DIAGNOSTICS */}
@@ -304,13 +292,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       onSelectNav(item.id);
                       broadcastNavChange(item.id as NavViewId);
                     }}
-                    className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
-                      isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
-                    } ${
-                      isIconOnly
+                    className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
+                      } ${isIconOnly
                         ? "w-full aspect-square justify-center p-0 max-w-[44px]"
                         : "justify-start px-3 py-2.5"
-                    }`}
+                      }`}
                     title={item.label}
                   >
                     <div className="flex items-center gap-2.5">
@@ -330,9 +316,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             {/* Header with collapse toggle */}
             <div
               onClick={toggleDiagnosticsCollapsed}
-              className={`flex items-center justify-between text-[10.5px] text-cyan-300 font-hud tracking-wider uppercase cursor-pointer select-none group ${
-                diagnosticsCollapsed ? "pb-0.5" : "border-b border-cyan-500/30 pb-1.5 mb-2.5"
-              }`}
+              className={`flex items-center justify-between text-[10.5px] text-cyan-300 font-hud tracking-wider uppercase cursor-pointer select-none group ${diagnosticsCollapsed ? "pb-0.5" : "border-b border-cyan-500/30 pb-1.5 mb-2.5"
+                }`}
               title={diagnosticsCollapsed ? "Expand Diagnostics" : "Collapse Diagnostics"}
             >
               <div className="flex items-center gap-1.5 overflow-hidden">
@@ -411,8 +396,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                           {diag.vram_used_bytes && diag.vram_total_bytes
                             ? `${(diag.vram_used_bytes / 1073741824).toFixed(1)} / ${(diag.vram_total_bytes / 1073741824).toFixed(1)} GB`
                             : diag.vram_usage !== null && diag.vram_usage !== undefined
-                            ? `${diag.vram_usage.toFixed(0)}%`
-                            : "0%"}
+                              ? `${diag.vram_usage.toFixed(0)}%`
+                              : "0%"}
                         </span>
                       </div>
                       <div className="w-full h-1 bg-cyan-950/80 rounded-full border border-cyan-500/20 overflow-hidden p-[0.5px]">
@@ -424,9 +409,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                               Math.max(
                                 0,
                                 diag.vram_usage ??
-                                  (diag.vram_used_bytes && diag.vram_total_bytes && diag.vram_total_bytes > 0
-                                    ? (diag.vram_used_bytes / diag.vram_total_bytes) * 100
-                                    : 0)
+                                (diag.vram_used_bytes && diag.vram_total_bytes && diag.vram_total_bytes > 0
+                                  ? (diag.vram_used_bytes / diag.vram_total_bytes) * 100
+                                  : 0)
                               )
                             )}%`,
                           }}
@@ -462,8 +447,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     {diag?.gpu_name
                       ? diag.gpu_name.replace("NVIDIA GeForce ", "")
                       : diag?.cpu_name
-                      ? diag.cpu_name.replace(/(Processor|\(R\)|\(TM\))/gi, "").trim()
-                      : "HARDWARE ACTIVE"}
+                        ? diag.cpu_name.replace(/(Processor|\(R\)|\(TM\))/gi, "").trim()
+                        : "HARDWARE ACTIVE"}
                   </span>
                 </div>
               </div>
@@ -471,6 +456,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </div>
         )}
       </HudBrackets>
-    </aside>
+    </aside >
   );
 };

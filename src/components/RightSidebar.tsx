@@ -1,3 +1,4 @@
+import { HudBrackets } from "./HudBrackets";
 import React, { useState, useEffect } from "react";
 import { X, Minus, Square } from "lucide-react";
 import { exitApp, minimizeToTray } from "../utils/tauriBridge";
@@ -82,75 +83,79 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       style={{ width: `${width}px` }}
       className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-l border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10"
     >
-      {isIconOnly ? (
-        <RightSidebarCompactRail
-          onExpand={onExpand}
-          onMaximizePanes={onMaximizePanes}
-        />
-      ) : (
-        <>
-          {/* Pinned Top Bar with View Title and Window Controls */}
-          <div className="flex items-center justify-between px-1 pb-1.5 border-b border-amber-500/20 text-[10px] font-tech text-cyan-400/80">
-            {/* Left section: View Title */}
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="w-1.5 h-1.5 bg-amber-400 rotate-45 shadow-[0_0_6px_#ffb300]" />
-              <span className="font-bold tracking-widest text-amber-200 uppercase truncate">
-                VIEW: {currentNav.replace("_", " ")}
-              </span>
+      <HudBrackets
+        variant="amber"
+        showTicks={false}
+        className="h-full w-full flex flex-col justify-between p-1 overflow-hidden select-none"
+      >
+        {isIconOnly ? (
+          <RightSidebarCompactRail
+            onExpand={onExpand}
+            onMaximizePanes={onMaximizePanes}
+          />
+        ) : (
+          <>
+            {/* Pinned Top Bar with View Title, Window Controls, and Toggle Button */}
+            <div className="shrink-0 w-full flex flex-col border-b border-amber-500/20 pb-1 mb-1">
+              {/* Row 1: View Title + Window Controls (Exit at far right) */}
+              <div className="flex items-center justify-between h-7 px-1 text-[10px] font-tech text-cyan-400/80">
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="w-1.5 h-1.5 bg-amber-400 rotate-45 shadow-[0_0_6px_#ffb300]" />
+                  <span className="font-bold tracking-widest text-amber-200 uppercase truncate">
+                    VIEW: {currentNav.replace("_", " ")}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => minimizeToTray()}
+                    title="Minimize FocusHUD to Tray (Frees Screen)"
+                    aria-label="Minimize FocusHUD to Tray"
+                    className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={onMaximizePanes}
+                    title="Maximize Left & Right Panes"
+                    aria-label="Maximize Left & Right Panes"
+                    className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => exitApp()}
+                    title="Close FocusHUD (Restores Desktop)"
+                    aria-label="Close FocusHUD"
+                    className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Right Sidebar Toggle Button centered in the 68px rail slot */}
+              <div className="flex items-center justify-end h-7">
+                <div className="w-[44px] flex items-center justify-center h-7 px-1">
+                  {onCollapse && (
+                    <SidebarToggleIcon
+                      side="right"
+                      isCollapsed={false}
+                      onToggle={onCollapse}
+                      theme="amber"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Right section: Window Controls */}
-            <div className="flex items-center gap-1 shrink-0">
-              {/* 1. Minimize to Tray */}
-              <button
-                onClick={() => minimizeToTray()}
-                title="Minimize FocusHUD to Tray (Frees Screen)"
-                aria-label="Minimize FocusHUD to Tray"
-                className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-
-              {/* 2. Maximize Panes */}
-              <button
-                onClick={onMaximizePanes}
-                title="Maximize Left & Right Panes"
-                aria-label="Maximize Left & Right Panes"
-                className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-              >
-                <Square className="w-3.5 h-3.5" />
-              </button>
-
-              {/* 3. Exit FocusHUD */}
-              <button
-                onClick={() => exitApp()}
-                title="Close FocusHUD (Restores Desktop)"
-                aria-label="Close FocusHUD"
-                className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+            {/* Main Content View Container */}
+            <div className="flex-1 w-full min-h-0 overflow-hidden relative">
+              {renderActiveView()}
             </div>
-          </div>
-
-          {/* Sub-bar below the line: Right Sidebar Toggle Button aligned with Exit button */}
-          <div className="flex items-center justify-end px-1 py-1 mb-1">
-            {onCollapse && (
-              <SidebarToggleIcon
-                side="right"
-                isCollapsed={false}
-                onToggle={onCollapse}
-                theme="amber"
-              />
-            )}
-          </div>
-
-          {/* Main Content View Container */}
-          <div className="flex-1 w-full min-h-0 overflow-hidden relative">
-            {renderActiveView()}
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </HudBrackets>
     </aside>
   );
 };

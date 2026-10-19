@@ -1,7 +1,6 @@
 import React from "react";
 import { Play, Pause, RotateCcw, Check, Maximize2, X, Minus, Square } from "lucide-react";
 import { usePomodoro } from "../utils/pomodoroStore";
-import { HudBrackets } from "./HudBrackets";
 import { exitApp, minimizeToTray } from "../utils/tauriBridge";
 import { SidebarToggleIcon } from "./SidebarToggleIcon";
 
@@ -15,7 +14,6 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   onMaximizePanes,
 }) => {
   const {
-    mode,
     cycle,
     totalCycles,
     timeLeft,
@@ -38,20 +36,15 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   const strokeDashoffset = circumference - progress * circumference;
 
   return (
-    <HudBrackets
-      variant="amber"
-      showTicks={false}
-      className="h-full w-full flex flex-col justify-between items-center p-1.5 overflow-hidden select-none"
-    >
+    <div className="h-full w-full flex flex-col justify-between items-center overflow-hidden select-none">
       {/* 1. Top Pinned Status Header */}
-      <div className="shrink-0 w-full flex flex-col gap-1 border-b border-amber-500/20 pb-1.5">
-        {/* Row 1: Status Ping & Compact Window Controls (with Exit at far right) */}
-        <div className="w-full flex items-center justify-between px-0.5 text-amber-500/60">
+      <div className="shrink-0 w-full flex flex-col border-b border-amber-500/20 pb-1 mb-1">
+        {/* Row 1: Status Ping & Compact Window Controls (h-7, px-1) */}
+        <div className="w-full flex items-center justify-between h-7 px-1 text-amber-500/60">
           <div className="flex items-center gap-1">
             <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isRunning ? "bg-amber-400 animate-ping shadow-[0_0_6px_#ffb300]" : "bg-neutral-600"
-              }`}
+              className={`w-1.5 h-1.5 rounded-full ${isRunning ? "bg-amber-400 animate-ping shadow-[0_0_6px_#ffb300]" : "bg-neutral-600"
+                }`}
               title={isRunning ? "Timer Active" : "Timer Standby"}
             />
           </div>
@@ -60,34 +53,31 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               onClick={() => minimizeToTray()}
               title="Minimize to Tray"
               aria-label="Minimize to Tray"
-              className="hover:text-amber-200 hover:scale-110 transition p-0.5 cursor-pointer"
+              className="hover:text-amber-200 hover:scale-110 transition p-1 cursor-pointer"
             >
-              <Minus className="w-3 h-3" />
+              <Minus className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onMaximizePanes}
               title="Maximize Panes"
               aria-label="Maximize Panes"
-              className="hover:text-amber-200 hover:scale-110 transition p-0.5 cursor-pointer"
+              className="hover:text-amber-200 hover:scale-110 transition p-1 cursor-pointer"
             >
-              <Square className="w-2.5 h-2.5" />
+              <Square className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => exitApp()}
               title="Close FocusHUD"
               aria-label="Close FocusHUD"
-              className="hover:text-red-400 hover:scale-110 transition p-0.5 cursor-pointer"
+              className="hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
             >
-              <X className="w-3 h-3" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Row 2: Mode Label + Amber Toggle Button aligned directly under Exit */}
-        <div className="w-full flex items-center justify-between px-0.5 pt-0.5">
-          <span className="text-[7.5px] font-tech font-bold uppercase tracking-widest text-amber-300/90 truncate">
-            {mode === "focus" ? "FOCUS" : mode === "short_break" ? "SHORT" : "LONG"}
-          </span>
+        {/* Row 2: Amber Toggle Button (h-7, px-1) */}
+        <div className="w-full flex items-center justify-center h-7 px-1">
           {onExpand && (
             <SidebarToggleIcon
               side="right"
@@ -147,11 +137,10 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
         <button
           onClick={toggleRun}
           title={isRunning ? "Pause Timer" : "Start Focus Timer"}
-          className={`hud-btn w-9 h-9 flex items-center justify-center rounded cursor-pointer transition-all ${
-            isRunning
-              ? "hud-btn-active border-amber-400 bg-amber-500/25 shadow-[0_0_12px_rgba(255,145,0,0.4)] text-amber-100"
-              : "border-amber-500/40 text-amber-300 hover:text-amber-100 hover:border-amber-400"
-          }`}
+          className={`hud-btn w-9 h-9 flex items-center justify-center rounded cursor-pointer transition-all ${isRunning
+            ? "hud-btn-active border-amber-400 bg-amber-500/25 shadow-[0_0_12px_rgba(255,145,0,0.4)] text-amber-100"
+            : "border-amber-500/40 text-amber-300 hover:text-amber-100 hover:border-amber-400"
+            }`}
         >
           {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
         </button>
@@ -178,13 +167,12 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               <div
                 key={idx}
                 title={`Cycle ${idx + 1} of ${totalCycles}`}
-                className={`w-1.5 h-1.5 rotate-45 transition-all ${
-                  isDone
-                    ? "bg-amber-400 shadow-[0_0_5px_#ff9100]"
-                    : isCurrent
+                className={`w-1.5 h-1.5 rotate-45 transition-all ${isDone
+                  ? "bg-amber-400 shadow-[0_0_5px_#ff9100]"
+                  : isCurrent
                     ? "bg-amber-400/60 border border-amber-300 shadow-[0_0_3px_#ff9100]"
                     : "bg-neutral-800 border border-amber-500/20"
-                }`}
+                  }`}
               />
             );
           })}
@@ -214,6 +202,6 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
           </button>
         )}
       </div>
-    </HudBrackets>
+    </div>
   );
 };

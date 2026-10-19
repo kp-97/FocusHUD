@@ -66,7 +66,6 @@ describe("RightSidebar component", () => {
     render(<RightSidebar width={68} activeNav="home" />);
     // In compact mode, the full header is hidden and the mini rail is rendered
     expect(screen.queryByText(/VIEW: HOME/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/FOCUS/i)).toBeInTheDocument();
     expect(screen.getByText(/CYCLES/i)).toBeInTheDocument();
     expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
   });
