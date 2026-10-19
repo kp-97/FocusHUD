@@ -43,6 +43,16 @@ export async function restoreWorkArea() {
   }
 }
 
+export async function minimizeToTray() {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("minimize_to_tray");
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function getScreenMetrics() {
   try {
     const { invoke } = await import("@tauri-apps/api/core");

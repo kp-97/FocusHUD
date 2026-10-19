@@ -4,7 +4,14 @@ import { RightSidebar } from "./components/RightSidebar";
 import { CenterWorkspace } from "./components/CenterWorkspace";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { TopNavHUD } from "./components/TopNavHUD";
+import { SettingsModal } from "./components/SettingsModal";
 import { updateDockSizes, restoreWorkArea } from "./utils/tauriBridge";
+import {
+  getMaxLeftWidth,
+  getMaxRightWidth,
+  broadcastLayoutAction,
+  subscribeLayoutAction,
+} from "./utils/store";
 
 const SNAP_POINTS = [
   { value: 68, label: "SQUARE ICONS" },
@@ -31,6 +38,7 @@ export default function App() {
   const [desktopDockActive, setDesktopDockActive] = useState<boolean>(false);
   const [snapMode, setSnapMode] = useState<"fluid" | "grid-snap" | "ratio-16-9">("fluid");
   const [activeNav, setActiveNav] = useState<string>("home");
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Check if opened as dedicated dock window (e.g. ?dock=left or ?dock=right)
   const [dockWindowType] = useState<"left" | "right" | "full">(() => {
@@ -78,6 +86,32 @@ export default function App() {
     }
   }, [dockWindowType, desktopDockActive]);
 
+  // Cross-window layout command listener (e.g. Maximize Panes)
+  useEffect(() => {
+    const unsubscribe = subscribeLayoutAction((action) => {
+      if (action.type === "MAXIMIZE_PANES") {
+        const maxL = getMaxLeftWidth();
+        const maxR = getMaxRightWidth();
+        setLeftWidth(maxL);
+        setRightWidth(maxR);
+        if (dockWindowType !== "full" || desktopDockActive) {
+          updateDockSizes(maxL, maxR, true);
+        }
+      } else if (action.type === "SET_LEFT_WIDTH") {
+        setLeftWidth(action.width);
+        if (dockWindowType !== "full" || desktopDockActive) {
+          updateDockSizes(action.width, null, true);
+        }
+      } else if (action.type === "SET_RIGHT_WIDTH") {
+        setRightWidth(action.width);
+        if (dockWindowType !== "full" || desktopDockActive) {
+          updateDockSizes(null, action.width, true);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [dockWindowType, desktopDockActive]);
+
   const handleToggleDesktopDock = async () => {
     if (desktopDockActive) {
       await restoreWorkArea();
@@ -89,8 +123,6 @@ export default function App() {
   };
 
   // Drag handlers for Left Bar:
-  // During drag, the transparent HWND canvas is already expanded to 520px,
-  // so we only update React CSS state at 120fps with zero HWND resize jitter!
   const handleLeftDragChange = (newWidth: number) => {
     setLeftWidth(newWidth);
   };
@@ -110,8 +142,40 @@ export default function App() {
     }
   };
 
+  // Sidebar toggle expand / collapse:
+  // If collapsed (< 120px), expand to max configured width (default 360).
+  // If expanded, collapse to 68px.
+  const handleLeftToggleCollapse = () => {
+    const maxLeft = getMaxLeftWidth();
+    const next = leftWidth < 120 ? maxLeft : 68;
+    setLeftWidth(next);
+    if (dockWindowType !== "full" || desktopDockActive) {
+      updateDockSizes(next, null, true);
+    }
+  };
+
+  const handleRightToggleCollapse = () => {
+    const maxRight = getMaxRightWidth();
+    const next = rightWidth < 120 ? maxRight : 68;
+    setRightWidth(next);
+    if (dockWindowType !== "full" || desktopDockActive) {
+      updateDockSizes(null, next, true);
+    }
+  };
+
+  // Maximize both left and right panes simultaneously
+  const handleMaximizePanes = () => {
+    const maxLeft = getMaxLeftWidth();
+    const maxRight = getMaxRightWidth();
+    setLeftWidth(maxLeft);
+    setRightWidth(maxRight);
+    broadcastLayoutAction({ type: "MAXIMIZE_PANES" });
+    if (dockWindowType !== "full" || desktopDockActive) {
+      updateDockSizes(maxLeft, maxRight, true);
+    }
+  };
+
   // Drag handlers for Right Bar:
-  // Pure CSS resize inside the stationary 520px transparent HWND canvas during drag!
   const handleRightDragChange = (newWidth: number) => {
     setRightWidth(newWidth);
   };
@@ -166,6 +230,8 @@ export default function App() {
             onSelectNav={setActiveNav}
             isCompact={leftWidth < 220}
             isDockMode={true}
+            onToggleCollapse={handleLeftToggleCollapse}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
           <div className="absolute top-0 bottom-0 right-0 w-2.5 z-50">
             <ResizeHandle
@@ -181,6 +247,17 @@ export default function App() {
             />
           </div>
         </div>
+
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onApplyMaxDimensions={(maxL) => {
+            if (leftWidth > maxL) {
+              setLeftWidth(maxL);
+              updateDockSizes(maxL, null, true);
+            }
+          }}
+        />
       </div>
     );
   }
@@ -211,9 +288,22 @@ export default function App() {
             activeNav={activeNav}
             isCompact={rightWidth < 220}
             isDockMode={true}
-            onExpand={() => handleRightDoubleClick()}
+            onExpand={handleRightToggleCollapse}
+            onCollapse={handleRightToggleCollapse}
+            onMaximizePanes={handleMaximizePanes}
           />
         </div>
+
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onApplyMaxDimensions={(_, maxR) => {
+            if (rightWidth > maxR) {
+              setRightWidth(maxR);
+              updateDockSizes(null, maxR, true);
+            }
+          }}
+        />
       </div>
     );
   }
@@ -247,6 +337,8 @@ export default function App() {
           activeNav={activeNav}
           onSelectNav={setActiveNav}
           isCompact={leftWidth < 220}
+          onToggleCollapse={handleLeftToggleCollapse}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         {/* Left Resize Splitter Handle */}
@@ -285,9 +377,28 @@ export default function App() {
           width={rightWidth}
           activeNav={activeNav}
           isCompact={rightWidth < 220}
-          onExpand={() => handleRightDoubleClick()}
+          onExpand={handleRightToggleCollapse}
+          onCollapse={handleRightToggleCollapse}
+          onMaximizePanes={handleMaximizePanes}
         />
       </div>
+
+      {/* Settings Modal Dialog */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onApplyMaxDimensions={(maxL, maxR) => {
+          if (leftWidth > maxL) setLeftWidth(maxL);
+          if (rightWidth > maxR) setRightWidth(maxR);
+          if (dockWindowType !== "full" || desktopDockActive) {
+            updateDockSizes(
+              leftWidth > maxL ? maxL : leftWidth,
+              rightWidth > maxR ? maxR : rightWidth,
+              true
+            );
+          }
+        }}
+      />
 
       {/* Outer Sci-Fi Crosshairs overlay (matching picture crosshairs) */}
       <div className="absolute top-12 left-2 text-cyan-500/40 text-xs font-mono pointer-events-none z-40">

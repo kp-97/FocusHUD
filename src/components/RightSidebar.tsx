@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import { exitApp } from "../utils/tauriBridge";
+import { X, Minus, Square } from "lucide-react";
+import { exitApp, minimizeToTray } from "../utils/tauriBridge";
 import { NavViewId } from "../types/hud";
 import { getInitialNav, subscribeNavChange } from "../utils/store";
 import { RightSidebarCompactRail } from "./RightSidebarCompactRail";
+import { SidebarToggleIcon } from "./SidebarToggleIcon";
 
 // View components
 import { HomeView } from "./views/HomeView";
@@ -21,12 +22,16 @@ interface RightSidebarProps {
   isCompact?: boolean;
   isDockMode?: boolean;
   onExpand?: () => void;
+  onCollapse?: () => void;
+  onMaximizePanes?: () => void;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
   width,
   activeNav: propActiveNav,
   onExpand,
+  onCollapse,
+  onMaximizePanes,
 }) => {
   // Real-time synchronization across windows & props
   const [currentNav, setCurrentNav] = useState<NavViewId>(() => {
@@ -80,25 +85,62 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       } bg-[#03070d] border-l border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10`}
     >
       {isIconOnly ? (
-        <RightSidebarCompactRail onExpand={onExpand} />
+        <RightSidebarCompactRail
+          onExpand={onExpand}
+          onMaximizePanes={onMaximizePanes}
+        />
       ) : (
         <>
-          {/* Pinned Top Bar with Close FocusHUD Button */}
+          {/* Pinned Top Bar with Toggle Icon, Title, and Window Controls */}
           <div className="flex items-center justify-between px-1 pb-1 mb-1 border-b border-cyan-500/20 text-[10px] font-tech text-cyan-400/80">
+            {/* Left section: Toggle Icon + View Title */}
             <div className="flex items-center gap-1.5 truncate">
+              {onCollapse && (
+                <SidebarToggleIcon
+                  side="right"
+                  isCollapsed={false}
+                  onToggle={onCollapse}
+                  theme="cyan"
+                />
+              )}
               <span className="w-1.5 h-1.5 bg-amber-400 rotate-45 shadow-[0_0_6px_#ffb300]" />
               <span className="font-bold tracking-widest text-amber-200 uppercase truncate">
                 VIEW: {currentNav.replace("_", " ")}
               </span>
             </div>
 
-            <button
-              onClick={() => exitApp()}
-              title="Close FocusHUD (Restores Desktop)"
-              className="text-cyan-500/40 hover:text-red-400 hover:scale-110 transition p-0.5 cursor-pointer shrink-0"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            {/* Right section: Window Controls */}
+            <div className="flex items-center gap-1 shrink-0">
+              {/* 1. Minimize to Tray */}
+              <button
+                onClick={() => minimizeToTray()}
+                title="Minimize FocusHUD to Tray (Frees Screen)"
+                aria-label="Minimize FocusHUD to Tray"
+                className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+
+              {/* 2. Maximize Panes */}
+              <button
+                onClick={onMaximizePanes}
+                title="Maximize Left & Right Panes"
+                aria-label="Maximize Left & Right Panes"
+                className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+              >
+                <Square className="w-3.5 h-3.5" />
+              </button>
+
+              {/* 3. Exit FocusHUD */}
+              <button
+                onClick={() => exitApp()}
+                title="Close FocusHUD (Restores Desktop)"
+                aria-label="Close FocusHUD"
+                className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* Main Content View Container */}
@@ -110,4 +152,5 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     </aside>
   );
 };
+
 

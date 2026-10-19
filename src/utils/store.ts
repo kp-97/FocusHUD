@@ -234,3 +234,70 @@ export const loadEvents = (): CalendarEvent[] => {
 export const saveEvents = (events: CalendarEvent[]) => {
   localStorage.setItem("focushud_events", JSON.stringify(events));
 };
+
+// Maximum width settings for left and right panes
+export const getMaxLeftWidth = (): number => {
+  const saved = localStorage.getItem("hud_left_max_width");
+  return saved ? Math.max(280, Number(saved)) : 360;
+};
+
+export const setMaxLeftWidth = (width: number) => {
+  localStorage.setItem("hud_left_max_width", String(width));
+};
+
+export const getMaxRightWidth = (): number => {
+  const saved = localStorage.getItem("hud_right_max_width");
+  return saved ? Math.max(280, Number(saved)) : 360;
+};
+
+export const setMaxRightWidth = (width: number) => {
+  localStorage.setItem("hud_right_max_width", String(width));
+};
+
+// Cross-window layout command synchronization
+const LAYOUT_CHANNEL_NAME = "focushud_layout_channel";
+const layoutChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(LAYOUT_CHANNEL_NAME) : null;
+
+export type LayoutAction =
+  | { type: "MAXIMIZE_PANES" }
+  | { type: "SET_LEFT_WIDTH"; width: number }
+  | { type: "SET_RIGHT_WIDTH"; width: number };
+
+export const broadcastLayoutAction = (action: LayoutAction) => {
+  if (layoutChannel) {
+    layoutChannel.postMessage(action);
+  }
+  try {
+    localStorage.setItem("focushud_last_layout_action", JSON.stringify({ action, timestamp: Date.now() }));
+  } catch {}
+};
+
+export const subscribeLayoutAction = (callback: (action: LayoutAction) => void): (() => void) => {
+  const handler = (e: MessageEvent) => {
+    if (e.data && e.data.type) {
+      callback(e.data as LayoutAction);
+    }
+  };
+
+  const storageHandler = (e: StorageEvent) => {
+    if (e.key === "focushud_last_layout_action" && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed.action) callback(parsed.action);
+      } catch {}
+    }
+  };
+
+  if (layoutChannel) {
+    layoutChannel.addEventListener("message", handler);
+  }
+  window.addEventListener("storage", storageHandler);
+
+  return () => {
+    if (layoutChannel) {
+      layoutChannel.removeEventListener("message", handler);
+    }
+    window.removeEventListener("storage", storageHandler);
+  };
+};
+
