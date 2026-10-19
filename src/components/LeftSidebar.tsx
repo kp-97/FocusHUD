@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Home,
   MessageSquare,
@@ -15,10 +15,14 @@ import {
   HardDrive,
   ChevronDown,
   ChevronUp,
-  X,
+  Settings,
+  Palette,
+  Puzzle,
+  LogOut,
 } from "lucide-react";
 import { HudBrackets } from "./HudBrackets";
 import { WaveformVisualizer } from "./WaveformVisualizer";
+import { SidebarToggleIcon } from "./SidebarToggleIcon";
 import { exitApp, getSystemDiagnostics, SystemDiagnostics } from "../utils/tauriBridge";
 import { broadcastNavChange } from "../utils/store";
 import { NavViewId } from "../types/hud";
@@ -29,6 +33,8 @@ interface LeftSidebarProps {
   onSelectNav: (id: string) => void;
   isCompact?: boolean;
   isDockMode?: boolean;
+  onToggleCollapse?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -36,11 +42,36 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   activeNav,
   onSelectNav,
   isCompact = false,
+  onToggleCollapse,
+  onOpenSettings,
 }) => {
   const [diag, setDiag] = useState<SystemDiagnostics | null>(null);
   const [diagnosticsCollapsed, setDiagnosticsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("hud_diag_collapsed") === "true";
   });
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close hamburger menu when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   const toggleDiagnosticsCollapsed = () => {
     setDiagnosticsCollapsed((prev) => {
@@ -84,53 +115,134 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className={`h-full shrink-0 flex flex-col ${
-        isIconOnly ? "p-1.5" : "p-2.5"
-      } bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-hidden relative z-10`}
+      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
     >
       <HudBrackets
-        className={`h-full flex flex-col justify-between ${
-          isIconOnly ? "p-1.5 items-center" : "p-3"
-        } overflow-hidden`}
+        className="h-full flex flex-col justify-between p-2 overflow-visible"
       >
-        {/* Top Header: FocusHUD & Waveform Banner (Pinned) */}
-        <div className="shrink-0 flex flex-col gap-2 w-full">
-          <div className="flex items-center justify-between border-b border-cyan-500/30 pb-2">
-            {!isIconOnly ? (
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-                <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan">
-                  FocusHUD
-                </h1>
+        {/* Top Header: FocusHUD & Controls (Pinned) */}
+        <div className="shrink-0 flex flex-col w-full relative">
+          {/* Header Row: Dual Expand/Collapse Button + Title & Controls */}
+          <div className="border-b border-cyan-500/30 pb-1 mb-1">
+            <div className="flex items-center">
+              {/* Left Column: Fixed Left-Right Pane Expand/Collapse Button (Replaced Diamond) */}
+              <div className="w-8 shrink-0 flex items-center justify-center h-7">
+                {onToggleCollapse && (
+                  <SidebarToggleIcon
+                    side="both"
+                    isCollapsed={isIconOnly}
+                    onToggle={onToggleCollapse}
+                    theme="cyan"
+                  />
+                )}
               </div>
-            ) : (
-              <div className="w-full flex justify-center py-0.5">
-                <div className="w-2.5 h-2.5 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
-              </div>
-            )}
 
-            {!isIconOnly && (
-              <div className="flex items-center gap-1">
-                <button
-                  title="System Controls"
-                  className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1"
-                >
-                  <Menu className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => exitApp()}
-                  title="Close FocusHUD (Restores Desktop)"
-                  className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
+              {/* Expanded Section: FocusHUD Title + Settings + Menu */}
+              {!isIconOnly && (
+                <div className="flex-1 min-w-0 flex items-center justify-between h-7 pl-2">
+                  <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan truncate">
+                    FocusHUD
+                  </h1>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setIsMenuOpen((prev) => !prev)}
+                      title="System Menu"
+                      aria-label="System Menu"
+                      aria-expanded={isMenuOpen}
+                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                    >
+                      <Menu className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Floating Hamburger Dropdown Menu (Spills to the right into the center pane) */}
+          {isMenuOpen && (
+            <div
+              ref={menuRef}
+              className="absolute top-1 left-[calc(100%+24px)] w-52 bg-[#040d1a]/95 backdrop-blur-md border border-cyan-500/40 rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150"
+              role="menu"
+              aria-label="System Menu"
+            >
+              {/* Pointing notch back to sidebar */}
+              <div className="absolute -left-1.5 top-3 w-2.5 h-2.5 bg-[#040d1a] rotate-45 border-l border-b border-cyan-500/50" />
+              <div className="px-2.5 py-1 text-[9px] font-tech text-cyan-400/60 uppercase tracking-widest border-b border-cyan-500/20">
+                SYSTEM MENU
+              </div>
+
+              {/* 1. Settings */}
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  if (onOpenSettings) onOpenSettings();
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all text-left cursor-pointer"
+                role="menuitem"
+              >
+                <Settings className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold tracking-wider">SETTINGS</span>
+                  <span className="text-[9px] font-tech text-cyan-400/70">Preferences & Panes</span>
+                </div>
+              </button>
+
+              {/* 2. Themes */}
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all text-left cursor-pointer"
+                role="menuitem"
+              >
+                <Palette className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold tracking-wider">THEMES</span>
+                  <span className="text-[9px] font-tech text-cyan-400/70">Cyan Cyberpunk (Active)</span>
+                </div>
+              </button>
+
+              {/* 3. Extensions */}
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all text-left cursor-pointer"
+                role="menuitem"
+              >
+                <Puzzle className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold tracking-wider">EXTENSIONS</span>
+                  <span className="text-[9px] font-tech text-cyan-400/70">Plugins & Integrations</span>
+                </div>
+              </button>
+
+              <div className="my-0.5 border-t border-cyan-500/20" />
+
+              {/* 4. Log out */}
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  exitApp();
+                }}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded text-red-400/80 hover:text-red-300 hover:bg-red-500/15 transition-all text-left cursor-pointer"
+                role="menuitem"
+              >
+                <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold tracking-wider">LOG OUT</span>
+                  <span className="text-[9px] font-tech text-red-400/60">Lock HUD & Exit</span>
+                </div>
+              </button>
+            </div>
+          )}
 
           {/* Diagnostic Waveform Banner */}
           {!isIconOnly && (
-            <div className="my-0.5">
+            <div className="my-1">
               <WaveformVisualizer isCompact={compactMode} />
             </div>
           )}
@@ -150,13 +262,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       onSelectNav(item.id);
                       broadcastNavChange(item.id as NavViewId);
                     }}
-                    className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
-                      isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
-                    } ${
-                      isIconOnly
+                    className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
+                      } ${isIconOnly
                         ? "w-full aspect-square justify-center p-0 max-w-[44px]"
                         : "justify-start px-3 py-2.5"
-                    }`}
+                      }`}
                     title={item.label}
                   >
                     <div className="flex items-center gap-2.5">
@@ -170,21 +280,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </nav>
         </div>
 
-        {/* Bottom Diagnostics / Telemetry Info (Pinned) */}
-        {!isIconOnly && (
-          <div className="shrink-0 w-full border-t border-cyan-500/30 pt-2 text-[11px] font-tech text-cyan-400/80">
+        {/* Bottom Section: System Stats (when expanded) & Settings Button (always at bottom left) */}
+        <div className="shrink-0 w-full flex flex-col border-t border-cyan-500/30 pt-2">
+          {!isIconOnly && (
+            <div className="w-full text-[11px] font-tech text-cyan-400/80 mb-2">
             {/* Header with collapse toggle */}
             <div
               onClick={toggleDiagnosticsCollapsed}
-              className={`flex items-center justify-between text-[10.5px] text-cyan-300 font-hud tracking-wider uppercase cursor-pointer select-none group ${
-                diagnosticsCollapsed ? "pb-0.5" : "border-b border-cyan-500/30 pb-1.5 mb-2.5"
-              }`}
-              title={diagnosticsCollapsed ? "Expand Diagnostics" : "Collapse Diagnostics"}
+              className={`flex items-center justify-between text-[10.5px] text-cyan-300 font-hud tracking-wider uppercase cursor-pointer select-none group ${diagnosticsCollapsed ? "pb-0.5" : "border-b border-cyan-500/30 pb-1.5 mb-2.5"
+                }`}
+              title={diagnosticsCollapsed ? "Expand System Stats" : "Collapse System Stats"}
             >
               <div className="flex items-center gap-1.5 overflow-hidden">
                 <div className="w-1.5 h-1.5 bg-cyan-400 rotate-45 shadow-[0_0_5px_#00e5ff]" />
                 <span className="font-bold tracking-widest text-cyan-200 group-hover:text-cyan-100 transition-colors">
-                  DIAGNOSTICS
+                  SYSTEM STATS
                 </span>
                 {diagnosticsCollapsed && diag && (
                   <span className="text-[9px] font-tech text-cyan-400/70 normal-case ml-1 truncate">
@@ -257,8 +367,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                           {diag.vram_used_bytes && diag.vram_total_bytes
                             ? `${(diag.vram_used_bytes / 1073741824).toFixed(1)} / ${(diag.vram_total_bytes / 1073741824).toFixed(1)} GB`
                             : diag.vram_usage !== null && diag.vram_usage !== undefined
-                            ? `${diag.vram_usage.toFixed(0)}%`
-                            : "0%"}
+                              ? `${diag.vram_usage.toFixed(0)}%`
+                              : "0%"}
                         </span>
                       </div>
                       <div className="w-full h-1 bg-cyan-950/80 rounded-full border border-cyan-500/20 overflow-hidden p-[0.5px]">
@@ -270,9 +380,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                               Math.max(
                                 0,
                                 diag.vram_usage ??
-                                  (diag.vram_used_bytes && diag.vram_total_bytes && diag.vram_total_bytes > 0
-                                    ? (diag.vram_used_bytes / diag.vram_total_bytes) * 100
-                                    : 0)
+                                (diag.vram_used_bytes && diag.vram_total_bytes && diag.vram_total_bytes > 0
+                                  ? (diag.vram_used_bytes / diag.vram_total_bytes) * 100
+                                  : 0)
                               )
                             )}%`,
                           }}
@@ -308,15 +418,35 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     {diag?.gpu_name
                       ? diag.gpu_name.replace("NVIDIA GeForce ", "")
                       : diag?.cpu_name
-                      ? diag.cpu_name.replace(/(Processor|\(R\)|\(TM\))/gi, "").trim()
-                      : "HARDWARE ACTIVE"}
+                        ? diag.cpu_name.replace(/(Processor|\(R\)|\(TM\))/gi, "").trim()
+                        : "HARDWARE ACTIVE"}
                   </span>
                 </div>
               </div>
             )}
           </div>
         )}
+
+        {/* Pinned Bottom Left Settings Button (both contracted and expanded views) */}
+        <div className={`w-full flex items-center ${isIconOnly ? "justify-center pt-0" : "justify-start border-t border-cyan-500/20 pt-1.5"}`}>
+          <button
+            onClick={onOpenSettings}
+            title="Settings"
+            aria-label="Settings"
+            className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-500/20 ${
+              isIconOnly
+                ? "w-full aspect-square justify-center p-0 max-w-[44px]"
+                : "w-full justify-start px-2.5 py-1.5"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-cyan-400 shrink-0" />
+              {!isIconOnly && <span className="font-semibold text-xs tracking-wider">SETTINGS</span>}
+            </div>
+          </button>
+        </div>
+      </div>
       </HudBrackets>
-    </aside>
+    </aside >
   );
 };

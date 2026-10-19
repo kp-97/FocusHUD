@@ -234,3 +234,101 @@ export const loadEvents = (): CalendarEvent[] => {
 export const saveEvents = (events: CalendarEvent[]) => {
   localStorage.setItem("focushud_events", JSON.stringify(events));
 };
+
+// Remembered expanded widths for left and right panes (used when expanding from collapsed mode)
+export const DEFAULT_LEFT_WIDTH = 360;
+export const DEFAULT_RIGHT_WIDTH = 280;
+
+export const getRememberedLeftWidth = (): number => {
+  const saved = localStorage.getItem("hud_left_remembered_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  const current = localStorage.getItem("hud_left_width");
+  if (current) {
+    const val = Math.round(Number(current));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  return DEFAULT_LEFT_WIDTH;
+};
+
+export const setRememberedLeftWidth = (width: number) => {
+  if (width >= 120) {
+    localStorage.setItem("hud_left_remembered_width", String(Math.round(width)));
+  }
+};
+
+export const getRememberedRightWidth = (): number => {
+  const saved = localStorage.getItem("hud_right_remembered_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  const current = localStorage.getItem("hud_right_width");
+  if (current) {
+    const val = Math.round(Number(current));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  return DEFAULT_RIGHT_WIDTH;
+};
+
+export const setRememberedRightWidth = (width: number) => {
+  if (width >= 120) {
+    localStorage.setItem("hud_right_remembered_width", String(Math.round(width)));
+  }
+};
+
+// Aliases for compatibility
+export const getMaxLeftWidth = getRememberedLeftWidth;
+export const setMaxLeftWidth = setRememberedLeftWidth;
+export const getMaxRightWidth = getRememberedRightWidth;
+export const setMaxRightWidth = setRememberedRightWidth;
+
+// Cross-window layout command synchronization
+const LAYOUT_CHANNEL_NAME = "focushud_layout_channel";
+const layoutChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(LAYOUT_CHANNEL_NAME) : null;
+
+export type LayoutAction =
+  | { type: "MAXIMIZE_PANES" }
+  | { type: "SET_LEFT_WIDTH"; width: number }
+  | { type: "SET_RIGHT_WIDTH"; width: number };
+
+export const broadcastLayoutAction = (action: LayoutAction) => {
+  if (layoutChannel) {
+    layoutChannel.postMessage(action);
+  }
+  try {
+    localStorage.setItem("focushud_last_layout_action", JSON.stringify({ action, timestamp: Date.now() }));
+  } catch {}
+};
+
+export const subscribeLayoutAction = (callback: (action: LayoutAction) => void): (() => void) => {
+  const handler = (e: MessageEvent) => {
+    if (e.data && e.data.type) {
+      callback(e.data as LayoutAction);
+    }
+  };
+
+  const storageHandler = (e: StorageEvent) => {
+    if (e.key === "focushud_last_layout_action" && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed.action) callback(parsed.action);
+      } catch {}
+    }
+  };
+
+  if (layoutChannel) {
+    layoutChannel.addEventListener("message", handler);
+  }
+  window.addEventListener("storage", storageHandler);
+
+  return () => {
+    if (layoutChannel) {
+      layoutChannel.removeEventListener("message", handler);
+    }
+    window.removeEventListener("storage", storageHandler);
+  };
+};
+

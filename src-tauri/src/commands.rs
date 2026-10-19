@@ -103,6 +103,20 @@ pub fn restore_work_area() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn minimize_to_tray(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("left-dock") {
+        let _ = w.hide();
+    }
+    if let Some(w) = app.get_webview_window("right-dock") {
+        let _ = w.hide();
+    }
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
+    }
+    restore_monitor_work_area()
+}
+
+#[tauri::command]
 pub fn exit_app(app: tauri::AppHandle) {
     let _ = restore_monitor_work_area();
     app.exit(0);
