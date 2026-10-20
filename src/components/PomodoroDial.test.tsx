@@ -41,7 +41,7 @@ describe("PomodoroDial component", () => {
 
     expect(screen.queryByRole("button", { name: /START/i })).not.toBeInTheDocument();
 
-    const stopBtn = screen.getByRole("button", { name: /STOP/i });
+    const stopBtn = screen.getByRole("button", { name: /(CANCEL|STOP)/i });
     const pauseBtn = screen.getByRole("button", { name: /PAUSE/i });
 
     expect(stopBtn).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("PomodoroDial component", () => {
     );
   });
 
-  it("stops timer early and shifts to next phase when Stop button is clicked", () => {
+  it("cancels timer and resets countdown when Cancel button is clicked", () => {
     act(() => {
       render(<PomodoroDial isCompact={false} />);
     });
@@ -65,19 +65,26 @@ describe("PomodoroDial component", () => {
     });
     expect(getPomodoroState().isRunning).toBe(true);
 
-    // Click Stop button (which replaced Start button)
-    const stopBtn = screen.getByRole("button", { name: /STOP/i });
+    // Simulate elapsed time
     act(() => {
-      fireEvent.click(stopBtn);
+      pomodoroActions.adjustMinutes(-5);
+    });
+    expect(getPomodoroState().timeLeft).toBe(20 * 60);
+
+    // Click Cancel button (which replaced Start button)
+    const cancelBtn = screen.getByRole("button", { name: /(CANCEL|STOP)/i });
+    act(() => {
+      fireEvent.click(cancelBtn);
     });
 
     const state = getPomodoroState();
     expect(state.isRunning).toBe(false);
-    expect(state.mode).toBe("short_break");
-    expect(screen.getAllByText("SHORT BREAK").length).toBeGreaterThan(0);
-    // After stopping, Start button is restored and Stop is hidden
+    expect(state.mode).toBe("focus");
+    expect(state.cycle).toBe(1);
+    expect(state.timeLeft).toBe(state.focusMinutes * 60);
+    // After cancelling, Start button is restored and Cancel/Stop is hidden
     expect(screen.getByRole("button", { name: /START/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /STOP/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /(CANCEL|STOP)/i })).not.toBeInTheDocument();
   });
 
   it("increments remaining time by 1 minute on plus button click", () => {

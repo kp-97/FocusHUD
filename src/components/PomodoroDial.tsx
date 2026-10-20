@@ -386,10 +386,11 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
           <>
             <button
               onClick={stopTimer}
-              title="Stop Timer (Shift to Next Phase)"
+              title="Cancel Timer"
+              aria-label="Cancel Timer"
               className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-tech font-bold uppercase transition bg-red-950/30 border border-red-500/40 text-red-400 hover:bg-red-900/40 hover:border-red-400 hover:text-red-200 cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.2)]"
             >
-              <Square className="w-3 h-3 fill-red-400" /> STOP
+              <Square className="w-3 h-3 fill-red-400" /> CANCEL
             </button>
 
             <button

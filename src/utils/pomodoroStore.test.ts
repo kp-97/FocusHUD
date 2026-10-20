@@ -67,54 +67,48 @@ describe("pomodoroStore", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  describe("stop action", () => {
-    it("stops focus timer early and shifts to short_break", () => {
+  describe("stop / cancel action", () => {
+    it("cancels active focus timer: stops running, stays in focus mode, and resets countdown back to full duration", () => {
       pomodoroActions.start();
       expect(getPomodoroState().isRunning).toBe(true);
       expect(getPomodoroState().mode).toBe("focus");
 
-      pomodoroActions.stop();
-
-      const state = getPomodoroState();
-      expect(state.isRunning).toBe(false);
-      expect(state.mode).toBe("short_break");
-      expect(state.cycle).toBe(2);
-      expect(state.timeLeft).toBe(state.shortBreakMinutes * 60);
-    });
-
-    it("stops focus timer early at totalCycles and shifts to long_break", () => {
-      pomodoroActions.setTotalCycles(4);
-      // Advance to cycle 4
-      pomodoroActions.stop(); // 1 -> short_break (cycle 2)
-      pomodoroActions.stop(); // break -> focus (cycle 2)
-      pomodoroActions.stop(); // 2 -> short_break (cycle 3)
-      pomodoroActions.stop(); // break -> focus (cycle 3)
-      pomodoroActions.stop(); // 3 -> short_break (cycle 4)
-      pomodoroActions.stop(); // break -> focus (cycle 4)
-
-      expect(getPomodoroState().cycle).toBe(4);
-      expect(getPomodoroState().mode).toBe("focus");
-
-      pomodoroActions.start();
-      pomodoroActions.stop();
-
-      const state = getPomodoroState();
-      expect(state.isRunning).toBe(false);
-      expect(state.mode).toBe("long_break");
-      expect(state.cycle).toBe(1);
-      expect(state.timeLeft).toBe(state.longBreakMinutes * 60);
-    });
-
-    it("stops break timer early and shifts back to focus", () => {
-      pomodoroActions.switchMode("short_break");
-      pomodoroActions.start();
+      // Advance/adjust time so some time has elapsed
+      pomodoroActions.adjustMinutes(-5);
+      expect(getPomodoroState().timeLeft).toBe(20 * 60);
 
       pomodoroActions.stop();
 
       const state = getPomodoroState();
       expect(state.isRunning).toBe(false);
       expect(state.mode).toBe("focus");
+      expect(state.cycle).toBe(1);
       expect(state.timeLeft).toBe(state.focusMinutes * 60);
+    });
+
+    it("cancels active break timer: stops running, stays in break mode, and resets countdown back to full break duration", () => {
+      pomodoroActions.switchMode("short_break");
+      const breakMins = getPomodoroState().shortBreakMinutes;
+      pomodoroActions.start();
+      pomodoroActions.adjustMinutes(-1);
+      expect(getPomodoroState().timeLeft).toBe((breakMins - 1) * 60);
+
+      pomodoroActions.cancel();
+
+      const state = getPomodoroState();
+      expect(state.isRunning).toBe(false);
+      expect(state.mode).toBe("short_break");
+      expect(state.timeLeft).toBe(state.shortBreakMinutes * 60);
+    });
+
+    it("skipPhase advances to next phase when explicitly called", () => {
+      pomodoroActions.start();
+      pomodoroActions.skipPhase();
+
+      const state = getPomodoroState();
+      expect(state.isRunning).toBe(false);
+      expect(state.mode).toBe("short_break");
+      expect(state.cycle).toBe(2);
     });
   });
 

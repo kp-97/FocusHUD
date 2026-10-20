@@ -220,6 +220,28 @@ export const pomodoroActions = {
   },
 
   stop: () => {
+    // Cancels the active timer: stops running and resets countdown back to initial duration for current mode
+    let mins = state.focusMinutes;
+    if (state.mode === "short_break") mins = state.shortBreakMinutes;
+    if (state.mode === "long_break") mins = state.longBreakMinutes;
+
+    state = {
+      ...state,
+      isRunning: false,
+      totalSeconds: mins * 60,
+      timeLeft: mins * 60,
+    };
+
+    localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
+    updateTimerLoop();
+    notify();
+  },
+
+  cancel: () => {
+    pomodoroActions.stop();
+  },
+
+  skipPhase: () => {
     const isFocus = state.mode === "focus";
     let nextMode: PomodoroMode = "focus";
     let nextCycle = state.cycle;

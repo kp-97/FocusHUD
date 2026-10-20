@@ -215,7 +215,8 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
           <div className="flex items-center gap-1.5">
             <button
               onClick={stop}
-              title="Stop Timer (Next Phase)"
+              title="Cancel Timer"
+              aria-label="Cancel Timer"
               className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-red-500/30 text-red-400/70 hover:text-red-200 hover:border-red-400"
             >
               <Square className="w-2.5 h-2.5 fill-red-400" />
