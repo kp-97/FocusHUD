@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { HudBrackets } from "./HudBrackets";
+import { HudBrackets } from "../../ui/HudBrackets";
 import {
   DEFAULT_LEFT_WIDTH,
   DEFAULT_RIGHT_WIDTH,
@@ -12,11 +12,11 @@ import {
   getMaxLeftWidth,
   getMaxRightWidth,
   applyMaxPaneWidths,
-} from "../utils/store";
-import { NavItemConfig } from "../types/hud";
-import { NavViewCustomizationSection } from "./settings/NavViewCustomizationSection";
-import { PaneLimitsSection } from "./settings/PaneLimitsSection";
-import { PaneSizingMemorySection } from "./settings/PaneSizingMemorySection";
+} from "../../../stores/layoutStore";
+import { NavItemConfig } from "../../../types/hud";
+import { ViewCustomizationTab } from "./ViewCustomizationTab";
+import { PaneLimitsTab } from "./PaneLimitsTab";
+import { AppearanceTab } from "./AppearanceTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -150,10 +150,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Scrollable Body Content with Sub-sections */}
+        {/* Scrollable Body Content with Tabs */}
         <div className="space-y-4 text-xs font-tech overflow-y-auto flex-1 pr-1">
-          {/* Section 1: Navigation View Customization */}
-          <NavViewCustomizationSection
+          {/* View Customization */}
+          <ViewCustomizationTab
             navConfig={navConfig}
             onToggleVisibility={handleToggleVisibility}
             onMoveUp={handleMoveUp}
@@ -162,8 +162,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             navResetSuccess={navResetSuccess}
           />
 
-          {/* Section 2: Configurable Pane Max Width Limits */}
-          <PaneLimitsSection
+          {/* Pane Limits */}
+          <PaneLimitsTab
             maxLeft={maxLeft}
             maxRight={maxRight}
             onChangeMaxLeft={setMaxLeft}
@@ -172,8 +172,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             limitsApplied={limitsApplied}
           />
 
-          {/* Section 3: Pane Sizing & Memory */}
-          <PaneSizingMemorySection
+          {/* Sizing Memory & Appearance */}
+          <AppearanceTab
             onResetDefaults={handleResetDefaults}
             resetSuccess={resetSuccess}
           />

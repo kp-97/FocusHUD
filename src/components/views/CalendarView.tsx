@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
-import { loadEvents, getTodayString } from "../../utils/store";
+import { loadEvents, getTodayString } from "../../stores/layoutStore";
 import { CalendarEvent } from "../../types/hud";
 
 const DAYS_OF_WEEK = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];

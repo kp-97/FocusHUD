@@ -1,25 +1,28 @@
 /**
- * Tauri Bridge for Windows Desktop Work Area Docking
+ * Tauri Bridge Service for Windows Desktop Work Area Docking
  * Communicates with the Rust backend to reserve screen space
  * and snap open desktop programs into the middle column.
  */
 
-export async function setDockDragMode(side: "left" | "right", active: boolean) {
+import type { SystemDiagnostics } from "../types/diagnostics";
+export type { SystemDiagnostics };
+
+export async function setDockDragMode(side: "left" | "right", active: boolean): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("set_dock_drag_mode", { side, active });
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-export async function setDockPopoutMode(side: "left" | "right", active: boolean) {
+export async function setDockPopoutMode(side: "left" | "right", active: boolean): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("set_dock_popout_mode", { side, active });
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
@@ -28,7 +31,7 @@ export async function updateDockSizes(
   leftWidth?: number | null,
   rightWidth?: number | null,
   commit: boolean = false
-) {
+): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("update_dock_sizes", {
@@ -37,28 +40,28 @@ export async function updateDockSizes(
       commit,
     });
     return true;
-  } catch (err) {
+  } catch {
     // In web preview mode, invoke is simulated gracefully
     return false;
   }
 }
 
-export async function restoreWorkArea() {
+export async function restoreWorkArea(): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("restore_work_area");
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-export async function minimizeToTray() {
+export async function minimizeToTray(): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("minimize_to_tray");
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
@@ -75,29 +78,26 @@ export async function getScreenMetrics() {
       original_bottom: number;
     }>("get_screen_metrics");
     return metrics;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
-export async function exitApp() {
+export async function exitApp(): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("exit_app");
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
-
-import type { SystemDiagnostics } from "../types/diagnostics";
-export type { SystemDiagnostics };
 
 export async function getSystemDiagnostics(): Promise<SystemDiagnostics | null> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<SystemDiagnostics>("get_system_diagnostics");
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -107,7 +107,7 @@ export async function openSettingsWindow(): Promise<boolean> {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("open_settings_window");
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
@@ -117,8 +117,7 @@ export async function closeSettingsWindow(): Promise<boolean> {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("close_settings_window");
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
-

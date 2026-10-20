@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ResizeHandle } from "./ResizeHandle";
 
 // Mock Tauri bridge invocation
-vi.mock("../utils/tauriBridge", () => ({
+vi.mock("../../services/tauriBridge", () => ({
   setDockDragMode: vi.fn().mockResolvedValue(true),
 }));
 

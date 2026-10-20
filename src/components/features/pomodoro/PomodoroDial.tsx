@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Play, Pause, RotateCcw, Timer, Plus, Minus, Check, X, Sliders, Square } from "lucide-react";
-import { usePomodoro } from "../utils/pomodoroStore";
+import { usePomodoro } from "../../../stores/pomodoroStore";
 
 interface PomodoroDialProps {
   isCompact?: boolean;

@@ -1,13 +1,13 @@
 import React from "react";
 import { Sliders, RotateCcw, Check } from "lucide-react";
-import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH } from "../../utils/store";
+import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH } from "../../../stores/layoutStore";
 
-interface PaneSizingMemorySectionProps {
+interface AppearanceTabProps {
   onResetDefaults: () => void;
   resetSuccess: boolean;
 }
 
-export const PaneSizingMemorySection: React.FC<PaneSizingMemorySectionProps> = ({
+export const AppearanceTab: React.FC<AppearanceTabProps> = ({
   onResetDefaults,
   resetSuccess,
 }) => {

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Target, Plus, Check, Trash2, ChevronRight, ChevronDown, Sparkles } from "lucide-react";
 import { GoalNode } from "../../types/hud";
-import { loadGoals, saveGoals, getTodayString } from "../../utils/store";
-import { Tree3DView } from "../Tree3DView";
+import { loadGoals, saveGoals, getTodayString } from "../../stores/layoutStore";
+import { Tree3DView } from "../features/tree3d/Tree3DView";
 
 interface GoalsViewProps {
   show3D?: boolean;

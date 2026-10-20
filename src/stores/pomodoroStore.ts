@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { playSessionCompleteSound } from "../services/audioService";
 
 export type PomodoroMode = "focus" | "short_break" | "long_break";
 
@@ -127,8 +128,8 @@ const tick = () => {
 const updateTimerLoop = () => {
   if (state.isRunning && !intervalId) {
     intervalId = setInterval(tick, 1000);
-    if (intervalId && typeof (intervalId as any).unref === "function") {
-      (intervalId as any).unref();
+    if (intervalId && typeof (intervalId as unknown as { unref?: () => void }).unref === "function") {
+      (intervalId as unknown as { unref: () => void }).unref();
     }
   } else if (!state.isRunning && intervalId) {
     clearInterval(intervalId);
@@ -137,6 +138,8 @@ const updateTimerLoop = () => {
 };
 
 const handleCompleted = (currentDaily?: DailyStats) => {
+  playSessionCompleteSound();
+
   const today = getTodayDateString();
   const isFocus = state.mode === "focus";
   const baseDaily = currentDaily || state.dailyStats;
@@ -309,6 +312,17 @@ export const pomodoroActions = {
     localStorage.removeItem("focushud_pomodoro_daily");
     localStorage.removeItem("focusdock_pomodoro_daily");
     state = { ...state, dailyStats: fresh };
+    notify();
+  },
+
+  setDailyStats: (stats: Partial<DailyStats>) => {
+    state = { ...state, dailyStats: { ...state.dailyStats, ...stats } };
+    localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
+    notify();
+  },
+
+  reloadDailyStats: () => {
+    state = { ...state, dailyStats: loadInitialDailyStats() };
     notify();
   },
 

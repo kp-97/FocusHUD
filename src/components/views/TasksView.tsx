@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { CheckSquare, Search, Plus, Check, Trash2, Tag, Sparkles } from "lucide-react";
 import { TaskItem, GoalNode } from "../../types/hud";
-import { loadTasks, saveTasks, loadGoals, getTodayString } from "../../utils/store";
-import { Tree3DView, TreeNode3D } from "../Tree3DView";
+import { loadTasks, saveTasks, loadGoals, getTodayString } from "../../stores/layoutStore";
+import { Tree3DView, TreeNode3D } from "../features/tree3d/Tree3DView";
 
 interface TasksViewProps {
   show3D?: boolean;

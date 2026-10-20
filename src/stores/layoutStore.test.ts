@@ -33,10 +33,10 @@ import {
   getMaxRightWidth,
   setMaxRightWidth,
   applyMaxPaneWidths,
-} from "./store";
+} from "./layoutStore";
 import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode, NavItemConfig } from "../types/hud";
 
-describe("store utility module", () => {
+describe("layoutStore module", () => {
   beforeEach(() => {
     localStorage.clear();
   });

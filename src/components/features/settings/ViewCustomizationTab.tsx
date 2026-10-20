@@ -1,8 +1,8 @@
 import React from "react";
 import { ListOrdered, Check, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
-import { NavItemConfig } from "../../types/hud";
+import { NavItemConfig } from "../../../types/hud";
 
-interface NavViewCustomizationSectionProps {
+interface ViewCustomizationTabProps {
   navConfig: NavItemConfig[];
   onToggleVisibility: (id: string) => void;
   onMoveUp: (index: number) => void;
@@ -11,7 +11,7 @@ interface NavViewCustomizationSectionProps {
   navResetSuccess: boolean;
 }
 
-export const NavViewCustomizationSection: React.FC<NavViewCustomizationSectionProps> = ({
+export const ViewCustomizationTab: React.FC<ViewCustomizationTabProps> = ({
   navConfig,
   onToggleVisibility,
   onMoveUp,

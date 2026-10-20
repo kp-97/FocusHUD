@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { GripVertical } from "lucide-react";
-import { setDockDragMode } from "../utils/tauriBridge";
+import { setDockDragMode } from "../../services/tauriBridge";
 
 interface ResizeHandleProps {
   side: "left" | "right";

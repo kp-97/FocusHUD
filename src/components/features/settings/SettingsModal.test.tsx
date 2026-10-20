@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
-import * as store from "../utils/store";
+import * as store from "../../../stores/layoutStore";
 
 describe("SettingsModal component", () => {
   beforeEach(() => {

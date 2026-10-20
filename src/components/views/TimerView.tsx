@@ -1,6 +1,6 @@
 import React from "react";
-import { PomodoroDial } from "../PomodoroDial";
-import { HudBrackets } from "../HudBrackets";
+import { PomodoroDial } from "../features/pomodoro/PomodoroDial";
+import { HudBrackets } from "../ui/HudBrackets";
 
 export const TimerView: React.FC = () => {
   return (

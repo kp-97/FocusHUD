@@ -1,6 +1,6 @@
 import React from "react";
 import { Settings, Palette, Puzzle, LogOut } from "lucide-react";
-import { exitApp } from "../../utils/tauriBridge";
+import { exitApp } from "../../../services/tauriBridge";
 
 interface SystemMenuDropdownProps {
   isOpen: boolean;

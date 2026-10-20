@@ -11,15 +11,15 @@ import {
   Menu,
   Settings,
 } from "lucide-react";
-import { HudBrackets } from "./HudBrackets";
-import { WaveformVisualizer } from "./WaveformVisualizer";
-import { SidebarToggleIcon } from "./SidebarToggleIcon";
-import { getSystemDiagnostics, setDockPopoutMode } from "../utils/tauriBridge";
-import type { SystemDiagnostics } from "../types/diagnostics";
-import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../utils/store";
-import { NavViewId, NavItemConfig } from "../types/hud";
-import { SystemMenuDropdown } from "./leftSidebar/SystemMenuDropdown";
-import { DiagnosticsPanel } from "./leftSidebar/DiagnosticsPanel";
+import { HudBrackets } from "../../ui/HudBrackets";
+import { WaveformVisualizer } from "../../ui/WaveformVisualizer";
+import { SidebarToggleIcon } from "../../ui/SidebarToggleIcon";
+import { getSystemDiagnostics, setDockPopoutMode } from "../../../services/tauriBridge";
+import type { SystemDiagnostics } from "../../../types/diagnostics";
+import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../../../stores/layoutStore";
+import { NavViewId, NavItemConfig } from "../../../types/hud";
+import { SystemMenuDropdown } from "./SystemMenuDropdown";
+import { DiagnosticsCard } from "./DiagnosticsCard";
 
 const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -253,7 +253,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         {/* Bottom Section: System Stats (Extracted Component) & Settings Button */}
         <div className="shrink-0 w-full flex flex-col border-t border-cyan-500/30 pt-2">
           {!isIconOnly && (
-            <DiagnosticsPanel
+            <DiagnosticsCard
               diag={diag}
               collapsed={diagnosticsCollapsed}
               onToggleCollapse={toggleDiagnosticsCollapsed}

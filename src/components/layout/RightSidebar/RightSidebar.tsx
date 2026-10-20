@@ -1,20 +1,20 @@
-import { HudBrackets } from "./HudBrackets";
+import { HudBrackets } from "../../ui/HudBrackets";
 import React, { useState, useEffect } from "react";
 import { X, Minus, Square } from "lucide-react";
-import { exitApp, minimizeToTray } from "../utils/tauriBridge";
-import { NavViewId } from "../types/hud";
-import { getInitialNav, subscribeNavChange } from "../utils/store";
+import { exitApp, minimizeToTray } from "../../../services/tauriBridge";
+import { NavViewId } from "../../../types/hud";
+import { getInitialNav, subscribeNavChange } from "../../../stores/layoutStore";
 import { RightSidebarCompactRail } from "./RightSidebarCompactRail";
 
 // View components
-import { HomeView } from "./views/HomeView";
-import { ChatView } from "./views/ChatView";
-import { CalendarView } from "./views/CalendarView";
-import { GoalsView } from "./views/GoalsView";
-import { TasksView } from "./views/TasksView";
-import { KanbanView } from "./views/KanbanView";
-import { ActionPlansView } from "./views/ActionPlansView";
-import { TimerView } from "./views/TimerView";
+import { HomeView } from "../../views/HomeView";
+import { ChatView } from "../../views/ChatView";
+import { CalendarView } from "../../views/CalendarView";
+import { GoalsView } from "../../views/GoalsView";
+import { TasksView } from "../../views/TasksView";
+import { KanbanView } from "../../views/KanbanView";
+import { ActionPlansView } from "../../views/ActionPlansView";
+import { TimerView } from "../../views/TimerView";
 
 interface RightSidebarProps {
   width: number;

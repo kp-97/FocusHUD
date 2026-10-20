@@ -7,15 +7,15 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import type { SystemDiagnostics } from "../../types/diagnostics";
+import type { SystemDiagnostics } from "../../../types/diagnostics";
 
-interface DiagnosticsPanelProps {
+interface DiagnosticsCardProps {
   diag: SystemDiagnostics | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
+export const DiagnosticsCard: React.FC<DiagnosticsCardProps> = ({
   diag,
   collapsed,
   onToggleCollapse,

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { RightSidebar } from "./RightSidebar";
-import { pomodoroActions } from "../utils/pomodoroStore";
-import * as tauriBridge from "../utils/tauriBridge";
+import { pomodoroActions } from "../../../stores/pomodoroStore";
+import * as tauriBridge from "../../../services/tauriBridge";
 
-vi.mock("../utils/tauriBridge", () => ({
+vi.mock("../../../services/tauriBridge", () => ({
   exitApp: vi.fn(),
   minimizeToTray: vi.fn(),
   getSystemDiagnostics: vi.fn().mockResolvedValue(null),

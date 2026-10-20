@@ -430,4 +430,3 @@ export const applyMaxPaneWidths = (maxLeft: number, maxRight: number) => {
     maxRightWidth: getMaxRightWidth(),
   });
 };
-
