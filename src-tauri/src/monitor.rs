@@ -1,5 +1,7 @@
 use serde::Serialize;
 use std::sync::Mutex;
+#[cfg(target_os = "windows")]
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{POINT, RECT};
@@ -22,6 +24,8 @@ static ORIGINAL_WORK_AREA: Mutex<Option<RECT>> = Mutex::new(None);
 static CURRENT_WORK_AREA: Mutex<Option<RECT>> = Mutex::new(None);
 #[cfg(target_os = "windows")]
 static PREVIOUS_WORK_AREA: Mutex<Option<RECT>> = Mutex::new(None);
+#[cfg(target_os = "windows")]
+static WORK_AREA_SEQ: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize)]
 pub struct ScreenMetrics {
@@ -106,19 +110,27 @@ pub fn set_work_area_cache(new_rect: RECT, orig: RECT) {
 #[cfg(target_os = "windows")]
 pub unsafe fn apply_system_work_area(new_rect: &RECT) {
     let rect_copy = *new_rect;
+    let seq = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
     unsafe {
         // Immediate synchronous application of work area without broadcast delay
         SystemParametersInfoW(SPI_SETWORKAREA, 0, &rect_copy as *const _ as *mut _, 0);
     }
 
-    // Detached thread for non-blocking broadcast to external windows and taskbars
-    std::thread::spawn(move || unsafe {
-        SystemParametersInfoW(
-            SPI_SETWORKAREA,
-            0,
-            &rect_copy as *const _ as *mut _,
-            SPIF_SENDCHANGE,
-        );
+    // Detached thread for non-blocking broadcast to external windows and taskbars.
+    // Delay slightly and verify sequence counter to ensure newer work area updates
+    // are not overwritten by an earlier thread, preventing broadcast races.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        if WORK_AREA_SEQ.load(Ordering::SeqCst) == seq {
+            unsafe {
+                SystemParametersInfoW(
+                    SPI_SETWORKAREA,
+                    0,
+                    &rect_copy as *const _ as *mut _,
+                    SPIF_SENDCHANGE,
+                );
+            }
+        }
     });
 }
 
@@ -128,16 +140,22 @@ pub fn restore_work_area() -> Result<(), String> {
         let lock = ORIGINAL_WORK_AREA.lock().unwrap();
         if let Some(orig) = *lock {
             let orig_copy = orig;
+            let seq = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
             unsafe {
                 SystemParametersInfoW(SPI_SETWORKAREA, 0, &orig_copy as *const _ as *mut _, 0);
             }
-            std::thread::spawn(move || unsafe {
-                SystemParametersInfoW(
-                    SPI_SETWORKAREA,
-                    0,
-                    &orig_copy as *const _ as *mut _,
-                    SPIF_SENDCHANGE,
-                );
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+                if WORK_AREA_SEQ.load(Ordering::SeqCst) == seq {
+                    unsafe {
+                        SystemParametersInfoW(
+                            SPI_SETWORKAREA,
+                            0,
+                            &orig_copy as *const _ as *mut _,
+                            SPIF_SENDCHANGE,
+                        );
+                    }
+                }
             });
         }
     }

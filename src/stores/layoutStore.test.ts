@@ -197,7 +197,7 @@ describe("layoutStore module", () => {
       });
 
       const actionData = {
-        action: { type: "SET_PANES_WIDTH", leftWidth: 68, rightWidth: 68 } as LayoutAction,
+        action: { type: "SET_PANES_WIDTH", leftWidth: 68, rightWidth: 68, sender: "right" } as LayoutAction,
         timestamp: Date.now(),
       };
 
@@ -210,10 +210,27 @@ describe("layoutStore module", () => {
       );
 
       expect(received).toEqual([
-        { type: "SET_PANES_WIDTH", leftWidth: 68, rightWidth: 68 },
+        { type: "SET_PANES_WIDTH", leftWidth: 68, rightWidth: 68, sender: "right" },
       ]);
 
       unsubscribe();
+    });
+
+    it("persists and broadcasts layout action with sender", () => {
+      broadcastLayoutAction({
+        type: "SET_RIGHT_WIDTH",
+        width: 360,
+        sender: "right",
+      });
+
+      const raw = localStorage.getItem("focushud_last_layout_action");
+      expect(raw).toBeTruthy();
+      const parsed = JSON.parse(raw!);
+      expect(parsed.action).toEqual({
+        type: "SET_RIGHT_WIDTH",
+        width: 360,
+        sender: "right",
+      });
     });
   });
 

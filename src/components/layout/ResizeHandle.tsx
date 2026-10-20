@@ -39,6 +39,9 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
   const grabOffsetRef = useRef<number>(0);
   const currentWidthRef = useRef<number>(currentWidth);
   currentWidthRef.current = currentWidth;
+  const pointerDownPosRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  isDraggingRef.current = isDragging;
 
   const getDistanceFromScreenEdge = (clientX: number) => {
     return side === "left" ? clientX : window.innerWidth - clientX;
@@ -54,18 +57,30 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch (_) {}
 
-    setDockDragMode(side, true);
+    pointerDownPosRef.current = { clientX: e.clientX, clientY: e.clientY };
 
     const dist = getDistanceFromScreenEdge(e.clientX);
     const rawOffset = dist - currentWidthRef.current;
     grabOffsetRef.current = Math.max(-14, Math.min(14, rawOffset));
-
-    setIsDragging(true);
-    onDragStart?.();
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
+    if (!pointerDownPosRef.current) return;
+
+    if (!isDraggingRef.current) {
+      const delta = Math.hypot(
+        e.clientX - pointerDownPosRef.current.clientX,
+        e.clientY - pointerDownPosRef.current.clientY
+      );
+      if (delta >= 3) {
+        setDockDragMode(side, true);
+        setIsDragging(true);
+        isDraggingRef.current = true;
+        onDragStart?.();
+      } else {
+        return;
+      }
+    }
 
     const dist = getDistanceFromScreenEdge(e.clientX);
     let targetWidth = Math.round(dist - grabOffsetRef.current);
@@ -89,13 +104,17 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
+    pointerDownPosRef.current = null;
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch (_) {}
-    setIsDragging(false);
-    setActiveSnapLabel(null);
-    onDragEnd(currentWidthRef.current);
+
+    if (isDraggingRef.current) {
+      setIsDragging(false);
+      isDraggingRef.current = false;
+      setActiveSnapLabel(null);
+      onDragEnd(currentWidthRef.current);
+    }
   };
 
   return (

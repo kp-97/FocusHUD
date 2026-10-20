@@ -112,28 +112,32 @@ export default function App() {
   // Cross-window layout command listener (e.g. Maximize Panes)
   useEffect(() => {
     const unsubscribe = subscribeLayoutAction((action) => {
+      // If the action was sent by another window, update local state only.
+      // Do NOT re-invoke updateDockSizes to avoid duplicate Win32 work area / snap calculations.
+      const isRemote = Boolean(action.sender && action.sender !== dockWindowType);
+
       if (action.type === "MAXIMIZE_PANES") {
         const prevL = getRememberedLeftWidth();
         const prevR = getRememberedRightWidth();
         setLeftWidth(prevL);
         setRightWidth(prevR);
-        if (dockWindowType !== "full" || desktopDockActive) {
+        if (!isRemote && (dockWindowType !== "full" || desktopDockActive)) {
           updateDockSizes(prevL, prevR, true);
         }
       } else if (action.type === "SET_PANES_WIDTH") {
         setLeftWidth(action.leftWidth);
         setRightWidth(action.rightWidth);
-        if (dockWindowType !== "full" || desktopDockActive) {
+        if (!isRemote && (dockWindowType !== "full" || desktopDockActive)) {
           updateDockSizes(action.leftWidth, action.rightWidth, true);
         }
       } else if (action.type === "SET_LEFT_WIDTH") {
         setLeftWidth(action.width);
-        if (dockWindowType !== "full" || desktopDockActive) {
+        if (!isRemote && (dockWindowType !== "full" || desktopDockActive)) {
           updateDockSizes(action.width, null, true);
         }
       } else if (action.type === "SET_RIGHT_WIDTH") {
         setRightWidth(action.width);
-        if (dockWindowType !== "full" || desktopDockActive) {
+        if (!isRemote && (dockWindowType !== "full" || desktopDockActive)) {
           updateDockSizes(null, action.width, true);
         }
       } else if (action.type === "SET_MAX_WIDTHS") {
@@ -175,7 +179,7 @@ export default function App() {
     if (finalWidth >= 120) {
       setRememberedLeftWidth(finalWidth);
     }
-    broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: finalWidth });
+    broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: finalWidth, sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(finalWidth, null, true);
     }
@@ -185,14 +189,14 @@ export default function App() {
     if (leftWidth <= 70) {
       const next = getRememberedLeftWidth();
       setLeftWidth(next);
-      broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: next });
+      broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: next, sender: dockWindowType });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(next, null, true);
       }
     } else {
       setRememberedLeftWidth(leftWidth);
       setLeftWidth(68);
-      broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: 68 });
+      broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: 68, sender: dockWindowType });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(68, null, true);
       }
@@ -212,6 +216,7 @@ export default function App() {
         type: "SET_PANES_WIDTH",
         leftWidth: prevLeft,
         rightWidth: prevRight,
+        sender: dockWindowType,
       });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(prevLeft, prevRight, true);
@@ -225,6 +230,7 @@ export default function App() {
         type: "SET_PANES_WIDTH",
         leftWidth: 68,
         rightWidth: 68,
+        sender: dockWindowType,
       });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(68, 68, true);
@@ -238,14 +244,14 @@ export default function App() {
     if (rightWidth < 120) {
       const next = getRememberedRightWidth();
       setRightWidth(next);
-      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: next });
+      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: next, sender: dockWindowType });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(null, next, true);
       }
     } else {
       setRememberedRightWidth(rightWidth);
       setRightWidth(68);
-      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: 68 });
+      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: 68, sender: dockWindowType });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(null, 68, true);
       }
@@ -258,7 +264,7 @@ export default function App() {
     const prevRight = getRememberedRightWidth();
     setLeftWidth(prevLeft);
     setRightWidth(prevRight);
-    broadcastLayoutAction({ type: "MAXIMIZE_PANES" });
+    broadcastLayoutAction({ type: "MAXIMIZE_PANES", sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(prevLeft, prevRight, true);
     }
@@ -274,7 +280,7 @@ export default function App() {
     if (finalWidth >= 120) {
       setRememberedRightWidth(finalWidth);
     }
-    broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: finalWidth });
+    broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: finalWidth, sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(null, finalWidth, true);
     }
@@ -284,14 +290,14 @@ export default function App() {
     if (rightWidth <= 70) {
       const next = getRememberedRightWidth();
       setRightWidth(next);
-      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: next });
+      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: next, sender: dockWindowType });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(null, next, true);
       }
     } else {
       setRememberedRightWidth(rightWidth);
       setRightWidth(68);
-      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: 68 });
+      broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: 68, sender: dockWindowType });
       if (dockWindowType !== "full" || desktopDockActive) {
         updateDockSizes(null, 68, true);
       }
@@ -307,6 +313,7 @@ export default function App() {
       type: "SET_PANES_WIDTH",
       leftWidth: DEFAULT_LEFT_WIDTH,
       rightWidth: DEFAULT_RIGHT_WIDTH,
+      sender: dockWindowType,
     });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH, true);
@@ -320,6 +327,7 @@ export default function App() {
       type: "SET_PANES_WIDTH",
       leftWidth: left,
       rightWidth: right,
+      sender: dockWindowType,
     });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(left, right, true);
@@ -336,6 +344,7 @@ export default function App() {
       type: "SET_PANES_WIDTH",
       leftWidth: 280,
       rightWidth: 280,
+      sender: dockWindowType,
     });
   };
 
