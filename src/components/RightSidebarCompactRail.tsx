@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut } from "lucide-react";
+import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
 import { usePomodoro } from "../utils/pomodoroStore";
 import { exitApp } from "../utils/tauriBridge";
 
@@ -43,6 +43,7 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
     isRunning,
     dailyStats,
     toggleRun,
+    stop,
     reset,
   } = usePomodoro();
 
@@ -210,24 +211,47 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
 
       {/* 3. Centered Action Controls */}
       <div className="flex flex-col items-center gap-1.5 w-full shrink-0">
-        <button
-          onClick={toggleRun}
-          title={isRunning ? "Pause Timer" : "Start Focus Timer"}
-          className={`hud-btn w-9 h-9 flex items-center justify-center rounded cursor-pointer transition-all ${isRunning
-            ? "hud-btn-active border-amber-400 bg-amber-500/25 shadow-[0_0_12px_rgba(255,145,0,0.4)] text-amber-100"
-            : "border-amber-500/40 text-amber-300 hover:text-amber-100 hover:border-amber-400"
-            }`}
-        >
-          {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-        </button>
+        {isRunning ? (
+          <>
+            <button
+              onClick={toggleRun}
+              title="Pause Timer"
+              aria-label="Pause Timer"
+              className="hud-btn w-9 h-9 flex items-center justify-center rounded cursor-pointer transition-all hud-btn-active border-amber-400 bg-amber-500/25 shadow-[0_0_12px_rgba(255,145,0,0.4)] text-amber-100"
+            >
+              <Pause className="w-4 h-4" />
+            </button>
 
-        <button
-          onClick={reset}
-          title="Reset Timer"
-          className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/30 text-amber-400/70 hover:text-amber-200 hover:border-amber-400"
-        >
-          <RotateCcw className="w-3 h-3" />
-        </button>
+            <button
+              onClick={stop}
+              title="Cancel Timer"
+              aria-label="Cancel Timer"
+              className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-red-500/30 text-red-400/70 hover:text-red-200 hover:border-red-400"
+            >
+              <Square className="w-2.5 h-2.5 fill-red-400" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={toggleRun}
+              title="Start Focus Timer"
+              aria-label="Start Timer"
+              className="hud-btn w-9 h-9 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/40 text-amber-300 hover:text-amber-100 hover:border-amber-400"
+            >
+              <Play className="w-4 h-4 ml-0.5" />
+            </button>
+
+            <button
+              onClick={reset}
+              title="Reset Timer"
+              aria-label="Reset Timer"
+              className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/30 text-amber-400/70 hover:text-amber-200 hover:border-amber-400"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* 4. Session Cycles / Pips */}

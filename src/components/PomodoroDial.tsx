@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Timer, Plus, Minus, Check, X, Sliders } from "lucide-react";
+import { Play, Pause, RotateCcw, Timer, Plus, Minus, Check, X, Sliders, Square } from "lucide-react";
 import { usePomodoro } from "../utils/pomodoroStore";
 
 interface PomodoroDialProps {
@@ -21,6 +21,7 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
     isRunning,
     dailyStats,
     toggleRun,
+    stop: stopTimer,
     reset: resetTimer,
     adjustMinutes,
     setFocusMinutes,
@@ -370,35 +371,50 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
       <div className="flex items-center gap-2 mt-2">
         <button
           onClick={() => adjustMinutes(-1)}
-          title="Decrease 1m"
-          className="p-1 rounded bg-black/40 border border-orange-500/30 text-orange-400 hover:border-orange-400 hover:text-white transition"
+          disabled={timeLeft < 60}
+          title={timeLeft < 60 ? "Cannot decrease below 1 minute" : "Decrease 1m"}
+          className={`p-1 rounded bg-black/40 border text-orange-400 transition ${
+            timeLeft < 60
+              ? "border-orange-500/10 text-orange-400/30 cursor-not-allowed"
+              : "border-orange-500/30 hover:border-orange-400 hover:text-white cursor-pointer"
+          }`}
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
 
-        <button
-          onClick={toggleRun}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-tech font-bold uppercase transition ${
-            isRunning
-              ? "bg-amber-600/30 border border-amber-500 text-amber-200 shadow-[0_0_12px_rgba(255,179,0,0.3)]"
-              : "bg-orange-500/20 border border-orange-500 text-orange-300 hover:bg-orange-500/30"
-          }`}
-        >
-          {isRunning ? (
-            <>
+        {isRunning ? (
+          <>
+            <button
+              onClick={stopTimer}
+              title="Cancel Timer"
+              aria-label="Cancel Timer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-tech font-bold uppercase transition bg-red-950/30 border border-red-500/40 text-red-400 hover:bg-red-900/40 hover:border-red-400 hover:text-red-200 cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.2)]"
+            >
+              <Square className="w-3 h-3 fill-red-400" /> CANCEL
+            </button>
+
+            <button
+              onClick={toggleRun}
+              title="Pause Timer"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-tech font-bold uppercase transition bg-amber-600/30 border border-amber-500 text-amber-200 shadow-[0_0_12px_rgba(255,179,0,0.3)] hover:bg-amber-600/40 cursor-pointer"
+            >
               <Pause className="w-3 h-3 fill-amber-300" /> PAUSE
-            </>
-          ) : (
-            <>
-              <Play className="w-3 h-3 fill-orange-400" /> START
-            </>
-          )}
-        </button>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={toggleRun}
+            title="Start Focus Timer"
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-tech font-bold uppercase transition bg-orange-500/20 border border-orange-500 text-orange-300 hover:bg-orange-500/30 cursor-pointer"
+          >
+            <Play className="w-3 h-3 fill-orange-400" /> START
+          </button>
+        )}
 
         <button
           onClick={resetTimer}
           title="Reset Timer"
-          className="p-1 rounded bg-black/40 border border-orange-500/30 text-orange-400 hover:border-orange-400 hover:text-white transition"
+          className="p-1 rounded bg-black/40 border border-orange-500/30 text-orange-400 hover:border-orange-400 hover:text-white transition cursor-pointer"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
@@ -406,7 +422,7 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
         <button
           onClick={() => adjustMinutes(1)}
           title="Increase 1m"
-          className="p-1 rounded bg-black/40 border border-orange-500/30 text-orange-400 hover:border-orange-400 hover:text-white transition"
+          className="p-1 rounded bg-black/40 border border-orange-500/30 text-orange-400 hover:border-orange-400 hover:text-white transition cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>

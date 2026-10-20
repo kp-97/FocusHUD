@@ -6,6 +6,7 @@ export interface DailyStats {
   date: string;
   completedPomodoros: number;
   totalFocusMinutes: number;
+  focusSecondsElapsed?: number;
 }
 
 export interface PomodoroState {
@@ -37,13 +38,18 @@ const loadInitialDailyStats = (): DailyStats => {
     try {
       const parsed = JSON.parse(raw) as DailyStats;
       if (parsed.date === today) {
-        return parsed;
+        return {
+          date: today,
+          completedPomodoros: Number(parsed.completedPomodoros) || 0,
+          totalFocusMinutes: Number(parsed.totalFocusMinutes) || 0,
+          focusSecondsElapsed: Number(parsed.focusSecondsElapsed) || 0,
+        };
       }
     } catch {
       // Fallback
     }
   }
-  return { date: today, completedPomodoros: 0, totalFocusMinutes: 0 };
+  return { date: today, completedPomodoros: 0, totalFocusMinutes: 0, focusSecondsElapsed: 0 };
 };
 
 const initialFocusMinutes = getStoredNumber("focushud_pomodoro_focus_min", "focusdock_pomodoro_focus_min", 25);
@@ -76,11 +82,44 @@ const notify = () => {
 const tick = () => {
   if (!state.isRunning) return;
 
+  const today = getTodayDateString();
+  let updatedDaily: DailyStats = { ...state.dailyStats };
+  if (updatedDaily.date !== today) {
+    updatedDaily = {
+      date: today,
+      completedPomodoros: 0,
+      totalFocusMinutes: 0,
+      focusSecondsElapsed: 0,
+    };
+  }
+
+  // If in focus phase, track seconds elapsed and increment focus minutes every 60s
+  if (state.mode === "focus") {
+    const nextSeconds = (updatedDaily.focusSecondsElapsed || 0) + 1;
+    if (nextSeconds >= 60) {
+      updatedDaily = {
+        ...updatedDaily,
+        focusSecondsElapsed: nextSeconds - 60,
+        totalFocusMinutes: updatedDaily.totalFocusMinutes + 1,
+      };
+      localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(updatedDaily));
+    } else {
+      updatedDaily = {
+        ...updatedDaily,
+        focusSecondsElapsed: nextSeconds,
+      };
+    }
+  }
+
   if (state.timeLeft <= 1) {
     // Session completed
-    handleCompleted();
+    handleCompleted(updatedDaily);
   } else {
-    state = { ...state, timeLeft: state.timeLeft - 1 };
+    state = {
+      ...state,
+      timeLeft: state.timeLeft - 1,
+      dailyStats: updatedDaily,
+    };
     notify();
   }
 };
@@ -97,13 +136,15 @@ const updateTimerLoop = () => {
   }
 };
 
-const handleCompleted = () => {
+const handleCompleted = (currentDaily?: DailyStats) => {
   const today = getTodayDateString();
   const isFocus = state.mode === "focus";
+  const baseDaily = currentDaily || state.dailyStats;
   const updatedDaily: DailyStats = {
     date: today,
-    completedPomodoros: (state.dailyStats.date === today ? state.dailyStats.completedPomodoros : 0) + (isFocus ? 1 : 0),
-    totalFocusMinutes: (state.dailyStats.date === today ? state.dailyStats.totalFocusMinutes : 0) + (isFocus ? state.focusMinutes : 0),
+    completedPomodoros: (baseDaily.date === today ? baseDaily.completedPomodoros : 0) + (isFocus ? 1 : 0),
+    totalFocusMinutes: baseDaily.date === today ? baseDaily.totalFocusMinutes : 0,
+    focusSecondsElapsed: baseDaily.date === today ? (baseDaily.focusSecondsElapsed || 0) : 0,
   };
   localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(updatedDaily));
 
@@ -172,9 +213,67 @@ export const pomodoroActions = {
   pause: () => {
     if (state.isRunning) {
       state = { ...state, isRunning: false };
+      localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
       updateTimerLoop();
       notify();
     }
+  },
+
+  stop: () => {
+    // Cancels the active timer: stops running and resets countdown back to initial duration for current mode
+    let mins = state.focusMinutes;
+    if (state.mode === "short_break") mins = state.shortBreakMinutes;
+    if (state.mode === "long_break") mins = state.longBreakMinutes;
+
+    state = {
+      ...state,
+      isRunning: false,
+      totalSeconds: mins * 60,
+      timeLeft: mins * 60,
+    };
+
+    localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
+    updateTimerLoop();
+    notify();
+  },
+
+  cancel: () => {
+    pomodoroActions.stop();
+  },
+
+  skipPhase: () => {
+    const isFocus = state.mode === "focus";
+    let nextMode: PomodoroMode = "focus";
+    let nextCycle = state.cycle;
+    let nextMins = state.focusMinutes;
+
+    if (isFocus) {
+      if (state.cycle >= state.totalCycles) {
+        nextMode = "long_break";
+        nextCycle = 1;
+        nextMins = state.longBreakMinutes;
+      } else {
+        nextMode = "short_break";
+        nextCycle = state.cycle + 1;
+        nextMins = state.shortBreakMinutes;
+      }
+    } else {
+      nextMode = "focus";
+      nextMins = state.focusMinutes;
+    }
+
+    state = {
+      ...state,
+      mode: nextMode,
+      cycle: nextCycle,
+      totalSeconds: nextMins * 60,
+      timeLeft: nextMins * 60,
+      isRunning: false,
+    };
+
+    localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
+    updateTimerLoop();
+    notify();
   },
 
   reset: () => {
@@ -188,6 +287,28 @@ export const pomodoroActions = {
       timeLeft: mins * 60,
     };
     updateTimerLoop();
+    notify();
+  },
+
+  setCycle: (cycle: number) => {
+    state = {
+      ...state,
+      cycle: Math.max(1, Math.min(state.totalCycles, cycle)),
+    };
+    notify();
+  },
+
+  resetDailyStats: () => {
+    const today = getTodayDateString();
+    const fresh: DailyStats = {
+      date: today,
+      completedPomodoros: 0,
+      totalFocusMinutes: 0,
+      focusSecondsElapsed: 0,
+    };
+    localStorage.removeItem("focushud_pomodoro_daily");
+    localStorage.removeItem("focusdock_pomodoro_daily");
+    state = { ...state, dailyStats: fresh };
     notify();
   },
 
@@ -207,17 +328,40 @@ export const pomodoroActions = {
   },
 
   adjustMinutes: (delta: number) => {
-    const newTotal = Math.max(60, Math.min(3600 * 2, state.totalSeconds + delta * 60));
-    let newFocusMinutes = state.focusMinutes;
-    if (!state.isRunning && state.mode === "focus") {
-      newFocusMinutes = Math.round(newTotal / 60);
-      localStorage.setItem("focushud_pomodoro_focus_min", String(newFocusMinutes));
+    // If delta is negative (decrement) and timeLeft is less than 1 minute (60s), do nothing
+    if (delta < 0 && state.timeLeft < 60) {
+      return;
     }
+
+    const deltaSeconds = delta * 60;
+    const newTimeLeft = Math.max(0, Math.min(3600 * 2, state.timeLeft + deltaSeconds));
+    const newTotal = Math.max(newTimeLeft, state.totalSeconds + deltaSeconds);
+
+    let newFocusMinutes = state.focusMinutes;
+    let newShortBreak = state.shortBreakMinutes;
+    let newLongBreak = state.longBreakMinutes;
+
+    if (!state.isRunning && state.timeLeft === state.totalSeconds) {
+      const mins = Math.max(1, Math.round(newTimeLeft / 60));
+      if (state.mode === "focus") {
+        newFocusMinutes = mins;
+        localStorage.setItem("focushud_pomodoro_focus_min", String(mins));
+      } else if (state.mode === "short_break") {
+        newShortBreak = mins;
+        localStorage.setItem("focushud_pomodoro_short_min", String(mins));
+      } else if (state.mode === "long_break") {
+        newLongBreak = mins;
+        localStorage.setItem("focushud_pomodoro_long_min", String(mins));
+      }
+    }
+
     state = {
       ...state,
       totalSeconds: newTotal,
-      timeLeft: newTotal,
+      timeLeft: newTimeLeft,
       focusMinutes: newFocusMinutes,
+      shortBreakMinutes: newShortBreak,
+      longBreakMinutes: newLongBreak,
     };
     notify();
   },
