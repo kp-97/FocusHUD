@@ -23,7 +23,7 @@ import {
 import { HudBrackets } from "./HudBrackets";
 import { WaveformVisualizer } from "./WaveformVisualizer";
 import { SidebarToggleIcon } from "./SidebarToggleIcon";
-import { exitApp, getSystemDiagnostics, SystemDiagnostics } from "../utils/tauriBridge";
+import { exitApp, getSystemDiagnostics, setDockPopoutMode, SystemDiagnostics } from "../utils/tauriBridge";
 import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../utils/store";
 import { NavViewId, NavItemConfig } from "../types/hud";
 
@@ -37,9 +37,6 @@ const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }
   timer: Timer,
   kanban: Columns3,
 };
-import { exitApp, getSystemDiagnostics, setDockPopoutMode, SystemDiagnostics } from "../utils/tauriBridge";
-import { broadcastNavChange } from "../utils/store";
-import { NavViewId } from "../types/hud";
 
 interface LeftSidebarProps {
   width: number;
