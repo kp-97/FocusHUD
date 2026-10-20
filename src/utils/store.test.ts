@@ -20,8 +20,21 @@ import {
   broadcastLayoutAction,
   subscribeLayoutAction,
   LayoutAction,
+  DEFAULT_NAV_CONFIG,
+  loadNavConfig,
+  saveNavConfig,
+  resetNavConfig,
+  DEFAULT_MAX_LEFT_WIDTH,
+  DEFAULT_MAX_RIGHT_WIDTH,
+  MIN_PANE_MAX_WIDTH,
+  MAX_PANE_MAX_WIDTH,
+  getMaxLeftWidth,
+  setMaxLeftWidth,
+  getMaxRightWidth,
+  setMaxRightWidth,
+  applyMaxPaneWidths,
 } from "./store";
-import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode } from "../types/hud";
+import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode, NavItemConfig } from "../types/hud";
 
 describe("store utility module", () => {
   beforeEach(() => {
@@ -201,6 +214,116 @@ describe("store utility module", () => {
       ]);
 
       unsubscribe();
+    });
+  });
+
+  describe("navigation configuration", () => {
+    it("has expected default order: Home -> Chat -> Calendar -> Goals -> Tasks -> Action Plans -> Timer -> Kanban", () => {
+      const ids = DEFAULT_NAV_CONFIG.map((item) => item.id);
+      expect(ids).toEqual([
+        "home",
+        "chat",
+        "calendar",
+        "goals",
+        "tasks",
+        "action_plans",
+        "timer",
+        "kanban",
+      ]);
+      expect(DEFAULT_NAV_CONFIG.every((item) => item.visible)).toBe(true);
+    });
+
+    it("loads default nav config when localStorage is empty", () => {
+      const config = loadNavConfig();
+      expect(config).toEqual(DEFAULT_NAV_CONFIG);
+    });
+
+    it("saves and reloads custom nav order and visibility", () => {
+      const custom: NavItemConfig[] = [
+        { id: "timer", label: "TIMER", visible: true },
+        { id: "tasks", label: "TASKS", visible: false },
+        { id: "home", label: "HOME", visible: true },
+        { id: "chat", label: "AI CHAT", visible: true },
+        { id: "calendar", label: "CALENDAR", visible: true },
+        { id: "goals", label: "GOALS", visible: true },
+        { id: "action_plans", label: "ACTION PLANS", visible: true },
+        { id: "kanban", label: "KANBAN", visible: true },
+      ];
+
+      saveNavConfig(custom);
+      const loaded = loadNavConfig();
+      expect(loaded).toEqual(custom);
+    });
+
+    it("fills missing items and handles corrupted localStorage", () => {
+      // Partial list saved
+      localStorage.setItem(
+        "focushud_nav_config",
+        JSON.stringify([{ id: "kanban", label: "KANBAN", visible: false }])
+      );
+      const loaded = loadNavConfig();
+      expect(loaded[0]).toEqual({ id: "kanban", label: "KANBAN", visible: false });
+      expect(loaded.length).toBe(DEFAULT_NAV_CONFIG.length);
+
+      // Corrupted JSON
+      localStorage.setItem("focushud_nav_config", "{CORRUPT_JSON");
+      expect(loadNavConfig()).toEqual(DEFAULT_NAV_CONFIG);
+    });
+
+    it("resets nav config to defaults", () => {
+      const custom: NavItemConfig[] = [
+        { id: "kanban", label: "KANBAN", visible: false },
+        { id: "home", label: "HOME", visible: true },
+        { id: "chat", label: "AI CHAT", visible: true },
+        { id: "calendar", label: "CALENDAR", visible: true },
+        { id: "goals", label: "GOALS", visible: true },
+        { id: "tasks", label: "TASKS", visible: true },
+        { id: "action_plans", label: "ACTION PLANS", visible: true },
+        { id: "timer", label: "TIMER", visible: true },
+      ];
+      saveNavConfig(custom);
+
+      const reset = resetNavConfig();
+      expect(reset).toEqual(DEFAULT_NAV_CONFIG);
+      expect(loadNavConfig()).toEqual(DEFAULT_NAV_CONFIG);
+    });
+  });
+
+  describe("max pane width limits", () => {
+    it("returns default max widths when nothing is stored", () => {
+      expect(getMaxLeftWidth()).toBe(DEFAULT_MAX_LEFT_WIDTH);
+      expect(getMaxRightWidth()).toBe(DEFAULT_MAX_RIGHT_WIDTH);
+    });
+
+    it("sets and gets custom max widths clamped within bounds [280, 800]", () => {
+      setMaxLeftWidth(600);
+      setMaxRightWidth(750);
+      expect(getMaxLeftWidth()).toBe(600);
+      expect(getMaxRightWidth()).toBe(750);
+
+      // Below lower bound
+      setMaxLeftWidth(150);
+      expect(getMaxLeftWidth()).toBe(MIN_PANE_MAX_WIDTH);
+
+      // Above upper bound
+      setMaxRightWidth(1200);
+      expect(getMaxRightWidth()).toBe(MAX_PANE_MAX_WIDTH);
+    });
+
+    it("applies max pane widths and broadcasts action", () => {
+      applyMaxPaneWidths(550, 650);
+
+      expect(getMaxLeftWidth()).toBe(550);
+      expect(getMaxRightWidth()).toBe(650);
+
+      const raw = localStorage.getItem("focushud_last_layout_action");
+      expect(raw).toBeTruthy();
+      const parsed = JSON.parse(raw!);
+      expect(parsed.action).toEqual({
+        type: "SET_MAX_WIDTHS",
+        maxLeftWidth: 550,
+        maxRightWidth: 650,
+      });
     });
   });
 });

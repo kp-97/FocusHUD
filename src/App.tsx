@@ -5,7 +5,12 @@ import { CenterWorkspace } from "./components/CenterWorkspace";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { TopNavHUD } from "./components/TopNavHUD";
 import { SettingsModal } from "./components/SettingsModal";
-import { updateDockSizes, restoreWorkArea } from "./utils/tauriBridge";
+import {
+  updateDockSizes,
+  restoreWorkArea,
+  openSettingsWindow,
+  closeSettingsWindow,
+} from "./utils/tauriBridge";
 import {
   getRememberedLeftWidth,
   getRememberedRightWidth,
@@ -15,6 +20,8 @@ import {
   DEFAULT_RIGHT_WIDTH,
   broadcastLayoutAction,
   subscribeLayoutAction,
+  getMaxLeftWidth,
+  getMaxRightWidth,
 } from "./utils/store";
 
 const SNAP_POINTS = [
@@ -44,13 +51,19 @@ export default function App() {
   const [activeNav, setActiveNav] = useState<string>("home");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
-  // Check if opened as dedicated dock window (e.g. ?dock=left or ?dock=right)
-  const [dockWindowType] = useState<"left" | "right" | "full">(() => {
-    const param = new URLSearchParams(window.location.search).get("dock");
-    if (param === "left") return "left";
-    if (param === "right") return "right";
+  // Check if opened as dedicated dock window (e.g. ?dock=left or ?dock=right or ?dock=settings)
+  const [dockWindowType] = useState<"left" | "right" | "settings" | "full">(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dockParam = urlParams.get("dock");
+    const viewParam = urlParams.get("view");
+    if (dockParam === "settings" || viewParam === "settings") return "settings";
+    if (dockParam === "left") return "left";
+    if (dockParam === "right") return "right";
     return "full";
   });
+
+  const [maxLeftWidth, setMaxLeftWidth] = useState<number>(() => getMaxLeftWidth());
+  const [maxRightWidth, setMaxRightWidth] = useState<number>(() => getMaxRightWidth());
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(window.innerWidth);
@@ -123,10 +136,24 @@ export default function App() {
         if (dockWindowType !== "full" || desktopDockActive) {
           updateDockSizes(null, action.width, true);
         }
+      } else if (action.type === "SET_MAX_WIDTHS") {
+        setMaxLeftWidth(action.maxLeftWidth);
+        setMaxRightWidth(action.maxRightWidth);
       }
     });
     return () => unsubscribe();
   }, [dockWindowType, desktopDockActive]);
+
+  const handleOpenSettings = async () => {
+    if (dockWindowType !== "full") {
+      const opened = await openSettingsWindow();
+      if (!opened) {
+        setIsSettingsOpen(true);
+      }
+    } else {
+      setIsSettingsOpen(true);
+    }
+  };
 
   const handleToggleDesktopDock = async () => {
     if (desktopDockActive) {
@@ -317,6 +344,20 @@ export default function App() {
     containerWidth - leftWidth - rightWidth
   );
 
+  // Dedicated Centered Settings window
+  if (dockWindowType === "settings") {
+    return (
+      <SettingsModal
+        isOpen={true}
+        isStandalone={true}
+        onClose={() => {
+          closeSettingsWindow();
+        }}
+        onResetWidths={handleResetWidths}
+      />
+    );
+  }
+
   // Dedicated Left Dock window
   if (dockWindowType === "left") {
     return (
@@ -332,14 +373,14 @@ export default function App() {
             isCompact={leftWidth < 220}
             isDockMode={true}
             onToggleCollapse={handleLeftToggleCollapse}
-            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSettings={handleOpenSettings}
           />
           <div className="absolute top-0 bottom-0 right-0 w-2.5 z-50">
             <ResizeHandle
               side="left"
               currentWidth={leftWidth}
               minWidth={MIN_LEFT_WIDTH}
-              maxWidth={500}
+              maxWidth={maxLeftWidth}
               snapPoints={magneticSnap ? SNAP_POINTS : []}
               className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
               onDragChange={handleLeftDragChange}
@@ -371,7 +412,7 @@ export default function App() {
               side="right"
               currentWidth={rightWidth}
               minWidth={MIN_LEFT_WIDTH}
-              maxWidth={500}
+              maxWidth={maxRightWidth}
               snapPoints={magneticSnap ? SNAP_POINTS : []}
               className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
               onDragChange={handleRightDragChange}
@@ -387,7 +428,7 @@ export default function App() {
             onExpand={handleRightToggleCollapse}
             onCollapse={handleRightToggleCollapse}
             onMaximizePanes={handleMaximizePanes}
-            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSettings={handleOpenSettings}
           />
         </div>
 
@@ -430,7 +471,7 @@ export default function App() {
           onSelectNav={setActiveNav}
           isCompact={leftWidth < 220}
           onToggleCollapse={handleLeftToggleCollapse}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenSettings={handleOpenSettings}
         />
 
         {/* Left Resize Splitter Handle */}
@@ -438,7 +479,7 @@ export default function App() {
           side="left"
           currentWidth={leftWidth}
           minWidth={MIN_LEFT_WIDTH}
-          maxWidth={containerWidth - rightWidth - MIN_MIDDLE_WIDTH}
+          maxWidth={Math.min(maxLeftWidth, containerWidth - rightWidth - MIN_MIDDLE_WIDTH)}
           snapPoints={magneticSnap ? SNAP_POINTS : []}
           onDragChange={handleLeftDragChange}
           onDragEnd={handleLeftDragEnd}
@@ -457,7 +498,7 @@ export default function App() {
           side="right"
           currentWidth={rightWidth}
           minWidth={MIN_LEFT_WIDTH}
-          maxWidth={containerWidth - leftWidth - MIN_MIDDLE_WIDTH}
+          maxWidth={Math.min(maxRightWidth, containerWidth - leftWidth - MIN_MIDDLE_WIDTH)}
           snapPoints={magneticSnap ? SNAP_POINTS : []}
           onDragChange={handleRightDragChange}
           onDragEnd={handleRightDragEnd}
@@ -472,7 +513,7 @@ export default function App() {
           onExpand={handleRightToggleCollapse}
           onCollapse={handleRightToggleCollapse}
           onMaximizePanes={handleMaximizePanes}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenSettings={handleOpenSettings}
         />
       </div>
 

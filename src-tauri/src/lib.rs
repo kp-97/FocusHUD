@@ -60,7 +60,9 @@ pub fn run() {
             commands::restore_work_area,
             commands::minimize_to_tray,
             commands::exit_app,
-            commands::get_system_diagnostics
+            commands::get_system_diagnostics,
+            commands::open_settings_window,
+            commands::close_settings_window
         ])
         .setup(|app| {
             #[cfg(target_os = "windows")]

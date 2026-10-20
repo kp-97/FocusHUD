@@ -23,6 +23,20 @@ import {
 import { HudBrackets } from "./HudBrackets";
 import { WaveformVisualizer } from "./WaveformVisualizer";
 import { SidebarToggleIcon } from "./SidebarToggleIcon";
+import { exitApp, getSystemDiagnostics, SystemDiagnostics } from "../utils/tauriBridge";
+import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../utils/store";
+import { NavViewId, NavItemConfig } from "../types/hud";
+
+const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
+  home: Home,
+  chat: MessageSquare,
+  calendar: Calendar,
+  goals: Target,
+  tasks: CheckSquare,
+  action_plans: Workflow,
+  timer: Timer,
+  kanban: Columns3,
+};
 import { exitApp, getSystemDiagnostics, setDockPopoutMode, SystemDiagnostics } from "../utils/tauriBridge";
 import { broadcastNavChange } from "../utils/store";
 import { NavViewId } from "../types/hud";
@@ -114,16 +128,36 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     };
   }, []);
 
-  const navItems = [
-    { id: "home", label: "HOME", icon: Home },
-    { id: "chat", label: "CHAT", icon: MessageSquare },
-    { id: "calendar", label: "CALENDAR", icon: Calendar },
-    { id: "goals", label: "GOALS", icon: Target },
-    { id: "tasks", label: "TASKS", icon: CheckSquare },
-    { id: "kanban", label: "KANBAN", icon: Columns3 },
-    { id: "action_plans", label: "ACTION PLANS", icon: Workflow },
-    { id: "timer", label: "TIMER", icon: Timer },
-  ];
+  const [navConfig, setNavConfig] = useState<NavItemConfig[]>(() => loadNavConfig());
+
+  // Listen for navigation configuration changes across windows
+  useEffect(() => {
+    const unsubscribe = subscribeLayoutAction((action) => {
+      if (action.type === "NAV_CONFIG_CHANGE") {
+        setNavConfig(action.config);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  // If the currently selected navigation view was toggled off, fallback to home
+  useEffect(() => {
+    const isCurrentVisible = navConfig.some(
+      (item) => item.id === activeNav && item.visible
+    );
+    if (!isCurrentVisible) {
+      onSelectNav("home");
+      broadcastNavChange("home");
+    }
+  }, [navConfig, activeNav, onSelectNav]);
+
+  const visibleNavItems = navConfig
+    .filter((item) => item.visible)
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      icon: NAV_ICON_MAP[item.id] || Home,
+    }));
 
   const isIconOnly = width < 120;
   const compactMode = isCompact || width < 220;
@@ -268,7 +302,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         {/* Scrollable Navigation Views: Starts at HOME and ends above DIAGNOSTICS */}
         <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden my-2 pr-0.5">
           <nav className={`flex flex-col ${isIconOnly ? "gap-2 items-center w-full" : "gap-2"}`}>
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeNav === item.id;
 

@@ -148,3 +148,21 @@ pub fn exit_app(app: tauri::AppHandle) {
 pub fn get_system_diagnostics() -> Result<crate::diagnostics::SystemDiagnostics, String> {
     Ok(crate::diagnostics::get_latest_diagnostics())
 }
+
+#[tauri::command]
+pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.center();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn close_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.hide();
+    }
+    Ok(())
+}

@@ -166,4 +166,56 @@ describe("LeftSidebar component", () => {
     fireEvent.click(settingsBtn);
     expect(handleSettings).toHaveBeenCalledTimes(1);
   });
+
+  it("renders navigation items according to navConfig and hides invisible items", () => {
+    localStorage.setItem(
+      "focushud_nav_config",
+      JSON.stringify([
+        { id: "timer", label: "TIMER", visible: true },
+        { id: "calendar", label: "CALENDAR", visible: false },
+        { id: "home", label: "HOME", visible: true },
+        { id: "chat", label: "AI CHAT", visible: true },
+        { id: "goals", label: "GOALS", visible: true },
+        { id: "tasks", label: "TASKS", visible: true },
+        { id: "action_plans", label: "ACTION PLANS", visible: true },
+        { id: "kanban", label: "KANBAN", visible: true },
+      ])
+    );
+
+    render(
+      <LeftSidebar
+        width={280}
+        activeNav="home"
+        onSelectNav={vi.fn()}
+      />
+    );
+
+    // Visible items
+    expect(screen.getByText("TIMER")).toBeInTheDocument();
+    expect(screen.getByText("HOME")).toBeInTheDocument();
+    expect(screen.getByText("AI CHAT")).toBeInTheDocument();
+    // Hidden item should not be rendered
+    expect(screen.queryByText("CALENDAR")).not.toBeInTheDocument();
+  });
+
+  it("falls back to home when activeNav is toggled to invisible", () => {
+    const handleSelectNav = vi.fn();
+    localStorage.setItem(
+      "focushud_nav_config",
+      JSON.stringify([
+        { id: "home", label: "HOME", visible: true },
+        { id: "timer", label: "TIMER", visible: false },
+      ])
+    );
+
+    render(
+      <LeftSidebar
+        width={280}
+        activeNav="timer"
+        onSelectNav={handleSelectNav}
+      />
+    );
+
+    expect(handleSelectNav).toHaveBeenCalledWith("home");
+  });
 });
