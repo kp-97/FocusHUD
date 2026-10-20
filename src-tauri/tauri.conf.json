@@ -22,7 +22,8 @@
         "alwaysOnTop": true,
         "resizable": false,
         "shadow": false,
-        "visible": false
+        "visible": false,
+        "skipTaskbar": true
       },
       {
         "label": "right-dock",

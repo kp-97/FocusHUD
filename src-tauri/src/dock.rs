@@ -11,7 +11,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 #[cfg(target_os = "windows")]
-use crate::monitor::{apply_system_work_area, get_primary_monitor_rects, set_work_area_cache};
+use crate::monitor::{
+    apply_system_work_area, get_current_work_area, get_primary_monitor_rects, set_work_area_cache,
+};
 #[cfg(target_os = "windows")]
 use crate::snap::enum_windows_snap_callback;
 
@@ -187,17 +189,27 @@ pub unsafe fn update_dock_work_area(
         bottom: orig.bottom,
     };
 
+    if let Some(curr) = get_current_work_area() {
+        if curr.left == new_rect.left
+            && curr.top == new_rect.top
+            && curr.right == new_rect.right
+            && curr.bottom == new_rect.bottom
+        {
+            return;
+        }
+    }
+
     set_work_area_cache(new_rect, orig);
 
     unsafe {
-        apply_system_work_area(&new_rect);
-
         if snap_open_windows {
             EnumWindows(
                 Some(enum_windows_snap_callback),
                 &new_rect as *const _ as LPARAM,
             );
         }
+
+        apply_system_work_area(&new_rect);
     }
 }
 
