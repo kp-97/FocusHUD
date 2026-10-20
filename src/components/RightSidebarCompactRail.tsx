@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
 import { usePomodoro } from "../utils/pomodoroStore";
-import { exitApp } from "../utils/tauriBridge";
+import { exitApp, setDockPopoutMode } from "../utils/tauriBridge";
 
 interface RightSidebarCompactRailProps {
   onExpand?: () => void;
@@ -14,11 +14,19 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    setDockPopoutMode("right", isMenuOpen);
+
     if (!isMenuOpen) return;
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        !menuBtnRef.current?.contains(e.target as Node)
+      ) {
         setIsMenuOpen(false);
       }
     };
@@ -27,11 +35,19 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
         setIsMenuOpen(false);
       }
     };
+    const handleBlur = () => {
+      setIsMenuOpen(false);
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+      setDockPopoutMode("right", false);
     };
   }, [isMenuOpen]);
 
@@ -74,6 +90,7 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
             </div>
             {/* Hamburger Menu replacing the escape symbol */}
             <button
+              ref={menuBtnRef}
               onClick={() => setIsMenuOpen((prev) => !prev)}
               title="System Menu"
               aria-label="System Menu"

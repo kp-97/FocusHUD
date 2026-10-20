@@ -15,13 +15,15 @@ use crate::monitor::{apply_system_work_area, get_primary_monitor_rects, set_work
 #[cfg(target_os = "windows")]
 use crate::snap::enum_windows_snap_callback;
 
-pub const MAX_DOCK_LOGICAL_WIDTH: i32 = 520;
+pub const MAX_DOCK_LOGICAL_WIDTH: i32 = 760;
 pub const HANDLE_GUTTER_LOGICAL_PX: i32 = 0;
 
 pub static CURRENT_LEFT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static CURRENT_RIGHT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static LEFT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static LEFT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static RIGHT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
 pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -110,15 +112,17 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
     let top_y = rc_work.top;
     let dock_height = rc_work.bottom - rc_work.top;
 
-    let left_drag = LEFT_DRAG_ACTIVE.load(Ordering::Relaxed);
-    let right_drag = RIGHT_DRAG_ACTIVE.load(Ordering::Relaxed);
+    let left_expanded =
+        LEFT_DRAG_ACTIVE.load(Ordering::Relaxed) || LEFT_POPOUT_ACTIVE.load(Ordering::Relaxed);
+    let right_expanded =
+        RIGHT_DRAG_ACTIVE.load(Ordering::Relaxed) || RIGHT_POPOUT_ACTIVE.load(Ordering::Relaxed);
 
     // The OS windows are ALWAYS the full canvas size and never move/resize during drag.
     let phys_canvas = calculate_canvas_width(scale);
 
     // Visible + clickable area is clipped with a window region.
-    let left_visible = calculate_visible_width(left_width, left_drag, scale);
-    let right_visible = calculate_visible_width(right_width, right_drag, scale);
+    let left_visible = calculate_visible_width(left_width, left_expanded, scale);
+    let right_visible = calculate_visible_width(right_width, right_expanded, scale);
 
     if let Some(left_win) = app.get_webview_window("left-dock") {
         let _ = left_win.set_position(tauri::PhysicalPosition::new(mon_left, top_y));
@@ -203,9 +207,9 @@ mod tests {
 
     #[test]
     fn test_canvas_width_scaling() {
-        assert_eq!(calculate_canvas_width(1.0), 520);
-        assert_eq!(calculate_canvas_width(1.25), 650);
-        assert_eq!(calculate_canvas_width(1.5), 780);
+        assert_eq!(calculate_canvas_width(1.0), 760);
+        assert_eq!(calculate_canvas_width(1.25), 950);
+        assert_eq!(calculate_canvas_width(1.5), 1140);
     }
 
     #[test]
@@ -215,7 +219,7 @@ mod tests {
         assert_eq!(idle, 280);
 
         let dragging = calculate_visible_width(280, true, scale);
-        assert_eq!(dragging, 520);
+        assert_eq!(dragging, 760);
     }
 
     #[test]
@@ -223,9 +227,9 @@ mod tests {
         // Ultrawide 3440x1440
         let mon_left = 0;
         let mon_width = 3440;
-        let canvas = 520;
+        let canvas = 760;
         let right_x = calculate_right_dock_x(mon_left, mon_width, canvas);
-        assert_eq!(right_x, 2920);
+        assert_eq!(right_x, 2680);
     }
 
     #[test]

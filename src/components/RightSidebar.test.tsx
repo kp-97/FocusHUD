@@ -8,6 +8,7 @@ vi.mock("../utils/tauriBridge", () => ({
   exitApp: vi.fn(),
   minimizeToTray: vi.fn(),
   getSystemDiagnostics: vi.fn().mockResolvedValue(null),
+  setDockPopoutMode: vi.fn(),
 }));
 
 describe("RightSidebar component", () => {
@@ -83,6 +84,7 @@ describe("RightSidebar component", () => {
     });
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByText("SYSTEM MENU")).toBeInTheDocument();
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("right", true);
 
     // Minimize and Exit buttons should NOT exist in compact rail
     expect(screen.queryByLabelText(/Minimize to Tray/i)).not.toBeInTheDocument();
