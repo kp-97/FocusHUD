@@ -311,23 +311,25 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             return 1;
         }
 
-        let was_full_width = vis_w >= ((prev_rect.right - prev_rect.left) * 75 / 100)
-            || (vis.left <= prev_rect.left + 24 && vis.right >= prev_rect.right - 24);
-        let overlaps_both = vis.left < work_rect.left + 16 && vis.right > work_rect.right - 16;
+        let touches_left =
+            vis.left <= work_rect.left + 36 || (vis.left - prev_rect.left).abs() <= 48;
+        let touches_right =
+            vis.right >= work_rect.right - 36 || (vis.right - prev_rect.right).abs() <= 48;
+
+        let was_full_width = vis_w >= ((prev_rect.right - prev_rect.left) * 65 / 100)
+            || (touches_left && touches_right)
+            || (vis.left <= prev_rect.left + 36 && vis.right >= prev_rect.right - 36);
+        let overlaps_both = vis.left < work_rect.left + 36 && vis.right > work_rect.right - 36;
 
         if was_full_width || overlaps_both || vis_w >= work_w {
             fit_window_to_visible_rect(hwnd, work_rect);
             return 1;
         }
 
-        let was_left_docked = vis.left < work_rect.left || (vis.left - prev_rect.left).abs() <= 32;
-        let was_right_docked =
-            vis.right > work_rect.right || (vis.right - prev_rect.right).abs() <= 32;
-
         let mut target = vis;
         let mut changed = false;
 
-        if was_left_docked {
+        if touches_left {
             target.left = work_rect.left;
             target.right = (target.left + vis_w).min(work_rect.right);
             if vis_h >= (work_h * 75 / 100) {
@@ -335,7 +337,7 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
                 target.bottom = work_rect.bottom;
             }
             changed = true;
-        } else if was_right_docked {
+        } else if touches_right {
             target.right = work_rect.right;
             target.left = (target.right - vis_w).max(work_rect.left);
             if vis_h >= (work_h * 75 / 100) {
@@ -457,8 +459,13 @@ pub unsafe extern "system" fn win_event_hook_proc(
             return;
         }
 
-        // 4. Window dropped overlapping both bars -> Snap to 100% of Middle Column
-        if vis.left < work_rect.left + 16 && vis.right > work_rect.right - 16 {
+        // 4. Window dropped overlapping or touching both bars -> Snap to 100% of Middle Column
+        let touches_left = vis.left <= work_rect.left + 36;
+        let touches_right = vis.right >= work_rect.right - 36;
+
+        if (touches_left && touches_right)
+            || (vis.left < work_rect.left + 16 && vis.right > work_rect.right - 16)
+        {
             fit_window_to_visible_rect(hwnd, work_rect);
             return;
         }
@@ -467,7 +474,7 @@ pub unsafe extern "system" fn win_event_hook_proc(
         let mut target = vis;
         let mut changed = false;
 
-        if target.left < work_rect.left + 16 {
+        if touches_left {
             target.left = work_rect.left;
             target.right = (target.left + vis_w).min(work_rect.right);
             if vis_h >= (work_h * 75 / 100) {
@@ -475,7 +482,7 @@ pub unsafe extern "system" fn win_event_hook_proc(
                 target.bottom = work_rect.bottom;
             }
             changed = true;
-        } else if target.right > work_rect.right - 16 {
+        } else if touches_right {
             target.right = work_rect.right;
             target.left = (target.right - vis_w).max(work_rect.left);
             if vis_h >= (work_h * 75 / 100) {
