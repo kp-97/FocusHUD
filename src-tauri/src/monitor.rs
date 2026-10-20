@@ -105,27 +105,40 @@ pub fn set_work_area_cache(new_rect: RECT, orig: RECT) {
 
 #[cfg(target_os = "windows")]
 pub unsafe fn apply_system_work_area(new_rect: &RECT) {
+    let rect_copy = *new_rect;
     unsafe {
+        // Immediate synchronous application of work area without broadcast delay
+        SystemParametersInfoW(SPI_SETWORKAREA, 0, &rect_copy as *const _ as *mut _, 0);
+    }
+
+    // Detached thread for non-blocking broadcast to external windows and taskbars
+    std::thread::spawn(move || unsafe {
         SystemParametersInfoW(
             SPI_SETWORKAREA,
             0,
-            new_rect as *const _ as *mut _,
+            &rect_copy as *const _ as *mut _,
             SPIF_SENDCHANGE,
         );
-    }
+    });
 }
 
 pub fn restore_work_area() -> Result<(), String> {
     #[cfg(target_os = "windows")]
-    unsafe {
+    {
         let lock = ORIGINAL_WORK_AREA.lock().unwrap();
         if let Some(orig) = *lock {
-            SystemParametersInfoW(
-                SPI_SETWORKAREA,
-                0,
-                &orig as *const _ as *mut _,
-                SPIF_SENDCHANGE,
-            );
+            let orig_copy = orig;
+            unsafe {
+                SystemParametersInfoW(SPI_SETWORKAREA, 0, &orig_copy as *const _ as *mut _, 0);
+            }
+            std::thread::spawn(move || unsafe {
+                SystemParametersInfoW(
+                    SPI_SETWORKAREA,
+                    0,
+                    &orig_copy as *const _ as *mut _,
+                    SPIF_SENDCHANGE,
+                );
+            });
         }
     }
     Ok(())

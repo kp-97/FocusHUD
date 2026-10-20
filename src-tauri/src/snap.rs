@@ -1,4 +1,8 @@
 #[cfg(target_os = "windows")]
+use std::collections::HashMap;
+#[cfg(target_os = "windows")]
+use std::sync::Mutex;
+#[cfg(target_os = "windows")]
 use std::sync::atomic::Ordering;
 
 #[cfg(target_os = "windows")]
@@ -17,10 +21,10 @@ use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_MOVESIZEEND, GA_ROOT, GA_ROOTOWNER, GWL_EXSTYLE,
     GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos, GetWindowLongW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SW_RESTORE, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT,
-    WINEVENT_SKIPOWNPROCESS, WS_CAPTION, WS_CHILD, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_THICKFRAME,
+    GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SW_RESTORE, SWP_ASYNCWINDOWPOS,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos, ShowWindow,
+    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WS_CAPTION, WS_CHILD, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_THICKFRAME,
 };
 
 #[cfg(target_os = "windows")]
@@ -29,10 +33,33 @@ use crate::dock::{LEFT_DOCK_HWND, RIGHT_DOCK_HWND};
 use crate::monitor::{get_current_work_area, get_original_work_area, get_previous_work_area};
 
 #[cfg(target_os = "windows")]
+static PID_WEBVIEW_CACHE: Mutex<Option<HashMap<u32, bool>>> = Mutex::new(None);
+
+#[cfg(target_os = "windows")]
 pub unsafe fn is_webview_or_own_process(pid: u32) -> bool {
     if pid == std::process::id() {
         return true;
     }
+
+    if let Ok(mut lock) = PID_WEBVIEW_CACHE.lock() {
+        let cache = lock.get_or_insert_with(HashMap::new);
+        if let Some(&is_own) = cache.get(&pid) {
+            return is_own;
+        }
+
+        let is_own = unsafe { check_pid_is_webview_or_own(pid) };
+        if cache.len() > 512 {
+            cache.clear();
+        }
+        cache.insert(pid, is_own);
+        is_own
+    } else {
+        unsafe { check_pid_is_webview_or_own(pid) }
+    }
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn check_pid_is_webview_or_own(pid: u32) -> bool {
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if handle.is_null() {
@@ -44,7 +71,10 @@ pub unsafe fn is_webview_or_own_process(pid: u32) -> bool {
         CloseHandle(handle);
         if ok != 0 && size > 0 {
             let path = String::from_utf16_lossy(&buf[..size as usize]).to_lowercase();
-            if path.ends_with("msedgewebview2.exe") || path.ends_with("tauri-app.exe") {
+            if path.ends_with("msedgewebview2.exe")
+                || path.ends_with("tauri-app.exe")
+                || path.ends_with("focushud.exe")
+            {
                 return true;
             }
         }
@@ -127,6 +157,15 @@ pub unsafe fn fit_window_to_visible_rect(hwnd: HWND, target: RECT) {
     let cx = (target.right - target.left) + pad_left + pad_right;
     let cy = (target.bottom - target.top) + pad_top + pad_bottom;
 
+    // Avoid redundant repositioning if window is already at target dimensions
+    if win_rect.left == x
+        && win_rect.top == y
+        && (win_rect.right - win_rect.left) == cx
+        && (win_rect.bottom - win_rect.top) == cy
+    {
+        return;
+    }
+
     unsafe {
         SetWindowPos(
             hwnd,
@@ -135,7 +174,7 @@ pub unsafe fn fit_window_to_visible_rect(hwnd: HWND, target: RECT) {
             y,
             cx,
             cy,
-            SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS,
         );
     }
 }
@@ -153,6 +192,23 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
     }
 
     unsafe {
+        // Fast-path 1: Minimized or invisible windows
+        if IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 {
+            return false;
+        }
+
+        // Fast-path 2: Reject child windows and non-resizable/non-caption frames (cheap user-mode flags)
+        let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+        if (style & WS_CHILD) != 0 || (style & (WS_CAPTION | WS_THICKFRAME)) == 0 {
+            return false;
+        }
+
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        if (ex_style & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) != 0 {
+            return false;
+        }
+
+        // Fast-path 3: Check root / owner against FocusHUD dock HWNDs
         let root = GetAncestor(hwnd, GA_ROOT);
         if !root.is_null() {
             let r_val = root as isize;
@@ -173,16 +229,14 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             }
         }
 
-        if IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 {
-            return false;
-        }
-
+        // Fast-path 4: Process check with PID caching (skips redundant OpenProcess)
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, &mut pid);
         if is_webview_or_own_process(pid) {
             return false;
         }
 
+        // Fast-path 5: Cloaked windows (virtual desktops, hidden UWP apps)
         let mut cloaked: u32 = 0;
         let _ = DwmGetWindowAttribute(
             hwnd,
@@ -194,19 +248,7 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             return false;
         }
 
-        let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
-        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
-
-        if (style & WS_CHILD) != 0 {
-            return false;
-        }
-        if (ex_style & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) != 0 {
-            return false;
-        }
-        if (style & (WS_CAPTION | WS_THICKFRAME)) == 0 {
-            return false;
-        }
-
+        // Fast-path 6: Desktop and shell system classes
         let mut class_buf = [0u16; 128];
         let len = GetClassNameW(hwnd, class_buf.as_mut_ptr(), class_buf.len() as i32);
         if len > 0 {
