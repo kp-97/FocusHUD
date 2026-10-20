@@ -55,6 +55,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_screen_metrics,
             commands::set_dock_drag_mode,
+            commands::set_dock_popout_mode,
             commands::update_dock_sizes,
             commands::restore_work_area,
             commands::minimize_to_tray,

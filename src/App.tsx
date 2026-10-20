@@ -361,10 +361,10 @@ export default function App() {
   // Dedicated Left Dock window
   if (dockWindowType === "left") {
     return (
-      <div className="w-screen h-screen flex justify-start overflow-hidden bg-transparent text-cyan-200 select-none relative font-hud">
+      <div className="w-screen h-screen flex justify-start overflow-visible bg-transparent text-cyan-200 select-none relative font-hud">
         <div
           style={{ width: `${leftWidth}px` }}
-          className="relative h-full flex flex-row bg-[#03070d] overflow-hidden shrink-0"
+          className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0"
         >
           <LeftSidebar
             width={leftWidth}
@@ -402,10 +402,10 @@ export default function App() {
   // Dedicated Right Dock window
   if (dockWindowType === "right") {
     return (
-      <div className="w-screen h-screen flex justify-end overflow-hidden bg-transparent text-cyan-200 select-none relative font-hud">
+      <div className="w-screen h-screen flex justify-end overflow-visible bg-transparent text-cyan-200 select-none relative font-hud">
         <div
           style={{ width: `${rightWidth}px` }}
-          className="relative h-full flex flex-row bg-[#03070d] overflow-hidden shrink-0"
+          className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0"
         >
           <div className="absolute top-0 bottom-0 left-0 w-2.5 z-50">
             <ResizeHandle

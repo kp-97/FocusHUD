@@ -6,6 +6,7 @@ import * as tauriBridge from "../utils/tauriBridge";
 vi.mock("../utils/tauriBridge", () => ({
   exitApp: vi.fn(),
   getSystemDiagnostics: vi.fn().mockResolvedValue(null),
+  setDockPopoutMode: vi.fn(),
 }));
 
 describe("LeftSidebar component", () => {
@@ -71,6 +72,8 @@ describe("LeftSidebar component", () => {
       fireEvent.click(menuBtn);
     });
 
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", true);
+
     const menu = screen.getByRole("menu");
     expect(menu).toBeInTheDocument();
     expect(screen.getByText("SYSTEM MENU")).toBeInTheDocument();
@@ -86,6 +89,7 @@ describe("LeftSidebar component", () => {
     expect(handleSettings).toHaveBeenCalledTimes(1);
     // Menu should close
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
 
     // Reopen menu and test Log out
     act(() => {
@@ -99,7 +103,7 @@ describe("LeftSidebar component", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("closes hamburger menu when clicking outside", () => {
+  it("closes hamburger menu when clicking outside or when window blurs", () => {
     render(
       <LeftSidebar
         width={280}
@@ -113,12 +117,25 @@ describe("LeftSidebar component", () => {
       fireEvent.click(menuBtn);
     });
     expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", true);
 
     // Click outside
     act(() => {
       fireEvent.mouseDown(document.body);
     });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+
+    // Reopen and test window blur
+    act(() => {
+      fireEvent.click(menuBtn);
+    });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(new Event("blur"));
+    });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
   });
 
   it("renders compact mode with dual toggle button and bottom settings button when width < 120", () => {

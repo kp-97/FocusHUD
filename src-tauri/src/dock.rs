@@ -22,6 +22,8 @@ pub static CURRENT_LEFT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static CURRENT_RIGHT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static LEFT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static LEFT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static RIGHT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
 pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -110,15 +112,17 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
     let top_y = rc_work.top;
     let dock_height = rc_work.bottom - rc_work.top;
 
-    let left_drag = LEFT_DRAG_ACTIVE.load(Ordering::Relaxed);
-    let right_drag = RIGHT_DRAG_ACTIVE.load(Ordering::Relaxed);
+    let left_expanded =
+        LEFT_DRAG_ACTIVE.load(Ordering::Relaxed) || LEFT_POPOUT_ACTIVE.load(Ordering::Relaxed);
+    let right_expanded =
+        RIGHT_DRAG_ACTIVE.load(Ordering::Relaxed) || RIGHT_POPOUT_ACTIVE.load(Ordering::Relaxed);
 
     // The OS windows are ALWAYS the full canvas size and never move/resize during drag.
     let phys_canvas = calculate_canvas_width(scale);
 
     // Visible + clickable area is clipped with a window region.
-    let left_visible = calculate_visible_width(left_width, left_drag, scale);
-    let right_visible = calculate_visible_width(right_width, right_drag, scale);
+    let left_visible = calculate_visible_width(left_width, left_expanded, scale);
+    let right_visible = calculate_visible_width(right_width, right_expanded, scale);
 
     if let Some(left_win) = app.get_webview_window("left-dock") {
         let _ = left_win.set_position(tauri::PhysicalPosition::new(mon_left, top_y));

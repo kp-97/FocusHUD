@@ -14,6 +14,16 @@ export async function setDockDragMode(side: "left" | "right", active: boolean) {
   }
 }
 
+export async function setDockPopoutMode(side: "left" | "right", active: boolean) {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("set_dock_popout_mode", { side, active });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function updateDockSizes(
   leftWidth?: number | null,
   rightWidth?: number | null,

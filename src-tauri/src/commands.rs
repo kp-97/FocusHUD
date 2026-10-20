@@ -3,7 +3,8 @@ use tauri::Manager;
 
 use crate::dock::{
     CURRENT_LEFT_WIDTH, CURRENT_RIGHT_WIDTH, HANDLE_GUTTER_LOGICAL_PX, LEFT_DRAG_ACTIVE,
-    RIGHT_DRAG_ACTIVE, apply_dock_geometry, update_dock_work_area,
+    LEFT_POPOUT_ACTIVE, RIGHT_DRAG_ACTIVE, RIGHT_POPOUT_ACTIVE, apply_dock_geometry,
+    update_dock_work_area,
 };
 use crate::monitor::{
     ScreenMetrics, get_original_work_area, get_primary_monitor_rects,
@@ -44,6 +45,27 @@ pub fn set_dock_drag_mode(app: tauri::AppHandle, side: String, active: bool) -> 
         LEFT_DRAG_ACTIVE.store(active, Ordering::Relaxed);
     } else if side == "right" {
         RIGHT_DRAG_ACTIVE.store(active, Ordering::Relaxed);
+    }
+
+    let l_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
+    let r_w = CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
+
+    #[cfg(target_os = "windows")]
+    apply_dock_geometry(&app, l_w, r_w);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_dock_popout_mode(
+    app: tauri::AppHandle,
+    side: String,
+    active: bool,
+) -> Result<(), String> {
+    if side == "left" {
+        LEFT_POPOUT_ACTIVE.store(active, Ordering::Relaxed);
+    } else if side == "right" {
+        RIGHT_POPOUT_ACTIVE.store(active, Ordering::Relaxed);
     }
 
     let l_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
