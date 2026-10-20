@@ -58,3 +58,5 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
+
+export type { SystemDiagnostics } from "./diagnostics";

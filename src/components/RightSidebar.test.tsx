@@ -13,6 +13,7 @@ vi.mock("../utils/tauriBridge", () => ({
 
 describe("RightSidebar component", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     localStorage.clear();
     vi.clearAllMocks();
     pomodoroActions.pause();
@@ -22,6 +23,7 @@ describe("RightSidebar component", () => {
   afterEach(() => {
     pomodoroActions.pause();
     pomodoroActions.reset();
+    vi.useRealTimers();
   });
 
   it("renders standard view when expanded (width >= 120)", () => {

@@ -5,6 +5,7 @@ import { pomodoroActions, getPomodoroState } from "../utils/pomodoroStore";
 
 describe("PomodoroDial component", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     localStorage.clear();
     pomodoroActions.pause();
     pomodoroActions.resetDailyStats();
@@ -14,9 +15,9 @@ describe("PomodoroDial component", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     pomodoroActions.pause();
     pomodoroActions.reset();
+    vi.useRealTimers();
   });
 
   it("renders the Start button when not running, and does not show Stop button", () => {
