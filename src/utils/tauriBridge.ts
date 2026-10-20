@@ -104,3 +104,23 @@ export async function getSystemDiagnostics(): Promise<SystemDiagnostics | null> 
   }
 }
 
+export async function openSettingsWindow(): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("open_settings_window");
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function closeSettingsWindow(): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("close_settings_window");
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+

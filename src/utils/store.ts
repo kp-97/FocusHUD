@@ -1,4 +1,4 @@
-import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NavViewId } from "../types/hud";
+import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NavViewId, NavItemConfig } from "../types/hud";
 
 export const getTodayString = (): string => {
   return new Date().toISOString().split("T")[0];
@@ -279,11 +279,39 @@ export const setRememberedRightWidth = (width: number) => {
   }
 };
 
-// Aliases for compatibility
-export const getMaxLeftWidth = getRememberedLeftWidth;
-export const setMaxLeftWidth = setRememberedLeftWidth;
-export const getMaxRightWidth = getRememberedRightWidth;
-export const setMaxRightWidth = setRememberedRightWidth;
+// Max Draggable Width Limits (Configurable in Settings)
+export const MIN_PANE_MAX_WIDTH = 280;
+export const MAX_PANE_MAX_WIDTH = 800;
+export const DEFAULT_MAX_LEFT_WIDTH = 500;
+export const DEFAULT_MAX_RIGHT_WIDTH = 500;
+
+export const getMaxLeftWidth = (): number => {
+  const saved = localStorage.getItem("hud_left_max_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= MIN_PANE_MAX_WIDTH && val <= MAX_PANE_MAX_WIDTH) return val;
+  }
+  return DEFAULT_MAX_LEFT_WIDTH;
+};
+
+export const setMaxLeftWidth = (width: number) => {
+  const clamped = Math.max(MIN_PANE_MAX_WIDTH, Math.min(MAX_PANE_MAX_WIDTH, Math.round(width)));
+  localStorage.setItem("hud_left_max_width", String(clamped));
+};
+
+export const getMaxRightWidth = (): number => {
+  const saved = localStorage.getItem("hud_right_max_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= MIN_PANE_MAX_WIDTH && val <= MAX_PANE_MAX_WIDTH) return val;
+  }
+  return DEFAULT_MAX_RIGHT_WIDTH;
+};
+
+export const setMaxRightWidth = (width: number) => {
+  const clamped = Math.max(MIN_PANE_MAX_WIDTH, Math.min(MAX_PANE_MAX_WIDTH, Math.round(width)));
+  localStorage.setItem("hud_right_max_width", String(clamped));
+};
 
 // Cross-window layout command synchronization
 const LAYOUT_CHANNEL_NAME = "focushud_layout_channel";
@@ -293,7 +321,9 @@ export type LayoutAction =
   | { type: "MAXIMIZE_PANES" }
   | { type: "SET_PANES_WIDTH"; leftWidth: number; rightWidth: number }
   | { type: "SET_LEFT_WIDTH"; width: number }
-  | { type: "SET_RIGHT_WIDTH"; width: number };
+  | { type: "SET_RIGHT_WIDTH"; width: number }
+  | { type: "NAV_CONFIG_CHANGE"; config: NavItemConfig[] }
+  | { type: "SET_MAX_WIDTHS"; maxLeftWidth: number; maxRightWidth: number };
 
 export const broadcastLayoutAction = (action: LayoutAction) => {
   if (layoutChannel) {
@@ -331,5 +361,73 @@ export const subscribeLayoutAction = (callback: (action: LayoutAction) => void):
     }
     window.removeEventListener("storage", storageHandler);
   };
+};
+
+// Default Navigation Configuration & Views
+export const DEFAULT_NAV_CONFIG: NavItemConfig[] = [
+  { id: "home", label: "HOME", visible: true },
+  { id: "chat", label: "AI CHAT", visible: true },
+  { id: "calendar", label: "CALENDAR", visible: true },
+  { id: "goals", label: "GOALS", visible: true },
+  { id: "tasks", label: "TASKS", visible: true },
+  { id: "action_plans", label: "ACTION PLANS", visible: true },
+  { id: "timer", label: "TIMER", visible: true },
+  { id: "kanban", label: "KANBAN", visible: true },
+];
+
+export const loadNavConfig = (): NavItemConfig[] => {
+  const raw = localStorage.getItem("focushud_nav_config");
+  if (!raw) return DEFAULT_NAV_CONFIG;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_NAV_CONFIG;
+
+    const validIds = new Set(DEFAULT_NAV_CONFIG.map((d) => d.id));
+    const result: NavItemConfig[] = [];
+    const seen = new Set<string>();
+
+    for (const item of parsed) {
+      if (item && validIds.has(item.id) && !seen.has(item.id)) {
+        seen.add(item.id);
+        const defaultMatch = DEFAULT_NAV_CONFIG.find((d) => d.id === item.id);
+        result.push({
+          id: item.id,
+          label: item.label || defaultMatch?.label || item.id.toUpperCase(),
+          visible: typeof item.visible === "boolean" ? item.visible : true,
+        });
+      }
+    }
+
+    for (const def of DEFAULT_NAV_CONFIG) {
+      if (!seen.has(def.id)) {
+        result.push({ ...def });
+      }
+    }
+
+    return result;
+  } catch {
+    return DEFAULT_NAV_CONFIG;
+  }
+};
+
+export const saveNavConfig = (config: NavItemConfig[]) => {
+  localStorage.setItem("focushud_nav_config", JSON.stringify(config));
+  broadcastLayoutAction({ type: "NAV_CONFIG_CHANGE", config });
+};
+
+export const resetNavConfig = (): NavItemConfig[] => {
+  localStorage.setItem("focushud_nav_config", JSON.stringify(DEFAULT_NAV_CONFIG));
+  broadcastLayoutAction({ type: "NAV_CONFIG_CHANGE", config: DEFAULT_NAV_CONFIG });
+  return DEFAULT_NAV_CONFIG;
+};
+
+export const applyMaxPaneWidths = (maxLeft: number, maxRight: number) => {
+  setMaxLeftWidth(maxLeft);
+  setMaxRightWidth(maxRight);
+  broadcastLayoutAction({
+    type: "SET_MAX_WIDTHS",
+    maxLeftWidth: getMaxLeftWidth(),
+    maxRightWidth: getMaxRightWidth(),
+  });
 };
 

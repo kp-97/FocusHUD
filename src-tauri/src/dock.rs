@@ -15,7 +15,7 @@ use crate::monitor::{apply_system_work_area, get_primary_monitor_rects, set_work
 #[cfg(target_os = "windows")]
 use crate::snap::enum_windows_snap_callback;
 
-pub const MAX_DOCK_LOGICAL_WIDTH: i32 = 520;
+pub const MAX_DOCK_LOGICAL_WIDTH: i32 = 800;
 pub const HANDLE_GUTTER_LOGICAL_PX: i32 = 0;
 
 pub static CURRENT_LEFT_WIDTH: AtomicI32 = AtomicI32::new(280);
@@ -203,9 +203,9 @@ mod tests {
 
     #[test]
     fn test_canvas_width_scaling() {
-        assert_eq!(calculate_canvas_width(1.0), 520);
-        assert_eq!(calculate_canvas_width(1.25), 650);
-        assert_eq!(calculate_canvas_width(1.5), 780);
+        assert_eq!(calculate_canvas_width(1.0), 800);
+        assert_eq!(calculate_canvas_width(1.25), 1000);
+        assert_eq!(calculate_canvas_width(1.5), 1200);
     }
 
     #[test]
@@ -215,7 +215,7 @@ mod tests {
         assert_eq!(idle, 280);
 
         let dragging = calculate_visible_width(280, true, scale);
-        assert_eq!(dragging, 520);
+        assert_eq!(dragging, 800);
     }
 
     #[test]
@@ -223,9 +223,9 @@ mod tests {
         // Ultrawide 3440x1440
         let mon_left = 0;
         let mon_width = 3440;
-        let canvas = 520;
+        let canvas = 800;
         let right_x = calculate_right_dock_x(mon_left, mon_width, canvas);
-        assert_eq!(right_x, 2920);
+        assert_eq!(right_x, 2640);
     }
 
     #[test]

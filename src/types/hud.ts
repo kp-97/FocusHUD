@@ -8,6 +8,12 @@ export type NavViewId =
   | "action_plans"
   | "timer";
 
+export interface NavItemConfig {
+  id: NavViewId;
+  label: string;
+  visible: boolean;
+}
+
 export interface GoalNode {
   id: string;
   title: string;
