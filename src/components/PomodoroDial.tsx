@@ -382,32 +382,33 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
           <Minus className="w-3.5 h-3.5" />
         </button>
 
-        <button
-          onClick={stopTimer}
-          title="Stop Timer (Shift to Next Phase)"
-          className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-tech font-bold uppercase transition bg-red-950/30 border border-red-500/40 text-red-400 hover:bg-red-900/40 hover:border-red-400 hover:text-red-200 cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.2)]"
-        >
-          <Square className="w-3 h-3 fill-red-400" /> STOP
-        </button>
+        {isRunning ? (
+          <>
+            <button
+              onClick={stopTimer}
+              title="Stop Timer (Shift to Next Phase)"
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-tech font-bold uppercase transition bg-red-950/30 border border-red-500/40 text-red-400 hover:bg-red-900/40 hover:border-red-400 hover:text-red-200 cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.2)]"
+            >
+              <Square className="w-3 h-3 fill-red-400" /> STOP
+            </button>
 
-        <button
-          onClick={toggleRun}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-tech font-bold uppercase transition ${
-            isRunning
-              ? "bg-amber-600/30 border border-amber-500 text-amber-200 shadow-[0_0_12px_rgba(255,179,0,0.3)]"
-              : "bg-orange-500/20 border border-orange-500 text-orange-300 hover:bg-orange-500/30"
-          }`}
-        >
-          {isRunning ? (
-            <>
+            <button
+              onClick={toggleRun}
+              title="Pause Timer"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-tech font-bold uppercase transition bg-amber-600/30 border border-amber-500 text-amber-200 shadow-[0_0_12px_rgba(255,179,0,0.3)] hover:bg-amber-600/40 cursor-pointer"
+            >
               <Pause className="w-3 h-3 fill-amber-300" /> PAUSE
-            </>
-          ) : (
-            <>
-              <Play className="w-3 h-3 fill-orange-400" /> START
-            </>
-          )}
-        </button>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={toggleRun}
+            title="Start Focus Timer"
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-tech font-bold uppercase transition bg-orange-500/20 border border-orange-500 text-orange-300 hover:bg-orange-500/30 cursor-pointer"
+          >
+            <Play className="w-3 h-3 fill-orange-400" /> START
+          </button>
+        )}
 
         <button
           onClick={resetTimer}

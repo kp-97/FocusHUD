@@ -19,19 +19,36 @@ describe("PomodoroDial component", () => {
     pomodoroActions.reset();
   });
 
-  it("renders the Stop button immediately to the left of the Start button", () => {
+  it("renders the Start button when not running, and does not show Stop button", () => {
     act(() => {
       render(<PomodoroDial isCompact={false} />);
     });
 
-    const stopBtn = screen.getByRole("button", { name: /STOP/i });
+    expect(screen.getByRole("button", { name: /START/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /STOP/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /PAUSE/i })).not.toBeInTheDocument();
+  });
+
+  it("replaces the Start button with Stop and Pause buttons when running", () => {
+    act(() => {
+      render(<PomodoroDial isCompact={false} />);
+    });
+
     const startBtn = screen.getByRole("button", { name: /START/i });
+    act(() => {
+      fireEvent.click(startBtn);
+    });
+
+    expect(screen.queryByRole("button", { name: /START/i })).not.toBeInTheDocument();
+
+    const stopBtn = screen.getByRole("button", { name: /STOP/i });
+    const pauseBtn = screen.getByRole("button", { name: /PAUSE/i });
 
     expect(stopBtn).toBeInTheDocument();
-    expect(startBtn).toBeInTheDocument();
+    expect(pauseBtn).toBeInTheDocument();
 
-    // Verify DOM ordering: Stop button precedes Start button
-    expect(stopBtn.compareDocumentPosition(startBtn)).toBe(
+    // Verify DOM ordering: Stop button precedes Pause button
+    expect(stopBtn.compareDocumentPosition(pauseBtn)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
   });
@@ -48,7 +65,7 @@ describe("PomodoroDial component", () => {
     });
     expect(getPomodoroState().isRunning).toBe(true);
 
-    // Click Stop button
+    // Click Stop button (which replaced Start button)
     const stopBtn = screen.getByRole("button", { name: /STOP/i });
     act(() => {
       fireEvent.click(stopBtn);
@@ -58,6 +75,9 @@ describe("PomodoroDial component", () => {
     expect(state.isRunning).toBe(false);
     expect(state.mode).toBe("short_break");
     expect(screen.getAllByText("SHORT BREAK").length).toBeGreaterThan(0);
+    // After stopping, Start button is restored and Stop is hidden
+    expect(screen.getByRole("button", { name: /START/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /STOP/i })).not.toBeInTheDocument();
   });
 
   it("increments remaining time by 1 minute on plus button click", () => {
