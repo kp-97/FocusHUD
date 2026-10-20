@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { Workflow, Plus, Check, Trash2, ChevronRight, ChevronDown, Sparkles, Layers } from "lucide-react";
 import { ActionPlanNode } from "../../types/hud";
-import { loadActionPlans, saveActionPlans, getTodayString } from "../../utils/store";
-import { Tree3DView, TreeNode3D } from "../Tree3DView";
+import { loadActionPlans, saveActionPlans, getTodayString } from "../../stores/layoutStore";
+import { Tree3DView, TreeNode3D } from "../features/tree3d/Tree3DView";
 
 interface ActionPlansViewProps {
   show3D?: boolean;

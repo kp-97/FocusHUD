@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { LeftSidebar } from "./LeftSidebar";
-import * as tauriBridge from "../utils/tauriBridge";
+import * as tauriBridge from "../../../services/tauriBridge";
 
-vi.mock("../utils/tauriBridge", () => ({
+vi.mock("../../../services/tauriBridge", () => ({
   exitApp: vi.fn(),
   getSystemDiagnostics: vi.fn().mockResolvedValue(null),
   setDockPopoutMode: vi.fn(),

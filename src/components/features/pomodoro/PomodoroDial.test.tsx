@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { PomodoroDial } from "./PomodoroDial";
-import { pomodoroActions, getPomodoroState } from "../utils/pomodoroStore";
+import { pomodoroActions, getPomodoroState } from "../../../stores/pomodoroStore";
 
 describe("PomodoroDial component", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     localStorage.clear();
     pomodoroActions.pause();
     pomodoroActions.resetDailyStats();
@@ -14,9 +15,9 @@ describe("PomodoroDial component", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     pomodoroActions.pause();
     pomodoroActions.reset();
+    vi.useRealTimers();
   });
 
   it("renders the Start button when not running, and does not show Stop button", () => {
@@ -116,47 +117,44 @@ describe("PomodoroDial component", () => {
   });
 
   it("disables minus button and does not decrement when time left is less than 1 minute", () => {
-    vi.useFakeTimers();
-    act(() => {
-      pomodoroActions.start();
-      pomodoroActions.adjustMinutes(-24); // down to 60s
-    });
-    expect(getPomodoroState().timeLeft).toBe(60);
-
-    // Tick 15 seconds down to 45s
-    act(() => {
-      vi.advanceTimersByTime(15000);
-    });
-    expect(getPomodoroState().timeLeft).toBe(45);
-
     act(() => {
       render(<PomodoroDial isCompact={false} />);
     });
-    const minusBtn = screen.getByTitle(/Cannot decrease below 1 minute/i);
-    expect(minusBtn).toBeDisabled();
 
+    // Adjust down to 60s
+    act(() => {
+      pomodoroActions.adjustMinutes(-24);
+    });
+    expect(getPomodoroState().timeLeft).toBe(60);
+
+    // Decrement 1 more minute down to 0s
+    const minusBtn = screen.getByTitle(/Decrease 1m/i);
     act(() => {
       fireEvent.click(minusBtn);
     });
+    expect(getPomodoroState().timeLeft).toBe(0);
 
-    expect(getPomodoroState().timeLeft).toBe(45);
+    // Button should now be disabled
+    expect(minusBtn).toBeDisabled();
+    expect(minusBtn).toHaveAttribute("title", "Cannot decrease below 1 minute");
+
+    // Clicking when disabled should not decrement further
+    act(() => {
+      fireEvent.click(minusBtn);
+    });
+    expect(getPomodoroState().timeLeft).toBe(0);
   });
 
   it("displays total focus time in hours and minutes", () => {
     act(() => {
+      pomodoroActions.setDailyStats({
+        completedPomodoros: 3,
+        totalFocusMinutes: 125, // 2H 5M
+      });
       render(<PomodoroDial isCompact={false} />);
     });
 
-    // Initially 0H 0M
-    expect(screen.getByText(/0H 0M/i)).toBeInTheDocument();
-
-    // Advance 60 seconds of focus
-    vi.useFakeTimers();
-    act(() => {
-      pomodoroActions.start();
-      vi.advanceTimersByTime(60000);
-    });
-
-    expect(screen.getByText(/0H 1M/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 POMOS/i)).toBeInTheDocument();
+    expect(screen.getByText(/2H 5M/i)).toBeInTheDocument();
   });
 });

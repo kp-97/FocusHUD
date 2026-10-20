@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { LeftSidebar } from "./components/LeftSidebar";
-import { RightSidebar } from "./components/RightSidebar";
-import { CenterWorkspace } from "./components/CenterWorkspace";
-import { ResizeHandle } from "./components/ResizeHandle";
-import { TopNavHUD } from "./components/TopNavHUD";
-import { SettingsModal } from "./components/SettingsModal";
+import { LeftSidebar } from "./components/layout/LeftSidebar/LeftSidebar";
+import { RightSidebar } from "./components/layout/RightSidebar/RightSidebar";
+import { CenterWorkspace } from "./components/layout/CenterWorkspace";
+import { ResizeHandle } from "./components/layout/ResizeHandle";
+import { TopNavHUD } from "./components/layout/TopNavHUD";
+import { SettingsModal } from "./components/features/settings/SettingsModal";
 import {
   updateDockSizes,
   restoreWorkArea,
   openSettingsWindow,
   closeSettingsWindow,
-} from "./utils/tauriBridge";
+} from "./services/tauriBridge";
 import {
   getRememberedLeftWidth,
   getRememberedRightWidth,
@@ -22,7 +22,7 @@ import {
   subscribeLayoutAction,
   getMaxLeftWidth,
   getMaxRightWidth,
-} from "./utils/store";
+} from "./stores/layoutStore";
 
 const SNAP_POINTS = [
   { value: 68, label: "SQUARE ICONS" },

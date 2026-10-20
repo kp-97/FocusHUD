@@ -214,8 +214,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           className="w-full h-[56px] block"
         />
       </div>
-
-      {/* Text below the wave has been completely removed as requested */}
     </div>
   );
 };

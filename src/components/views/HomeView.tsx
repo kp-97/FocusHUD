@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PomodoroDial } from "../PomodoroDial";
+import { PomodoroDial } from "../features/pomodoro/PomodoroDial";
 import { ActionPlansView } from "./ActionPlansView";
 import { ChatView } from "./ChatView";
 import { CalendarView } from "./CalendarView";

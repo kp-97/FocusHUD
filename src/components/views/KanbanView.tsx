@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Columns3, Plus, ArrowLeft, ArrowRight, Trash2 } from "lucide-react";
 import { TaskItem } from "../../types/hud";
-import { loadTasks, saveTasks, getTodayString } from "../../utils/store";
+import { loadTasks, saveTasks, getTodayString } from "../../stores/layoutStore";
 
 export const KanbanView: React.FC = () => {
   const [tasks, setTasks] = useState<TaskItem[]>(loadTasks);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
-import { usePomodoro } from "../utils/pomodoroStore";
-import { exitApp, setDockPopoutMode } from "../utils/tauriBridge";
+import { usePomodoro } from "../../../stores/pomodoroStore";
+import { exitApp, setDockPopoutMode } from "../../../services/tauriBridge";
 
 interface RightSidebarCompactRailProps {
   onExpand?: () => void;
