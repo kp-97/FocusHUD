@@ -23,7 +23,7 @@ import {
 import { HudBrackets } from "./HudBrackets";
 import { WaveformVisualizer } from "./WaveformVisualizer";
 import { SidebarToggleIcon } from "./SidebarToggleIcon";
-import { exitApp, getSystemDiagnostics, SystemDiagnostics } from "../utils/tauriBridge";
+import { exitApp, getSystemDiagnostics, setDockPopoutMode, SystemDiagnostics } from "../utils/tauriBridge";
 import { broadcastNavChange } from "../utils/store";
 import { NavViewId } from "../types/hud";
 
@@ -51,12 +51,20 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Close hamburger menu when clicking outside or pressing Escape
+  // Sync dock popout mode with native window and close when clicking outside, pressing Escape, or window blur
   useEffect(() => {
+    setDockPopoutMode("left", isMenuOpen);
+
     if (!isMenuOpen) return;
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        !menuBtnRef.current?.contains(e.target as Node)
+      ) {
         setIsMenuOpen(false);
       }
     };
@@ -65,11 +73,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         setIsMenuOpen(false);
       }
     };
+    const handleBlur = () => {
+      setIsMenuOpen(false);
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+      setDockPopoutMode("left", false);
     };
   }, [isMenuOpen]);
 
@@ -146,6 +162,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
                   <div className="flex items-center gap-1 shrink-0">
                     <button
+                      ref={menuBtnRef}
                       onClick={() => setIsMenuOpen((prev) => !prev)}
                       title="System Menu"
                       aria-label="System Menu"
