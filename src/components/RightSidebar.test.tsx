@@ -108,4 +108,30 @@ describe("RightSidebar component", () => {
     render(<RightSidebar width={68} activeNav="home" />);
     expect(screen.queryByTitle(/Expand Right Panel/i)).not.toBeInTheDocument();
   });
+
+  it("stacks the pause and cancel buttons vertically when running in compact rail", () => {
+    render(<RightSidebar width={68} activeNav="home" />);
+    const playBtn = screen.getByTitle(/Start Focus Timer/i);
+    act(() => {
+      fireEvent.click(playBtn);
+    });
+
+    const pauseBtn = screen.getByTitle(/Pause Timer/i);
+    const cancelBtn = screen.getByTitle(/Cancel Timer/i);
+
+    expect(pauseBtn).toBeInTheDocument();
+    expect(cancelBtn).toBeInTheDocument();
+
+    // Verify DOM ordering: Pause button precedes Cancel button vertically
+    expect(pauseBtn.compareDocumentPosition(cancelBtn)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    // Clicking Cancel resets the timer and restores Start Focus Timer
+    act(() => {
+      fireEvent.click(cancelBtn);
+    });
+    expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
+    expect(screen.queryByTitle(/Cancel Timer/i)).not.toBeInTheDocument();
+  });
 });
