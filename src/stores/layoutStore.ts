@@ -317,13 +317,14 @@ export const setMaxRightWidth = (width: number) => {
 const LAYOUT_CHANNEL_NAME = "focushud_layout_channel";
 const layoutChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(LAYOUT_CHANNEL_NAME) : null;
 
-export type LayoutAction =
+export type LayoutAction = (
   | { type: "MAXIMIZE_PANES" }
   | { type: "SET_PANES_WIDTH"; leftWidth: number; rightWidth: number }
   | { type: "SET_LEFT_WIDTH"; width: number }
   | { type: "SET_RIGHT_WIDTH"; width: number }
   | { type: "NAV_CONFIG_CHANGE"; config: NavItemConfig[] }
-  | { type: "SET_MAX_WIDTHS"; maxLeftWidth: number; maxRightWidth: number };
+  | { type: "SET_MAX_WIDTHS"; maxLeftWidth: number; maxRightWidth: number }
+) & { sender?: string };
 
 export const broadcastLayoutAction = (action: LayoutAction) => {
   if (layoutChannel) {
