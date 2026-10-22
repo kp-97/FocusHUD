@@ -23,6 +23,7 @@ import {
   getMaxLeftWidth,
   getMaxRightWidth,
 } from "./stores/layoutStore";
+import { runLegacyStorageMigrationIfNeeded } from "./services/storageMigration";
 
 const SNAP_POINTS = [
   { value: 68, label: "SQUARE ICONS" },
@@ -80,6 +81,7 @@ export default function App() {
 
     window.addEventListener("resize", handleResize);
     handleResize();
+    runLegacyStorageMigrationIfNeeded();
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 

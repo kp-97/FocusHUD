@@ -1,6 +1,7 @@
 #![allow(clippy::missing_safety_doc, clippy::collapsible_if)]
 
 pub mod commands;
+pub mod db;
 pub mod diagnostics;
 pub mod dock;
 pub mod monitor;
@@ -62,9 +63,25 @@ pub fn run() {
             commands::exit_app,
             commands::get_system_diagnostics,
             commands::open_settings_window,
-            commands::close_settings_window
+            commands::close_settings_window,
+            commands::check_db_is_empty,
+            commands::get_goals,
+            commands::save_goal,
+            commands::delete_goal,
+            commands::get_tasks,
+            commands::save_task,
+            commands::delete_task,
+            commands::get_action_plans,
+            commands::save_action_plan,
+            commands::delete_action_plan,
+            commands::get_notes,
+            commands::save_note,
+            commands::delete_note,
+            commands::migrate_legacy_data
         ])
         .setup(|app| {
+            let conn = db::init_db(app.handle())?;
+            app.manage(db::DbState(std::sync::Mutex::new(conn)));
             #[cfg(target_os = "windows")]
             unsafe {
                 let (rc_monitor, rc_work) = monitor::get_primary_monitor_rects();
