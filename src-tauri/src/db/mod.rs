@@ -240,4 +240,83 @@ mod tests {
         assert_eq!(plans.len(), 1);
         assert_eq!(plans[0].title, "Legacy Plan");
     }
+
+    #[test]
+    fn test_sync_entities() {
+        let mut conn = init_memory_db().expect("init memory db failed");
+
+        let initial_tasks = vec![
+            Task {
+                id: "t_sync_1".into(),
+                parent_id: None,
+                goal_id: None,
+                title: "Task 1".into(),
+                description: "".into(),
+                status: "todo".into(),
+                priority: 3,
+                due_date: None,
+                estimated_minutes: None,
+                sort_order: 0,
+                created_at: 100,
+                updated_at: 100,
+            },
+            Task {
+                id: "t_sync_2".into(),
+                parent_id: None,
+                goal_id: None,
+                title: "Task 2".into(),
+                description: "".into(),
+                status: "todo".into(),
+                priority: 3,
+                due_date: None,
+                estimated_minutes: None,
+                sort_order: 1,
+                created_at: 200,
+                updated_at: 200,
+            },
+        ];
+
+        queries::sync_tasks(&mut conn, &initial_tasks).unwrap();
+        assert_eq!(queries::get_all_tasks(&conn).unwrap().len(), 2);
+
+        // Update task 1 and delete task 2, add task 3
+        let updated_tasks = vec![
+            Task {
+                id: "t_sync_1".into(),
+                parent_id: None,
+                goal_id: None,
+                title: "Task 1 Updated".into(),
+                description: "New description".into(),
+                status: "done".into(),
+                priority: 1,
+                due_date: None,
+                estimated_minutes: None,
+                sort_order: 0,
+                created_at: 100,
+                updated_at: 300,
+            },
+            Task {
+                id: "t_sync_3".into(),
+                parent_id: None,
+                goal_id: None,
+                title: "Task 3".into(),
+                description: "".into(),
+                status: "todo".into(),
+                priority: 2,
+                due_date: None,
+                estimated_minutes: None,
+                sort_order: 1,
+                created_at: 300,
+                updated_at: 300,
+            },
+        ];
+
+        queries::sync_tasks(&mut conn, &updated_tasks).unwrap();
+        let tasks = queries::get_all_tasks(&conn).unwrap();
+        assert_eq!(tasks.len(), 2);
+        assert_eq!(tasks[0].id, "t_sync_1");
+        assert_eq!(tasks[0].title, "Task 1 Updated");
+        assert_eq!(tasks[0].status, "done");
+        assert_eq!(tasks[1].id, "t_sync_3");
+    }
 }

@@ -173,3 +173,6 @@ export function treeToPlansFlat(nodes: ActionPlanNode[], parentId: string | null
 
   return flat;
 }
+
+export const dbActionPlansToTree = dbPlansToTree;
+export const treeToActionPlansFlat = treeToPlansFlat;

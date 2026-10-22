@@ -75,6 +75,14 @@ export async function runLegacyStorageMigrationIfNeeded(): Promise<boolean> {
       (actionPlans && actionPlans.length > 0)
     ) {
       await migrateLegacyStorage(payload);
+    } else {
+      // Clean launch: seed default goals, tasks, and action plans into SQLite
+      const { DEFAULT_GOALS, DEFAULT_TASKS, DEFAULT_ACTION_PLANS } = await import("../stores/layoutStore");
+      await migrateLegacyStorage({
+        goals: DEFAULT_GOALS as unknown as LegacyGoalNode[],
+        tasks: DEFAULT_TASKS as unknown as LegacyTaskItem[],
+        actionPlans: DEFAULT_ACTION_PLANS as unknown as LegacyActionPlanNode[],
+      });
     }
 
     localStorage.setItem(MIGRATION_KEY, "true");

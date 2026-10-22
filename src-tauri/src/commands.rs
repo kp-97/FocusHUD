@@ -226,6 +226,26 @@ pub fn delete_goal(
 }
 
 #[tauri::command]
+pub fn sync_goals(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    goals: Vec<crate::db::models::Goal>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::sync_goals(&mut conn, &goals).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "goals".into(),
+            action: "save".into(),
+            id: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_tasks(
     state: tauri::State<'_, crate::db::DbState>,
 ) -> Result<Vec<crate::db::models::Task>, String> {
@@ -274,6 +294,26 @@ pub fn delete_task(
 }
 
 #[tauri::command]
+pub fn sync_tasks(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    tasks: Vec<crate::db::models::Task>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::sync_tasks(&mut conn, &tasks).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "tasks".into(),
+            action: "save".into(),
+            id: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_action_plans(
     state: tauri::State<'_, crate::db::DbState>,
 ) -> Result<Vec<crate::db::models::ActionPlan>, String> {
@@ -316,6 +356,26 @@ pub fn delete_action_plan(
             entity: "action_plans".into(),
             action: "delete".into(),
             id: Some(id),
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn sync_action_plans(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    plans: Vec<crate::db::models::ActionPlan>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::sync_action_plans(&mut conn, &plans).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "action_plans".into(),
+            action: "save".into(),
+            id: None,
         },
     );
     Ok(())

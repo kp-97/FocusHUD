@@ -85,6 +85,56 @@ pub fn delete_goal(conn: &Connection, id: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn sync_goals(conn: &mut Connection, goals: &[Goal]) -> Result<()> {
+    let tx = conn.transaction()?;
+    if goals.is_empty() {
+        tx.execute("DELETE FROM goals", [])?;
+    } else {
+        let placeholders = goals.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM goals WHERE id NOT IN ({})", placeholders);
+        let params: Vec<&dyn rusqlite::ToSql> = goals
+            .iter()
+            .map(|g| &g.id as &dyn rusqlite::ToSql)
+            .collect();
+        tx.execute(&sql, rusqlite::params_from_iter(params))?;
+    }
+
+    for goal in goals {
+        let now = current_timestamp_ms();
+        let created_at = if goal.created_at > 0 {
+            goal.created_at
+        } else {
+            now
+        };
+        tx.execute(
+            "INSERT INTO goals (id, parent_id, title, description, status, target_date, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(id) DO UPDATE SET
+                parent_id = excluded.parent_id,
+                title = excluded.title,
+                description = excluded.description,
+                status = excluded.status,
+                target_date = excluded.target_date,
+                sort_order = excluded.sort_order,
+                updated_at = excluded.updated_at",
+            params![
+                goal.id,
+                goal.parent_id,
+                goal.title,
+                goal.description,
+                goal.status,
+                goal.target_date,
+                goal.sort_order,
+                created_at,
+                now,
+            ],
+        )?;
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 // ========================================================
 // Tasks Queries
 // ========================================================
@@ -166,6 +216,62 @@ pub fn delete_task(conn: &Connection, id: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn sync_tasks(conn: &mut Connection, tasks: &[Task]) -> Result<()> {
+    let tx = conn.transaction()?;
+    if tasks.is_empty() {
+        tx.execute("DELETE FROM tasks", [])?;
+    } else {
+        let placeholders = tasks.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM tasks WHERE id NOT IN ({})", placeholders);
+        let params: Vec<&dyn rusqlite::ToSql> = tasks
+            .iter()
+            .map(|t| &t.id as &dyn rusqlite::ToSql)
+            .collect();
+        tx.execute(&sql, rusqlite::params_from_iter(params))?;
+    }
+
+    for task in tasks {
+        let now = current_timestamp_ms();
+        let created_at = if task.created_at > 0 {
+            task.created_at
+        } else {
+            now
+        };
+        tx.execute(
+            "INSERT INTO tasks (id, parent_id, goal_id, title, description, status, priority, due_date, estimated_minutes, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             ON CONFLICT(id) DO UPDATE SET
+                parent_id = excluded.parent_id,
+                goal_id = excluded.goal_id,
+                title = excluded.title,
+                description = excluded.description,
+                status = excluded.status,
+                priority = excluded.priority,
+                due_date = excluded.due_date,
+                estimated_minutes = excluded.estimated_minutes,
+                sort_order = excluded.sort_order,
+                updated_at = excluded.updated_at",
+            params![
+                task.id,
+                task.parent_id,
+                task.goal_id,
+                task.title,
+                task.description,
+                task.status,
+                task.priority,
+                task.due_date,
+                task.estimated_minutes,
+                task.sort_order,
+                created_at,
+                now,
+            ],
+        )?;
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 // ========================================================
 // Action Plans Queries
 // ========================================================
@@ -238,6 +344,61 @@ pub fn upsert_action_plan(conn: &Connection, plan: &ActionPlan) -> Result<()> {
 
 pub fn delete_action_plan(conn: &Connection, id: &str) -> Result<()> {
     conn.execute("DELETE FROM action_plans WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+pub fn sync_action_plans(conn: &mut Connection, plans: &[ActionPlan]) -> Result<()> {
+    let tx = conn.transaction()?;
+    if plans.is_empty() {
+        tx.execute("DELETE FROM action_plans", [])?;
+    } else {
+        let placeholders = plans.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "DELETE FROM action_plans WHERE id NOT IN ({})",
+            placeholders
+        );
+        let params: Vec<&dyn rusqlite::ToSql> = plans
+            .iter()
+            .map(|p| &p.id as &dyn rusqlite::ToSql)
+            .collect();
+        tx.execute(&sql, rusqlite::params_from_iter(params))?;
+    }
+
+    for plan in plans {
+        let now = current_timestamp_ms();
+        let created_at = if plan.created_at > 0 {
+            plan.created_at
+        } else {
+            now
+        };
+        tx.execute(
+            "INSERT INTO action_plans (id, parent_id, goal_id, task_id, title, content, status, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             ON CONFLICT(id) DO UPDATE SET
+                parent_id = excluded.parent_id,
+                goal_id = excluded.goal_id,
+                task_id = excluded.task_id,
+                title = excluded.title,
+                content = excluded.content,
+                status = excluded.status,
+                sort_order = excluded.sort_order,
+                updated_at = excluded.updated_at",
+            params![
+                plan.id,
+                plan.parent_id,
+                plan.goal_id,
+                plan.task_id,
+                plan.title,
+                plan.content,
+                plan.status,
+                plan.sort_order,
+                created_at,
+                now,
+            ],
+        )?;
+    }
+
+    tx.commit()?;
     Ok(())
 }
 

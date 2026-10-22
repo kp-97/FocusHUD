@@ -1,12 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Columns3, Plus, ArrowLeft, ArrowRight, Trash2 } from "lucide-react";
 import { TaskItem } from "../../types/hud";
 import { loadTasks, saveTasks, getTodayString } from "../../stores/layoutStore";
+import { fetchTasks, onDbChange, isTauriEnvironment } from "../../services/dbService";
+import { dbTasksToTree } from "../../services/dbAdapters";
 
 export const KanbanView: React.FC = () => {
   const [tasks, setTasks] = useState<TaskItem[]>(loadTasks);
   const [newTitle, setNewTitle] = useState("");
   const [activeCol, setActiveCol] = useState<"todo" | "in_progress" | "done">("todo");
+
+  useEffect(() => {
+    let active = true;
+    if (isTauriEnvironment()) {
+      fetchTasks().then((dbTasks) => {
+        if (active && dbTasks.length > 0) setTasks(dbTasksToTree(dbTasks));
+      });
+    }
+
+    const unlistenPromise = onDbChange((payload) => {
+      if (payload.entity === "tasks" || payload.entity === "all") {
+        fetchTasks().then((dbTasks) => {
+          if (active) setTasks(dbTasksToTree(dbTasks));
+        });
+      }
+    });
+
+    return () => {
+      active = false;
+      unlistenPromise.then((unlisten) => unlisten && unlisten());
+    };
+  }, []);
 
   const saveAndSetTasks = (newTasks: TaskItem[]) => {
     setTasks(newTasks);

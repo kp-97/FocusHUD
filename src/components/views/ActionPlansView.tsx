@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Workflow, Plus, Check, Trash2, ChevronRight, ChevronDown, Sparkles, Layers } from "lucide-react";
 import { ActionPlanNode } from "../../types/hud";
 import { loadActionPlans, saveActionPlans, getTodayString } from "../../stores/layoutStore";
 import { Tree3DView, TreeNode3D } from "../features/tree3d/Tree3DView";
+import { fetchActionPlans, onDbChange, isTauriEnvironment } from "../../services/dbService";
+import { dbActionPlansToTree } from "../../services/dbAdapters";
 
 interface ActionPlansViewProps {
   show3D?: boolean;
@@ -14,6 +16,28 @@ export const ActionPlansView: React.FC<ActionPlansViewProps> = ({ show3D = true 
   const [addingStepToId, setAddingStepToId] = useState<string | null>(null);
   const [stepTitle, setStepTitle] = useState("");
   const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let active = true;
+    if (isTauriEnvironment()) {
+      fetchActionPlans().then((dbPlans) => {
+        if (active && dbPlans.length > 0) setPlans(dbActionPlansToTree(dbPlans));
+      });
+    }
+
+    const unlistenPromise = onDbChange((payload) => {
+      if (payload.entity === "action_plans" || payload.entity === "all") {
+        fetchActionPlans().then((dbPlans) => {
+          if (active) setPlans(dbActionPlansToTree(dbPlans));
+        });
+      }
+    });
+
+    return () => {
+      active = false;
+      unlistenPromise.then((unlisten) => unlisten && unlisten());
+    };
+  }, []);
 
   const saveAndSetPlans = (newPlans: ActionPlanNode[]) => {
     setPlans(newPlans);

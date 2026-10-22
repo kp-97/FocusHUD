@@ -135,6 +135,16 @@ export async function removeGoal(id: string): Promise<boolean> {
   }
 }
 
+export async function syncGoals(goals: DbGoal[]): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sync_goals", { goals });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ========================================================
 // Tasks
 // ========================================================
@@ -167,6 +177,16 @@ export async function removeTask(id: string): Promise<boolean> {
   }
 }
 
+export async function syncTasks(tasks: DbTask[]): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sync_tasks", { tasks });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ========================================================
 // Action Plans
 // ========================================================
@@ -193,6 +213,16 @@ export async function removeActionPlan(id: string): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("delete_action_plan", { id });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function syncActionPlans(plans: DbActionPlan[]): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sync_action_plans", { plans });
     return true;
   } catch {
     return false;
