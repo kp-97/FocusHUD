@@ -11,10 +11,14 @@ use tauri::Manager;
 pub struct DbState(pub Mutex<Connection>);
 
 pub fn get_db_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let app_dir = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| format!("Failed to resolve app_local_data_dir: {e}"))?;
+    // Resolves to %LOCALAPPDATA%\FocusHUD on Windows and ~/Library/Application Support/FocusHUD on macOS
+    let app_dir = match app_handle.path().local_data_dir() {
+        Ok(base) => base.join("FocusHUD"),
+        Err(_) => app_handle
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| format!("Failed to resolve app data directory: {e}"))?,
+    };
 
     fs::create_dir_all(&app_dir)?;
     Ok(app_dir.join("focushud.db"))
