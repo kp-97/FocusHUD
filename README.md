@@ -137,14 +137,24 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ## 🗺️ Project Roadmap
 
+### ✅ Completed (v0.1.x)
 - [x] Dual-dock resizable layout with Win32 work area reservation
 - [x] Pomodoro timer with dynamic Pause/Cancel controls & daily time tracking
 - [x] Compact 68px rail mode with mini circular HUD progress gauge
 - [x] Floating system menu popout with dynamic window unclipping ([#12](https://github.com/kp-97/FocusHUD/issues/12))
-- [ ] Central popup settings window for configurable pane widths ([#6](https://github.com/kp-97/FocusHUD/issues/6), [#13](https://github.com/kp-97/FocusHUD/issues/13))
-- [ ] Taskbar-less tray-only mode ([#10](https://github.com/kp-97/FocusHUD/issues/10))
+- [x] Central popup settings window for configurable pane widths ([#6](https://github.com/kp-97/FocusHUD/issues/6), [#13](https://github.com/kp-97/FocusHUD/issues/13))
+- [x] Taskbar-less tray-only companion mode ([#10](https://github.com/kp-97/FocusHUD/issues/10))
+
+### 🚧 In Progress: v0.2.0 Foundation & Expansion
+- [ ] **Local SQLite Persistence**: Embedded local SQLite storage with an infinitely nestable tree schema (Goals, Tasks, Action Plans, Notes) and real-time dual-dock cache synchronization ([#24](https://github.com/kp-97/FocusHUD/issues/24))
+- [ ] **Notes View & Scratchpad**: Embedded HUD note-taking interface with auto-save, standalone capture, and optional links to goals, tasks, or action plans ([#25](https://github.com/kp-97/FocusHUD/issues/25))
+- [ ] **macOS Compatibility**: Cross-platform window abstractions, macOS Accessibility API window snapping, and multi-platform CI verification ([#26](https://github.com/kp-97/FocusHUD/issues/26))
+
+### 🔮 Future Horizons
 - [ ] Custom HUD color themes (Amber, Emerald, Crimson)
 - [ ] Sound effects & audio cues for Pomodoro transitions
+- [ ] Global quick-capture hotkey (`Ctrl/Cmd + Shift + Space`) for rapid thought offloading
+
 
 ---
 
