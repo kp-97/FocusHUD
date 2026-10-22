@@ -1,4 +1,6 @@
 import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NavViewId, NavItemConfig } from "../types/hud";
+import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans } from "../services/dbService";
+import { treeToGoalsFlat, treeToTasksFlat, treeToActionPlansFlat } from "../services/dbAdapters";
 
 export const getTodayString = (): string => {
   return new Date().toISOString().split("T")[0];
@@ -47,7 +49,7 @@ export const getInitialNav = (): NavViewId => {
 };
 
 // Initial Goals
-const DEFAULT_GOALS: GoalNode[] = [
+export const DEFAULT_GOALS: GoalNode[] = [
   {
     id: "g1",
     title: "LAUNCH FOCUS-HUD V2",
@@ -97,10 +99,13 @@ export const loadGoals = (): GoalNode[] => {
 
 export const saveGoals = (goals: GoalNode[]) => {
   localStorage.setItem("focushud_goals", JSON.stringify(goals));
+  if (isTauriEnvironment()) {
+    syncGoals(treeToGoalsFlat(goals)).catch(() => {});
+  }
 };
 
 // Initial Tasks
-const DEFAULT_TASKS: TaskItem[] = [
+export const DEFAULT_TASKS: TaskItem[] = [
   {
     id: "t1",
     title: "VERIFY 120FPS DOCK RESIZE DRAG",
@@ -163,10 +168,13 @@ export const loadTasks = (): TaskItem[] => {
 
 export const saveTasks = (tasks: TaskItem[]) => {
   localStorage.setItem("focushud_tasks", JSON.stringify(tasks));
+  if (isTauriEnvironment()) {
+    syncTasks(treeToTasksFlat(tasks)).catch(() => {});
+  }
 };
 
 // Initial Action Plans
-const DEFAULT_ACTION_PLANS: ActionPlanNode[] = [
+export const DEFAULT_ACTION_PLANS: ActionPlanNode[] = [
   {
     id: "ap1",
     title: "PRODUCTIVITY WORKSPACE PIPELINE",
@@ -212,6 +220,9 @@ export const loadActionPlans = (): ActionPlanNode[] => {
 
 export const saveActionPlans = (plans: ActionPlanNode[]) => {
   localStorage.setItem("focushud_action_plans", JSON.stringify(plans));
+  if (isTauriEnvironment()) {
+    syncActionPlans(treeToActionPlansFlat(plans)).catch(() => {});
+  }
 };
 
 // Initial Calendar Events

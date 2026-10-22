@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Target, Plus, Check, Trash2, ChevronRight, ChevronDown, Sparkles } from "lucide-react";
 import { GoalNode } from "../../types/hud";
 import { loadGoals, saveGoals, getTodayString } from "../../stores/layoutStore";
 import { Tree3DView } from "../features/tree3d/Tree3DView";
+import { fetchGoals, onDbChange, isTauriEnvironment } from "../../services/dbService";
+import { dbGoalsToTree } from "../../services/dbAdapters";
 
 interface GoalsViewProps {
   show3D?: boolean;
@@ -14,6 +16,28 @@ export const GoalsView: React.FC<GoalsViewProps> = ({ show3D = true }) => {
   const [addingSubToId, setAddingSubToId] = useState<string | null>(null);
   const [subGoalTitle, setSubGoalTitle] = useState("");
   const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let active = true;
+    if (isTauriEnvironment()) {
+      fetchGoals().then((dbGoals) => {
+        if (active && dbGoals.length > 0) setGoals(dbGoalsToTree(dbGoals));
+      });
+    }
+
+    const unlistenPromise = onDbChange((payload) => {
+      if (payload.entity === "goals" || payload.entity === "all") {
+        fetchGoals().then((dbGoals) => {
+          if (active) setGoals(dbGoalsToTree(dbGoals));
+        });
+      }
+    });
+
+    return () => {
+      active = false;
+      unlistenPromise.then((unlisten) => unlisten && unlisten());
+    };
+  }, []);
 
   const saveAndSetGoals = (newGoals: GoalNode[]) => {
     setGoals(newGoals);
