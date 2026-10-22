@@ -318,5 +318,59 @@ mod tests {
         assert_eq!(tasks[0].title, "Task 1 Updated");
         assert_eq!(tasks[0].status, "done");
         assert_eq!(tasks[1].id, "t_sync_3");
+
+        // Test sync_notes
+        let initial_notes = vec![models::Note {
+            id: "n_sync_1".into(),
+            parent_id: None,
+            goal_id: None,
+            task_id: None,
+            action_plan_id: None,
+            title: "Note 1".into(),
+            content: "Content 1".into(),
+            is_pinned: false,
+            sort_order: 0,
+            created_at: 100,
+            updated_at: 100,
+        }];
+        queries::sync_notes(&mut conn, &initial_notes).unwrap();
+        let notes = queries::get_all_notes(&conn).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id, "n_sync_1");
+
+        let updated_notes = vec![
+            models::Note {
+                id: "n_sync_1".into(),
+                parent_id: None,
+                goal_id: None,
+                task_id: None,
+                action_plan_id: None,
+                title: "Note 1 Updated".into(),
+                content: "Content Updated".into(),
+                is_pinned: true,
+                sort_order: 0,
+                created_at: 100,
+                updated_at: 200,
+            },
+            models::Note {
+                id: "n_sync_2".into(),
+                parent_id: None,
+                goal_id: None,
+                task_id: None,
+                action_plan_id: None,
+                title: "Note 2".into(),
+                content: "Content 2".into(),
+                is_pinned: false,
+                sort_order: 1,
+                created_at: 200,
+                updated_at: 200,
+            },
+        ];
+        queries::sync_notes(&mut conn, &updated_notes).unwrap();
+        let notes = queries::get_all_notes(&conn).unwrap();
+        assert_eq!(notes.len(), 2);
+        assert_eq!(notes[0].id, "n_sync_1");
+        assert!(notes[0].is_pinned);
+        assert_eq!(notes[1].id, "n_sync_2");
     }
 }

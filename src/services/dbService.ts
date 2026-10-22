@@ -261,6 +261,16 @@ export async function removeNote(id: string): Promise<boolean> {
   }
 }
 
+export async function syncNotes(notes: DbNote[]): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sync_notes", { notes });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ========================================================
 // State & Migration
 // ========================================================

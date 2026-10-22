@@ -146,8 +146,8 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - [x] Taskbar-less tray-only companion mode ([#10](https://github.com/kp-97/FocusHUD/issues/10))
 
 ### 🚧 In Progress: v0.2.0 Foundation & Expansion
-- [ ] **Local SQLite Persistence**: Embedded local SQLite storage with an infinitely nestable tree schema (Goals, Tasks, Action Plans, Notes) and real-time dual-dock cache synchronization ([#24](https://github.com/kp-97/FocusHUD/issues/24))
-- [ ] **Notes View & Scratchpad**: Embedded HUD note-taking interface with auto-save, standalone capture, and optional links to goals, tasks, or action plans ([#25](https://github.com/kp-97/FocusHUD/issues/25))
+- [x] **Local SQLite Persistence**: Embedded local SQLite storage with an infinitely nestable tree schema (Goals, Tasks, Action Plans, Notes) and real-time dual-dock cache synchronization ([#24](https://github.com/kp-97/FocusHUD/issues/24))
+- [x] **Notes View & Scratchpad**: Embedded HUD note-taking interface with auto-save, standalone capture, and optional links to goals, tasks, or action plans ([#25](https://github.com/kp-97/FocusHUD/issues/25))
 - [ ] **macOS Compatibility**: Cross-platform window abstractions, macOS Accessibility API window snapping, and multi-platform CI verification ([#26](https://github.com/kp-97/FocusHUD/issues/26))
 
 ### 🔮 Future Horizons

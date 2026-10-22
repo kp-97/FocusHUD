@@ -33,6 +33,9 @@ import {
   getMaxRightWidth,
   setMaxRightWidth,
   applyMaxPaneWidths,
+  DEFAULT_NOTES,
+  loadNotes,
+  saveNotes,
 } from "./layoutStore";
 import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode, NavItemConfig } from "../types/hud";
 
@@ -235,7 +238,7 @@ describe("layoutStore module", () => {
   });
 
   describe("navigation configuration", () => {
-    it("has expected default order: Home -> Chat -> Calendar -> Goals -> Tasks -> Action Plans -> Timer -> Kanban", () => {
+    it("has expected default order: Home -> Chat -> Calendar -> Goals -> Tasks -> Notes -> Action Plans -> Timer -> Kanban", () => {
       const ids = DEFAULT_NAV_CONFIG.map((item) => item.id);
       expect(ids).toEqual([
         "home",
@@ -243,6 +246,7 @@ describe("layoutStore module", () => {
         "calendar",
         "goals",
         "tasks",
+        "notes",
         "action_plans",
         "timer",
         "kanban",
@@ -263,6 +267,7 @@ describe("layoutStore module", () => {
         { id: "chat", label: "AI CHAT", visible: true },
         { id: "calendar", label: "CALENDAR", visible: true },
         { id: "goals", label: "GOALS", visible: true },
+        { id: "notes", label: "NOTES", visible: true },
         { id: "action_plans", label: "ACTION PLANS", visible: true },
         { id: "kanban", label: "KANBAN", visible: true },
       ];
@@ -341,6 +346,30 @@ describe("layoutStore module", () => {
         maxLeftWidth: 550,
         maxRightWidth: 650,
       });
+    });
+  });
+
+  describe("notes storage", () => {
+    it("returns default notes when localStorage is empty", () => {
+      const notes = loadNotes();
+      expect(notes).toEqual(DEFAULT_NOTES);
+    });
+
+    it("saves and reloads custom notes from localStorage", () => {
+      const customNotes = [
+        {
+          id: "n_custom_1",
+          title: "Test Note",
+          content: "Test Content",
+          isPinned: true,
+          sortOrder: 0,
+          createdAt: 1000,
+          updatedAt: 2000,
+        },
+      ];
+      saveNotes(customNotes);
+      const loaded = loadNotes();
+      expect(loaded).toEqual(customNotes);
     });
   });
 });
