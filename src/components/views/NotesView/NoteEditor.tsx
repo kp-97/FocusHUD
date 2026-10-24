@@ -13,6 +13,13 @@ import {
   Sparkles,
   ChevronDown,
   ArrowLeft,
+  Bold,
+  Italic,
+  List,
+  ListTodo,
+  Code,
+  Quote,
+  Minus,
 } from "lucide-react";
 import { NoteItem, GoalNode, TaskItem, ActionPlanNode } from "../../../types/hud";
 import { MarkdownPreview } from "./MarkdownPreview";
@@ -54,6 +61,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [actionPlans, setActionPlans] = useState<ActionPlanNode[]>(() => loadActionPlans());
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Load goals, tasks, and action plans for contextual linking
   useEffect(() => {
@@ -117,6 +125,151 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     const nextCheckChar = currentCheck ? " " : "x";
     lines[lineIndex] = `${match[1]}${nextCheckChar}${match[3]}`;
     onChangeContent(lines.join("\n"));
+  };
+
+  // Apply Markdown formatting tag to selected text or current cursor position
+  const applyFormatting = (
+    type:
+      | "bold"
+      | "italic"
+      | "h1"
+      | "h2"
+      | "h3"
+      | "bullet"
+      | "checklist"
+      | "code"
+      | "codeblock"
+      | "quote"
+      | "divider"
+  ) => {
+    if (viewMode === "preview") {
+      setViewMode("edit");
+    }
+
+    const textarea = textareaRef.current;
+    const content = note.content || "";
+
+    if (!textarea) {
+      let insertion = "";
+      switch (type) {
+        case "bold": insertion = "**bold text**"; break;
+        case "italic": insertion = "*italic text*"; break;
+        case "h1": insertion = "# Heading 1\n"; break;
+        case "h2": insertion = "## Heading 2\n"; break;
+        case "h3": insertion = "### Heading 3\n"; break;
+        case "bullet": insertion = "- List item\n"; break;
+        case "checklist": insertion = "- [ ] Task item\n"; break;
+        case "code": insertion = "`code`"; break;
+        case "codeblock": insertion = "```\ncode block\n```\n"; break;
+        case "quote": insertion = "> Quote\n"; break;
+        case "divider": insertion = "\n---\n"; break;
+      }
+      onChangeContent(content ? `${content}\n${insertion}` : insertion);
+      return;
+    }
+
+    const start = textarea.selectionStart ?? content.length;
+    const end = textarea.selectionEnd ?? content.length;
+    const selected = content.substring(start, end);
+
+    let replacement = "";
+    let cursorOffsetStart = 0;
+    let cursorOffsetEnd = 0;
+
+    switch (type) {
+      case "bold":
+        replacement = `**${selected || "bold text"}**`;
+        cursorOffsetStart = start + 2;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 9);
+        break;
+      case "italic":
+        replacement = `*${selected || "italic text"}*`;
+        cursorOffsetStart = start + 1;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 11);
+        break;
+      case "h1":
+        replacement = `\n# ${selected || "Heading 1"}\n`;
+        cursorOffsetStart = start + 3;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 9);
+        break;
+      case "h2":
+        replacement = `\n## ${selected || "Heading 2"}\n`;
+        cursorOffsetStart = start + 4;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 9);
+        break;
+      case "h3":
+        replacement = `\n### ${selected || "Heading 3"}\n`;
+        cursorOffsetStart = start + 5;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 9);
+        break;
+      case "bullet":
+        if (selected.includes("\n")) {
+          replacement = selected
+            .split("\n")
+            .map((line) => `- ${line}`)
+            .join("\n");
+          cursorOffsetStart = start;
+          cursorOffsetEnd = start + replacement.length;
+        } else {
+          replacement = `\n- ${selected || "List item"}\n`;
+          cursorOffsetStart = start + 3;
+          cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 9);
+        }
+        break;
+      case "checklist":
+        if (selected.includes("\n")) {
+          replacement = selected
+            .split("\n")
+            .map((line) => `- [ ] ${line}`)
+            .join("\n");
+          cursorOffsetStart = start;
+          cursorOffsetEnd = start + replacement.length;
+        } else {
+          replacement = `\n- [ ] ${selected || "Task item"}\n`;
+          cursorOffsetStart = start + 7;
+          cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 9);
+        }
+        break;
+      case "code":
+        replacement = `\`${selected || "code"}\``;
+        cursorOffsetStart = start + 1;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 4);
+        break;
+      case "codeblock":
+        replacement = `\n\`\`\`\n${selected || "code block"}\n\`\`\`\n`;
+        cursorOffsetStart = start + 5;
+        cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 10);
+        break;
+      case "quote":
+        if (selected.includes("\n")) {
+          replacement = selected
+            .split("\n")
+            .map((line) => `> ${line}`)
+            .join("\n");
+          cursorOffsetStart = start;
+          cursorOffsetEnd = start + replacement.length;
+        } else {
+          replacement = `\n> ${selected || "Quote"}\n`;
+          cursorOffsetStart = start + 3;
+          cursorOffsetEnd = cursorOffsetStart + (selected ? selected.length : 5);
+        }
+        break;
+      case "divider":
+        replacement = `\n---\n`;
+        cursorOffsetStart = start + replacement.length;
+        cursorOffsetEnd = cursorOffsetStart;
+        break;
+    }
+
+    const nextContent = content.substring(0, start) + replacement + content.substring(end);
+    onChangeContent(nextContent);
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(cursorOffsetStart, cursorOffsetEnd);
+      }
+    }, 0);
   };
 
   // Flatten nested goals for selector
@@ -470,10 +623,104 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       </div>
 
+      {/* Markdown Quick Formatting Toolbar */}
+      <div className="flex items-center gap-0.5 px-2 py-1 bg-[#040810] border-b border-cyan-500/20 overflow-x-auto shrink-0 select-none">
+        <button
+          type="button"
+          onClick={() => applyFormatting("bold")}
+          title="Bold (**text**)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <Bold className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("italic")}
+          title="Italic (*text*)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <Italic className="w-3.5 h-3.5" />
+        </button>
+
+        <span className="w-px h-3.5 bg-cyan-500/20 mx-1 shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => applyFormatting("h1")}
+          title="Heading 1 (# Text)"
+          className="px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          H1
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("h2")}
+          title="Heading 2 (## Text)"
+          className="px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("h3")}
+          title="Heading 3 (### Text)"
+          className="px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          H3
+        </button>
+
+        <span className="w-px h-3.5 bg-cyan-500/20 mx-1 shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => applyFormatting("bullet")}
+          title="Bullet List (- item)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <List className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("checklist")}
+          title="Interactive Checklist (- [ ] task)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <ListTodo className="w-3.5 h-3.5" />
+        </button>
+
+        <span className="w-px h-3.5 bg-cyan-500/20 mx-1 shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => applyFormatting("code")}
+          title="Inline Code (`code`)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <Code className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("quote")}
+          title="Blockquote (> text)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <Quote className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("divider")}
+          title="Divider Line (---)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       {/* Editor Main Content Area */}
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
         {viewMode === "edit" && (
           <textarea
+            ref={textareaRef}
             value={note.content}
             onChange={(e) => onChangeContent(e.target.value)}
             placeholder="Type notes here... Supports Markdown headers (#), bullets (-), checklists (- [ ]), and bold (**text**)..."
@@ -493,6 +740,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         {viewMode === "split" && (
           <div className="flex-1 w-full flex flex-row overflow-hidden divide-x divide-cyan-500/20">
             <textarea
+              ref={textareaRef}
               value={note.content}
               onChange={(e) => onChangeContent(e.target.value)}
               placeholder="Type markdown here..."

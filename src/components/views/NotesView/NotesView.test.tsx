@@ -257,4 +257,34 @@ describe("NotesView Component", () => {
     fireEvent.click(backBtn);
     expect(handleBack).toHaveBeenCalledTimes(1);
   });
+
+  it("applies formatting from markdown toolbar to active note", async () => {
+    render(<NotesView />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("First Scratchpad")).toBeInTheDocument();
+    });
+
+    const boldBtn = screen.getByTitle("Bold (**text**)");
+    expect(boldBtn).toBeInTheDocument();
+
+    fireEvent.click(boldBtn);
+
+    const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
+    expect(textarea.value).toContain("**");
+  });
+
+  it("inserts checklist item from markdown toolbar", async () => {
+    render(<NotesView />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("First Scratchpad")).toBeInTheDocument();
+    });
+
+    const checklistBtn = screen.getByTitle("Interactive Checklist (- [ ] task)");
+    fireEvent.click(checklistBtn);
+
+    const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
+    expect(textarea.value).toContain("- [ ]");
+  });
 });

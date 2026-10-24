@@ -211,6 +211,31 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
       continue;
     }
 
+    // Horizontal Rule: ---, ***, ___
+    if (/^(\s*[-*_]\s*){3,}$/.test(line.trim())) {
+      elements.push(
+        <hr
+          key={`hr_${idx}`}
+          className="border-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent my-3"
+        />
+      );
+      continue;
+    }
+
+    // Numbered / Ordered List: 1. or 1)
+    const olMatch = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
+    if (olMatch) {
+      const num = olMatch[2];
+      const text = olMatch[3];
+      elements.push(
+        <div key={`ol_${idx}`} className="flex items-start gap-2 my-0.5 text-xs">
+          <span className="font-mono text-cyan-400 font-bold shrink-0">{num}.</span>
+          <span className="text-cyan-200">{renderInline(text)}</span>
+        </div>
+      );
+      continue;
+    }
+
     // Empty Line
     if (line.trim() === "") {
       elements.push(<div key={`empty_${idx}`} className="h-2" />);
