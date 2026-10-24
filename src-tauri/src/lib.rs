@@ -80,6 +80,7 @@ pub fn run() {
             commands::get_notes,
             commands::save_note,
             commands::delete_note,
+            commands::sync_notes,
             commands::migrate_legacy_data
         ])
         .setup(|app| {

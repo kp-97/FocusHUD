@@ -430,6 +430,26 @@ pub fn delete_note(
 }
 
 #[tauri::command]
+pub fn sync_notes(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    notes: Vec<crate::db::models::Note>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::sync_notes(&mut conn, &notes).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "notes".into(),
+            action: "save".into(),
+            id: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn migrate_legacy_data(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::db::DbState>,

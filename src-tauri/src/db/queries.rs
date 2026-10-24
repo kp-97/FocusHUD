@@ -482,6 +482,66 @@ pub fn delete_note(conn: &Connection, id: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn sync_notes(conn: &mut Connection, notes: &[Note]) -> Result<()> {
+    let tx = conn.transaction()?;
+    if notes.is_empty() {
+        tx.execute("DELETE FROM notes", [])?;
+    } else {
+        let placeholders = notes.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM notes WHERE id NOT IN ({})", placeholders);
+        let params: Vec<&dyn rusqlite::ToSql> = notes
+            .iter()
+            .map(|n| &n.id as &dyn rusqlite::ToSql)
+            .collect();
+        tx.execute(&sql, rusqlite::params_from_iter(params))?;
+    }
+
+    for note in notes {
+        let now = current_timestamp_ms();
+        let created_at = if note.created_at > 0 {
+            note.created_at
+        } else {
+            now
+        };
+        let updated_at = if note.updated_at > 0 {
+            note.updated_at
+        } else {
+            now
+        };
+        let is_pinned_int = if note.is_pinned { 1 } else { 0 };
+        tx.execute(
+            "INSERT INTO notes (id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+             ON CONFLICT(id) DO UPDATE SET
+                parent_id = excluded.parent_id,
+                goal_id = excluded.goal_id,
+                task_id = excluded.task_id,
+                action_plan_id = excluded.action_plan_id,
+                title = excluded.title,
+                content = excluded.content,
+                is_pinned = excluded.is_pinned,
+                sort_order = excluded.sort_order,
+                updated_at = excluded.updated_at",
+            params![
+                note.id,
+                note.parent_id,
+                note.goal_id,
+                note.task_id,
+                note.action_plan_id,
+                note.title,
+                note.content,
+                is_pinned_int,
+                note.sort_order,
+                created_at,
+                updated_at,
+            ],
+        )?;
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 // ========================================================
 // Database State & Migration Queries
 // ========================================================

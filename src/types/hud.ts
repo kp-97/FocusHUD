@@ -4,6 +4,7 @@ export type NavViewId =
   | "calendar"
   | "goals"
   | "tasks"
+  | "notes"
   | "kanban"
   | "action_plans"
   | "timer";
@@ -12,6 +13,20 @@ export interface NavItemConfig {
   id: NavViewId;
   label: string;
   visible: boolean;
+}
+
+export interface NoteItem {
+  id: string;
+  parentId?: string | null;
+  goalId?: string | null;
+  taskId?: string | null;
+  actionPlanId?: string | null;
+  title: string;
+  content: string;
+  isPinned?: boolean;
+  sortOrder?: number;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface GoalNode {

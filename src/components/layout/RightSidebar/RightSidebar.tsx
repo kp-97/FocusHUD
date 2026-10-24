@@ -15,6 +15,7 @@ import { TasksView } from "../../views/TasksView";
 import { KanbanView } from "../../views/KanbanView";
 import { ActionPlansView } from "../../views/ActionPlansView";
 import { TimerView } from "../../views/TimerView";
+import { NotesView } from "../../views/NotesView";
 
 interface RightSidebarProps {
   width: number;
@@ -66,6 +67,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         return <GoalsView />;
       case "tasks":
         return <TasksView />;
+      case "notes":
+        return <NotesView />;
       case "kanban":
         return <KanbanView />;
       case "action_plans":

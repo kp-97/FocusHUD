@@ -6,10 +6,12 @@ import { CalendarView } from "./CalendarView";
 import { GoalsView } from "./GoalsView";
 import { TasksView } from "./TasksView";
 import { KanbanView } from "./KanbanView";
+import { NotesView } from "./NotesView";
 import { NavViewId } from "../../types/hud";
 
 const AVAILABLE_VIEWS: Array<{ id: NavViewId; label: string }> = [
   { id: "timer", label: "POMODORO TIMER" },
+  { id: "notes", label: "NOTES & SCRATCHPAD" },
   { id: "action_plans", label: "ACTION PLANS" },
   { id: "chat", label: "AI CHAT" },
   { id: "calendar", label: "CALENDAR" },
@@ -49,6 +51,8 @@ export const HomeView: React.FC = () => {
             <PomodoroDial isCompact={true} />
           </div>
         );
+      case "notes":
+        return <NotesView />;
       case "action_plans":
         return <ActionPlansView show3D={false} />;
       case "chat":

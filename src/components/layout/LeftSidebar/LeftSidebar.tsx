@@ -10,6 +10,7 @@ import {
   Timer,
   Menu,
   Settings,
+  FileText,
 } from "lucide-react";
 import { HudBrackets } from "../../ui/HudBrackets";
 import { WaveformVisualizer } from "../../ui/WaveformVisualizer";
@@ -20,6 +21,7 @@ import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../../
 import { NavViewId, NavItemConfig } from "../../../types/hud";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
 import { DiagnosticsCard } from "./DiagnosticsCard";
+import { NotesView } from "../../views/NotesView";
 
 const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -27,6 +29,7 @@ const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }
   calendar: Calendar,
   goals: Target,
   tasks: CheckSquare,
+  notes: FileText,
   action_plans: Workflow,
   timer: Timer,
   kanban: Columns3,
@@ -54,6 +57,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const [diagnosticsCollapsed, setDiagnosticsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("hud_diag_collapsed") === "true";
   });
+  const [dockMode, setDockMode] = useState<"monitoring" | "notes">("monitoring");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -214,45 +218,82 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               <WaveformVisualizer isCompact={compactMode} />
             </div>
           )}
-        </div>
 
-        {/* Scrollable Navigation Views: Starts at HOME and ends above DIAGNOSTICS */}
-        <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden my-2 pr-0.5">
-          <nav className={`flex flex-col ${isIconOnly ? "gap-2 items-center w-full" : "gap-2"}`}>
-            {visibleNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeNav === item.id;
-
-              return (
-                <div key={item.id} className={`flex flex-col ${isIconOnly ? "w-full items-center" : ""}`}>
-                  <button
-                    onClick={() => {
-                      onSelectNav(item.id);
-                      broadcastNavChange(item.id as NavViewId);
-                    }}
-                    className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
-                      isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
-                    } ${
-                      isIconOnly
-                        ? "w-full aspect-square justify-center p-0 max-w-[44px]"
-                        : "justify-start px-3 py-2.5"
-                    }`}
-                    title={item.label}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon className={`w-4 h-4 ${isActive ? "text-cyan-200" : "text-cyan-400/80"}`} />
-                      {!isIconOnly && <span className="font-semibold">{item.label}</span>}
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Bottom Section: System Stats (Extracted Component) & Settings Button */}
-        <div className="shrink-0 w-full flex flex-col border-t border-cyan-500/30 pt-2">
+          {/* Dock Mode Switcher: Monitoring vs Notes Scratchpad */}
           {!isIconOnly && (
+            <div className="flex items-center gap-1 my-1 p-0.5 rounded bg-black/60 border border-cyan-500/30 text-[10px] font-tech shrink-0">
+              <button
+                type="button"
+                onClick={() => setDockMode("monitoring")}
+                className={`flex-1 py-0.5 rounded text-center uppercase tracking-wider font-semibold transition cursor-pointer ${
+                  dockMode === "monitoring"
+                    ? "bg-cyan-500/20 text-cyan-100 border border-cyan-500/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]"
+                    : "text-cyan-400/60 hover:text-cyan-200"
+                }`}
+              >
+                MONITORING
+              </button>
+              <button
+                type="button"
+                onClick={() => setDockMode("notes")}
+                className={`flex-1 py-0.5 rounded text-center uppercase tracking-wider font-semibold transition cursor-pointer ${
+                  dockMode === "notes"
+                    ? "bg-cyan-500/20 text-cyan-100 border border-cyan-500/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]"
+                    : "text-cyan-400/60 hover:text-cyan-200"
+                }`}
+              >
+                NOTES
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Content Section: Notes View OR Navigation Views & Diagnostics with smooth transition */}
+        {dockMode === "notes" && !isIconOnly ? (
+          <div className="flex-1 min-h-0 w-full overflow-hidden transition-all duration-300 animate-in fade-in">
+            <NotesView isLeftDock={true} onBackToMonitoring={() => setDockMode("monitoring")} />
+          </div>
+        ) : (
+          <>
+            {/* Scrollable Navigation Views: Starts at HOME and ends above DIAGNOSTICS */}
+            <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden my-2 pr-0.5 transition-all duration-300">
+              <nav className={`flex flex-col ${isIconOnly ? "gap-2 items-center w-full" : "gap-2"}`}>
+                {visibleNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNav === item.id;
+
+                  return (
+                    <div key={item.id} className={`flex flex-col ${isIconOnly ? "w-full items-center" : ""}`}>
+                      <button
+                        onClick={() => {
+                          onSelectNav(item.id);
+                          broadcastNavChange(item.id as NavViewId);
+                        }}
+                        className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
+                          isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
+                        } ${
+                          isIconOnly
+                            ? "w-full aspect-square justify-center p-0 max-w-[44px]"
+                            : "justify-start px-3 py-2.5"
+                        }`}
+                        title={item.label}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Icon className={`w-4 h-4 ${isActive ? "text-cyan-200" : "text-cyan-400/80"}`} />
+                          {!isIconOnly && <span className="font-semibold">{item.label}</span>}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
+              </nav>
+            </div>
+          </>
+        )}
+
+        {/* Bottom Section: System Stats & Settings Button */}
+        <div className="shrink-0 w-full flex flex-col border-t border-cyan-500/30 pt-2">
+          {dockMode === "monitoring" && !isIconOnly && (
             <DiagnosticsCard
               diag={diag}
               collapsed={diagnosticsCollapsed}

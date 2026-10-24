@@ -1,5 +1,5 @@
-import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NavViewId, NavItemConfig } from "../types/hud";
-import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans } from "../services/dbService";
+import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NavViewId, NavItemConfig, NoteItem } from "../types/hud";
+import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans, syncNotes } from "../services/dbService";
 import { treeToGoalsFlat, treeToTasksFlat, treeToActionPlansFlat } from "../services/dbAdapters";
 
 export const getTodayString = (): string => {
@@ -247,6 +247,41 @@ export const saveEvents = (events: CalendarEvent[]) => {
 };
 
 // Remembered expanded widths for left and right panes (used when expanding from collapsed mode)
+// Initial Notes
+export const DEFAULT_NOTES: NoteItem[] = [
+  {
+    id: "note_scratchpad_welcome",
+    title: "SCRATCHPAD & QUICK NOTES",
+    content: "# Welcome to FocusHUD Notes\n\nFast, accessible notepad directly within your HUD overlay.\n\n- [ ] Review daily priorities\n- [ ] Capture thoughts without switching context\n\n### Keyboard Shortcuts\n- **Ctrl+N**: Create a new note\n- **Ctrl+F**: Search notes\n- **Ctrl+Delete**: Delete selected note\n\nNotes auto-save as you type and synchronize seamlessly across docks.",
+    isPinned: true,
+    sortOrder: 0,
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now(),
+  },
+];
+
+export const loadNotes = (): NoteItem[] => {
+  const raw = localStorage.getItem("focushud_notes");
+  if (!raw) return DEFAULT_NOTES;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return DEFAULT_NOTES;
+  }
+};
+
+export const saveNotes = (notes: NoteItem[]) => {
+  localStorage.setItem("focushud_notes", JSON.stringify(notes));
+  if (isTauriEnvironment()) {
+    try {
+      const res = syncNotes(notes);
+      if (res && typeof (res as Promise<boolean>).catch === "function") {
+        (res as Promise<boolean>).catch(() => {});
+      }
+    } catch {}
+  }
+};
+
 export const DEFAULT_LEFT_WIDTH = 360;
 export const DEFAULT_RIGHT_WIDTH = 280;
 
@@ -382,6 +417,7 @@ export const DEFAULT_NAV_CONFIG: NavItemConfig[] = [
   { id: "calendar", label: "CALENDAR", visible: true },
   { id: "goals", label: "GOALS", visible: true },
   { id: "tasks", label: "TASKS", visible: true },
+  { id: "notes", label: "NOTES", visible: true },
   { id: "action_plans", label: "ACTION PLANS", visible: true },
   { id: "timer", label: "TIMER", visible: true },
   { id: "kanban", label: "KANBAN", visible: true },
