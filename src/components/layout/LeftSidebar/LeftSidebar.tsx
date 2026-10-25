@@ -60,7 +60,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   });
   const [dockMode, setDockMode] = useState<"monitoring" | "notes">("monitoring");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const activeTooltipRef = useRef<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
   const popoutCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,38 +70,43 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       clearTimeout(popoutCloseTimer.current);
       popoutCloseTimer.current = null;
     }
-    setActiveTooltip(id);
+    activeTooltipRef.current = id;
     setDockPopoutMode("left", true);
   }, []);
 
-  const handleTooltipClose = useCallback((id: string) => {
-    setActiveTooltip((prev) => (prev === id ? null : prev));
-    if (popoutCloseTimer.current) {
-      clearTimeout(popoutCloseTimer.current);
-    }
-    popoutCloseTimer.current = setTimeout(() => {
-      if (!isMenuOpen) {
-        setDockPopoutMode("left", false);
+  const handleTooltipClose = useCallback(
+    (id: string) => {
+      if (activeTooltipRef.current === id) {
+        activeTooltipRef.current = null;
       }
-    }, 150);
-  }, [isMenuOpen]);
+      if (popoutCloseTimer.current) {
+        clearTimeout(popoutCloseTimer.current);
+      }
+      popoutCloseTimer.current = setTimeout(() => {
+        if (!isMenuOpen && !activeTooltipRef.current) {
+          setDockPopoutMode("left", false);
+        }
+      }, 150);
+    },
+    [isMenuOpen]
+  );
 
   const handleSidebarMouseLeave = useCallback(() => {
     if (popoutCloseTimer.current) {
       clearTimeout(popoutCloseTimer.current);
       popoutCloseTimer.current = null;
     }
-    setActiveTooltip(null);
+    activeTooltipRef.current = null;
     if (!isMenuOpen) {
       setDockPopoutMode("left", false);
     }
   }, [isMenuOpen]);
 
-  // Sync dock popout mode with native window and close when clicking outside, pressing Escape, or window blur
+  // Sync dock popout mode with native window for hamburger menu
   useEffect(() => {
     if (isMenuOpen) {
       setDockPopoutMode("left", true);
-    } else if (!activeTooltip) {
+    } else if (!activeTooltipRef.current) {
       setDockPopoutMode("left", false);
     }
 
@@ -133,26 +138,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", handleBlur);
-      if (!activeTooltip) {
+      if (!activeTooltipRef.current) {
         setDockPopoutMode("left", false);
       }
     };
-  }, [isMenuOpen, activeTooltip]);
-
-  // Reset popout on window blur
-  useEffect(() => {
-    const handleGlobalBlur = () => {
-      if (popoutCloseTimer.current) {
-        clearTimeout(popoutCloseTimer.current);
-        popoutCloseTimer.current = null;
-      }
-      setActiveTooltip(null);
-      if (!isMenuOpen) {
-        setDockPopoutMode("left", false);
-      }
-    };
-    window.addEventListener("blur", handleGlobalBlur);
-    return () => window.removeEventListener("blur", handleGlobalBlur);
   }, [isMenuOpen]);
 
   const toggleDiagnosticsCollapsed = () => {

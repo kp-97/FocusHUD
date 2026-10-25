@@ -43,8 +43,12 @@ export const TooltipProvider: React.FC<TooltipProviderProps> = ({
   onTooltipOpen,
   onTooltipClose,
 }) => {
+  const value = React.useMemo(
+    () => ({ onTooltipOpen, onTooltipClose }),
+    [onTooltipOpen, onTooltipClose]
+  );
   return (
-    <TooltipContext.Provider value={{ onTooltipOpen, onTooltipClose }}>
+    <TooltipContext.Provider value={value}>
       {children}
     </TooltipContext.Provider>
   );
@@ -229,17 +233,24 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [isVisible, updateCoords]);
 
+  const isVisibleRef = useRef(isVisible);
+  isVisibleRef.current = isVisible;
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  const contextRef = useRef(context);
+  contextRef.current = context;
+
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
-      if (isVisible) {
-        onOpenChange?.(false);
-        context?.onTooltipClose?.(tooltipId);
+      if (isVisibleRef.current) {
+        onOpenChangeRef.current?.(false);
+        contextRef.current?.onTooltipClose?.(tooltipId);
       }
     };
-  }, [isVisible, onOpenChange, context, tooltipId]);
+  }, [tooltipId]);
 
   if (disabled || !content) {
     return children;
