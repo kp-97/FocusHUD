@@ -12,6 +12,10 @@ use windows_sys::Win32::Graphics::Dwm::{
     DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute,
 };
 #[cfg(target_os = "windows")]
+use windows_sys::Win32::Graphics::Gdi::{
+    MONITOR_DEFAULTTONULL, MONITOR_DEFAULTTOPRIMARY, MonitorFromPoint, MonitorFromWindow,
+};
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Threading::{
     OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
@@ -19,8 +23,9 @@ use windows_sys::Win32::System::Threading::{
 use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_MOVESIZEEND, GA_ROOT, GA_ROOTOWNER, GWL_EXSTYLE,
-    GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos, GetWindowLongW, GetWindowRect,
+    EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MOVESIZEEND, GA_ROOT,
+    GA_ROOTOWNER, GWL_EXSTYLE, GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos,
+    GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SW_RESTORE, SWP_ASYNCWINDOWPOS,
     SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos, ShowWindow,
     WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WS_CAPTION, WS_CHILD, WS_EX_NOACTIVATE,
@@ -30,10 +35,83 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 #[cfg(target_os = "windows")]
 use crate::dock::{LEFT_DOCK_HWND, RIGHT_DOCK_HWND};
 #[cfg(target_os = "windows")]
-use crate::monitor::{get_current_work_area, get_original_work_area, get_previous_work_area};
+use crate::monitor::{
+    get_current_work_area, get_original_work_area, get_previous_work_area,
+    get_primary_monitor_rects,
+};
 
 #[cfg(target_os = "windows")]
 static PID_WEBVIEW_CACHE: Mutex<Option<HashMap<u32, bool>>> = Mutex::new(None);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapTargetKind {
+    Full,
+    LeftHalf,
+    RightHalf,
+}
+
+#[cfg(target_os = "windows")]
+pub fn calculate_snap_rects(work_rect: RECT) -> (RECT, RECT) {
+    let work_w = work_rect.right - work_rect.left;
+    let mid_x = work_rect.left + (work_w / 2);
+    let left_half = RECT {
+        left: work_rect.left,
+        top: work_rect.top,
+        right: mid_x,
+        bottom: work_rect.bottom,
+    };
+    let right_half = RECT {
+        left: mid_x,
+        top: work_rect.top,
+        right: work_rect.right,
+        bottom: work_rect.bottom,
+    };
+    (left_half, right_half)
+}
+
+#[cfg(target_os = "windows")]
+pub fn is_rect_fitted(current: RECT, target: RECT, tolerance: i32) -> bool {
+    (current.left - target.left).abs() <= tolerance
+        && (current.right - target.right).abs() <= tolerance
+        && (current.top - target.top).abs() <= tolerance
+        && (current.bottom - target.bottom).abs() <= tolerance
+}
+
+#[cfg(target_os = "windows")]
+pub fn determine_foreground_snap_target(vis: RECT, work_rect: RECT) -> (RECT, SnapTargetKind) {
+    let (left_half, right_half) = calculate_snap_rects(work_rect);
+    let work_w = work_rect.right - work_rect.left;
+    let mid_x = work_rect.left + (work_w / 2);
+
+    // If workspace is wide enough for 50/50 tiling, check if previously left- or right-tiled
+    if work_w >= 900 {
+        let was_left_tiled =
+            (vis.left - work_rect.left).abs() <= 48 && (vis.right - mid_x).abs() <= 64;
+        let was_right_tiled =
+            (vis.left - mid_x).abs() <= 64 && (vis.right - work_rect.right).abs() <= 48;
+
+        if was_left_tiled {
+            return (left_half, SnapTargetKind::LeftHalf);
+        } else if was_right_tiled {
+            return (right_half, SnapTargetKind::RightHalf);
+        }
+    }
+
+    (work_rect, SnapTargetKind::Full)
+}
+
+#[cfg(target_os = "windows")]
+pub unsafe fn is_window_on_primary_monitor(hwnd: HWND) -> bool {
+    unsafe {
+        let hmon_window = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONULL);
+        if hmon_window.is_null() {
+            return false;
+        }
+        let pt = POINT { x: 0, y: 0 };
+        let hmon_primary = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
+        hmon_window == hmon_primary
+    }
+}
 
 #[cfg(target_os = "windows")]
 pub unsafe fn is_webview_or_own_process(pid: u32) -> bool {
@@ -208,7 +286,7 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             return false;
         }
 
-        // Fast-path 3: Check root / owner against FocusHUD dock HWNDs
+        // Fast-path 3: Check root / owner against FocusHUD dock HWNDs and owned dialog modals
         let root = GetAncestor(hwnd, GA_ROOT);
         if !root.is_null() {
             let r_val = root as isize;
@@ -227,16 +305,25 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             {
                 return false;
             }
+            // Skip owned dialogs, popup modals, and palettes
+            if owner != hwnd {
+                return false;
+            }
         }
 
-        // Fast-path 4: Process check with PID caching (skips redundant OpenProcess)
+        // Fast-path 4: Non-empty window title (ignores nameless background/helper windows)
+        if GetWindowTextLengthW(hwnd) == 0 {
+            return false;
+        }
+
+        // Fast-path 5: Process check with PID caching (skips redundant OpenProcess)
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, &mut pid);
         if is_webview_or_own_process(pid) {
             return false;
         }
 
-        // Fast-path 5: Cloaked windows (virtual desktops, hidden UWP apps)
+        // Fast-path 6: Cloaked windows (virtual desktops, hidden UWP apps)
         let mut cloaked: u32 = 0;
         let _ = DwmGetWindowAttribute(
             hwnd,
@@ -248,7 +335,7 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             return false;
         }
 
-        // Fast-path 6: Desktop and shell system classes
+        // Fast-path 7: Desktop and shell system classes
         let mut class_buf = [0u16; 128];
         let len = GetClassNameW(hwnd, class_buf.as_mut_ptr(), class_buf.len() as i32);
         if len > 0 {
@@ -267,6 +354,25 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
                 )
             {
                 return false;
+            }
+        }
+
+        // Fast-path 8: Ensure window is on the primary monitor
+        if !is_window_on_primary_monitor(hwnd) {
+            return false;
+        }
+
+        // Fast-path 9: Skip full-screen games, media players, presentations
+        if IsZoomed(hwnd) == 0 {
+            if let Some(vis) = get_visible_window_rect(hwnd) {
+                let (rc_mon, _) = get_primary_monitor_rects();
+                if vis.left <= rc_mon.left
+                    && vis.top <= rc_mon.top
+                    && vis.right >= rc_mon.right
+                    && vis.bottom >= rc_mon.bottom
+                {
+                    return false;
+                }
             }
         }
     }
@@ -288,12 +394,22 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             return 1;
         }
 
-        let prev_rect = get_previous_work_area().unwrap_or(work_rect);
+        let is_zoomed = IsZoomed(hwnd) != 0;
+        let is_foreground = hwnd == GetForegroundWindow();
 
-        if IsZoomed(hwnd) != 0 {
+        // Strict foreground isolation: Only snap maximized windows (which must adapt to
+        // the modified system work area) and the current active foreground window.
+        // Background windows are strictly left untouched.
+        if !is_zoomed && !is_foreground {
+            return 1;
+        }
+
+        if is_zoomed {
             fit_window_to_visible_rect(hwnd, work_rect);
             return 1;
         }
+
+        let prev_rect = get_previous_work_area().unwrap_or(work_rect);
 
         let Some(vis) = get_visible_window_rect(hwnd) else {
             return 1;
@@ -378,9 +494,18 @@ pub unsafe extern "system" fn win_event_hook_proc(
     }
 
     unsafe {
+        // Fast-path: Ignore non-maximized location changes
         if event == EVENT_OBJECT_LOCATIONCHANGE && IsZoomed(hwnd) == 0 {
             return;
         }
+
+        // Strict foreground isolation: Only the active foreground window is evaluated and snapped.
+        // Background and unfocused windows are strictly bypassed.
+        let fg = GetForegroundWindow();
+        if hwnd != fg {
+            return;
+        }
+
         if !is_snappable_app_window(hwnd) {
             return;
         }
@@ -394,7 +519,7 @@ pub unsafe extern "system" fn win_event_hook_proc(
             return;
         }
 
-        // If a window just became maximized (IsZoomed), ensure it fits strictly between the bars
+        // 1. EVENT_OBJECT_LOCATIONCHANGE: Window just maximized
         if event == EVENT_OBJECT_LOCATIONCHANGE {
             if IsZoomed(hwnd) != 0 {
                 if let Some(vis) = get_visible_window_rect(hwnd) {
@@ -406,6 +531,43 @@ pub unsafe extern "system" fn win_event_hook_proc(
             return;
         }
 
+        // 2. EVENT_SYSTEM_FOREGROUND: Focus switched (Alt+Tab, Taskbar click, app activation)
+        if event == EVENT_SYSTEM_FOREGROUND {
+            if IsZoomed(hwnd) != 0 {
+                if let Some(vis) = get_visible_window_rect(hwnd) {
+                    if vis.left < work_rect.left - 2 || vis.right > work_rect.right + 2 {
+                        fit_window_to_visible_rect(hwnd, work_rect);
+                    }
+                }
+                return;
+            }
+
+            let Some(vis) = get_visible_window_rect(hwnd) else {
+                return;
+            };
+
+            let vis_w = vis.right - vis.left;
+            let vis_h = vis.bottom - vis.top;
+            if vis_w < 120 || vis_h < 100 {
+                return;
+            }
+
+            let (left_half, right_half) = calculate_snap_rects(work_rect);
+
+            // Avoid redundant repositioning / flickering if already neatly fitted
+            if is_rect_fitted(vis, work_rect, 6)
+                || is_rect_fitted(vis, left_half, 6)
+                || is_rect_fitted(vis, right_half, 6)
+            {
+                return;
+            }
+
+            let (target, _kind) = determine_foreground_snap_target(vis, work_rect);
+            fit_window_to_visible_rect(hwnd, target);
+            return;
+        }
+
+        // 3. EVENT_SYSTEM_MOVESIZEEND: User finished dragging / resizing with mouse
         if event != EVENT_SYSTEM_MOVESIZEEND {
             return;
         }
@@ -512,6 +674,15 @@ pub unsafe extern "system" fn win_event_hook_proc(
 pub unsafe fn init_window_snap_hooks() {
     unsafe {
         let _ = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            std::ptr::null_mut(),
+            Some(win_event_hook_proc),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        );
+        let _ = SetWinEventHook(
             EVENT_SYSTEM_MOVESIZEEND,
             EVENT_SYSTEM_MOVESIZEEND,
             std::ptr::null_mut(),
@@ -529,5 +700,108 @@ pub unsafe fn init_window_snap_hooks() {
             0,
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_calculate_snap_rects() {
+        let work_rect = RECT {
+            left: 280,
+            top: 0,
+            right: 3160,
+            bottom: 1356,
+        };
+        let (left_half, right_half) = calculate_snap_rects(work_rect);
+
+        // work_w = 2880, mid_x = 280 + 1440 = 1720
+        assert_eq!(left_half.left, 280);
+        assert_eq!(left_half.right, 1720);
+        assert_eq!(left_half.top, 0);
+        assert_eq!(left_half.bottom, 1356);
+
+        assert_eq!(right_half.left, 1720);
+        assert_eq!(right_half.right, 3160);
+        assert_eq!(right_half.top, 0);
+        assert_eq!(right_half.bottom, 1356);
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_is_rect_fitted() {
+        let target = RECT {
+            left: 280,
+            top: 0,
+            right: 3160,
+            bottom: 1356,
+        };
+        // Within tolerance
+        let fitted = RECT {
+            left: 282,
+            top: 1,
+            right: 3159,
+            bottom: 1354,
+        };
+        assert!(is_rect_fitted(fitted, target, 6));
+
+        // Outside tolerance
+        let unfitted = RECT {
+            left: 200,
+            top: 0,
+            right: 3160,
+            bottom: 1356,
+        };
+        assert!(!is_rect_fitted(unfitted, target, 6));
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_determine_foreground_snap_target_tiled() {
+        let work_rect = RECT {
+            left: 280,
+            top: 0,
+            right: 3160,
+            bottom: 1356,
+        };
+
+        // Window roughly on left half (mid_x = 1720)
+        let vis_left = RECT {
+            left: 285,
+            top: 10,
+            right: 1730,
+            bottom: 1350,
+        };
+        let (target_left, kind_left) = determine_foreground_snap_target(vis_left, work_rect);
+        assert_eq!(kind_left, SnapTargetKind::LeftHalf);
+        assert_eq!(target_left.left, 280);
+        assert_eq!(target_left.right, 1720);
+
+        // Window roughly on right half
+        let vis_right = RECT {
+            left: 1715,
+            top: 10,
+            right: 3155,
+            bottom: 1350,
+        };
+        let (target_right, kind_right) = determine_foreground_snap_target(vis_right, work_rect);
+        assert_eq!(kind_right, SnapTargetKind::RightHalf);
+        assert_eq!(target_right.left, 1720);
+        assert_eq!(target_right.right, 3160);
+
+        // Window floating in the center -> snaps to full
+        let vis_center = RECT {
+            left: 800,
+            top: 100,
+            right: 2200,
+            bottom: 1000,
+        };
+        let (target_full, kind_full) = determine_foreground_snap_target(vis_center, work_rect);
+        assert_eq!(kind_full, SnapTargetKind::Full);
+        assert_eq!(target_full.left, 280);
+        assert_eq!(target_full.right, 3160);
     }
 }
