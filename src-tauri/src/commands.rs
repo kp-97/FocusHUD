@@ -8,7 +8,7 @@ use crate::dock::{
 };
 use crate::monitor::{
     ScreenMetrics, get_original_work_area, get_primary_monitor_rects,
-    restore_work_area as restore_monitor_work_area,
+    restore_work_area as restore_monitor_work_area, signal_watchdog_clean_exit,
 };
 
 #[tauri::command]
@@ -141,6 +141,7 @@ pub fn minimize_to_tray(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn exit_app(app: tauri::AppHandle) {
     let _ = restore_monitor_work_area();
+    signal_watchdog_clean_exit();
     app.exit(0);
 }
 
