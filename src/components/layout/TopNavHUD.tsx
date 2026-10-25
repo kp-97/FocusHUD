@@ -5,6 +5,7 @@ import {
   Radio,
   Monitor,
 } from "lucide-react";
+import { Tooltip } from "../ui/Tooltip";
 
 interface TopNavHUDProps {
   leftWidth: number;
@@ -81,47 +82,61 @@ export const TopNavHUD: React.FC<TopNavHUDProps> = ({
         </button>
 
         {/* Magnetic Snap Toggle */}
-        <button
-          onClick={onToggleMagneticSnap}
-          title={magneticSnap ? "Magnetic Snap is ON (Snaps to 64, 220, 280, 360px)" : "Magnetic Snap is OFF"}
-          className={`flex items-center gap-1 ml-2 px-2 py-0.5 rounded text-[10px] border transition ${
-            magneticSnap
-              ? "bg-cyan-400/20 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(0,229,255,0.3)]"
-              : "bg-black/40 border-neutral-700 text-neutral-400 hover:text-neutral-200"
-          }`}
+        <Tooltip
+          content={magneticSnap ? "Magnetic Snap is ON (Snaps to 64, 220, 280, 360px)" : "Magnetic Snap is OFF"}
+          side="bottom"
+          theme="cyan"
         >
-          <Magnet className="w-3 h-3 text-cyan-400" />
-          <span>SNAP: {magneticSnap ? "ON" : "OFF"}</span>
-        </button>
+          <button
+            onClick={onToggleMagneticSnap}
+            aria-label={magneticSnap ? "Magnetic Snap is ON" : "Magnetic Snap is OFF"}
+            className={`flex items-center gap-1 ml-2 px-2 py-0.5 rounded text-[10px] border transition cursor-pointer ${
+              magneticSnap
+                ? "bg-cyan-400/20 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(0,229,255,0.3)]"
+                : "bg-black/40 border-neutral-700 text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            <Magnet className="w-3 h-3 text-cyan-400" />
+            <span>SNAP: {magneticSnap ? "ON" : "OFF"}</span>
+          </button>
+        </Tooltip>
 
         {/* Windows Desktop Docking Toggle (Native Desktop Work Area Snapping) */}
-        <button
-          onClick={onToggleDesktopDock}
-          title={
+        <Tooltip
+          content={
             desktopDockActive
               ? "Desktop Dock ACTIVE: Windows Work Area is constrained so all open programs snap into the middle!"
               : "Click to activate native Windows Desktop Docking (snaps open apps to middle column)"
           }
-          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition ${
-            desktopDockActive
-              ? "bg-emerald-500/25 border-emerald-400 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.4)]"
-              : "bg-black/40 border-cyan-500/30 text-cyan-400/80 hover:border-cyan-400 hover:text-cyan-200"
-          }`}
+          side="bottom"
+          theme="cyan"
         >
-          <Monitor className={`w-3 h-3 ${desktopDockActive ? "text-emerald-300 animate-pulse" : "text-cyan-400"}`} />
-          <span>DESKTOP DOCK: {desktopDockActive ? "ACTIVE" : "STANDBY"}</span>
-        </button>
+          <button
+            onClick={onToggleDesktopDock}
+            aria-label={desktopDockActive ? "Desktop Dock ACTIVE" : "Desktop Dock STANDBY"}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition cursor-pointer ${
+              desktopDockActive
+                ? "bg-emerald-500/25 border-emerald-400 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.4)]"
+                : "bg-black/40 border-cyan-500/30 text-cyan-400/80 hover:border-cyan-400 hover:text-cyan-200"
+            }`}
+          >
+            <Monitor className={`w-3 h-3 ${desktopDockActive ? "text-emerald-300 animate-pulse" : "text-cyan-400"}`} />
+            <span>DESKTOP DOCK: {desktopDockActive ? "ACTIVE" : "STANDBY"}</span>
+          </button>
+        </Tooltip>
       </div>
 
       {/* Right Actions & Metrics */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={onReset}
-          title="Reset to default dimensions"
-          className="p-1 rounded bg-black/40 border border-cyan-500/30 text-cyan-400 hover:text-white hover:border-cyan-400 transition"
-        >
-          <RefreshCw className="w-3 h-3" />
-        </button>
+        <Tooltip content="Reset to default dimensions" side="bottom" theme="cyan">
+          <button
+            onClick={onReset}
+            aria-label="Reset to default dimensions"
+            className="p-1 rounded bg-black/40 border border-cyan-500/30 text-cyan-400 hover:text-white hover:border-cyan-400 transition cursor-pointer"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </button>
+        </Tooltip>
 
         <div className="hidden lg:flex items-center gap-2 text-[10px] text-cyan-400/70 border-l border-cyan-500/30 pl-2">
           <span>LEFT: {Math.round(leftWidth)}px</span>

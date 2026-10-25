@@ -218,4 +218,41 @@ describe("LeftSidebar component", () => {
 
     expect(handleSelectNav).toHaveBeenCalledWith("home");
   });
+
+  it("shows instant custom tooltips without native title lag in compact icon-only mode", () => {
+    render(
+      <LeftSidebar
+        width={68}
+        activeNav="home"
+        onSelectNav={vi.fn()}
+      />
+    );
+
+    // Buttons should have aria-label and NO native title (to avoid 1s OS delay)
+    const homeBtn = screen.getByRole("button", { name: "HOME" });
+    expect(homeBtn).toBeInTheDocument();
+    expect(homeBtn).not.toHaveAttribute("title");
+
+    // Tooltip not visible before hover
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // Hover over HOME icon button
+    fireEvent.mouseEnter(homeBtn);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip).toHaveTextContent("HOME");
+
+    // Moving mouse to Settings button updates tooltip
+    const settingsBtn = screen.getByRole("button", { name: "Settings" });
+    expect(settingsBtn).not.toHaveAttribute("title");
+
+    fireEvent.mouseLeave(homeBtn);
+    fireEvent.mouseEnter(settingsBtn);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Settings");
+
+    // Leaving button hides tooltip
+    fireEvent.mouseLeave(settingsBtn);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
 });
