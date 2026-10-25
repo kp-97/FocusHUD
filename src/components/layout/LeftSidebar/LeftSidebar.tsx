@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Home,
   MessageSquare,
@@ -19,6 +19,7 @@ import { getSystemDiagnostics, setDockPopoutMode } from "../../../services/tauri
 import type { SystemDiagnostics } from "../../../types/diagnostics";
 import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../../../stores/layoutStore";
 import { NavViewId, NavItemConfig } from "../../../types/hud";
+import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
 import { DiagnosticsCard } from "./DiagnosticsCard";
 import { NotesView } from "../../views/NotesView";
@@ -59,12 +60,55 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   });
   const [dockMode, setDockMode] = useState<"monitoring" | "notes">("monitoring");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const activeTooltipRef = useRef<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
+  const popoutCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync dock popout mode with native window and close when clicking outside, pressing Escape, or window blur
+  const handleTooltipOpen = useCallback((id: string) => {
+    if (popoutCloseTimer.current) {
+      clearTimeout(popoutCloseTimer.current);
+      popoutCloseTimer.current = null;
+    }
+    activeTooltipRef.current = id;
+    setDockPopoutMode("left", true);
+  }, []);
+
+  const handleTooltipClose = useCallback(
+    (id: string) => {
+      if (activeTooltipRef.current === id) {
+        activeTooltipRef.current = null;
+      }
+      if (popoutCloseTimer.current) {
+        clearTimeout(popoutCloseTimer.current);
+      }
+      popoutCloseTimer.current = setTimeout(() => {
+        if (!isMenuOpen && !activeTooltipRef.current) {
+          setDockPopoutMode("left", false);
+        }
+      }, 150);
+    },
+    [isMenuOpen]
+  );
+
+  const handleSidebarMouseLeave = useCallback(() => {
+    if (popoutCloseTimer.current) {
+      clearTimeout(popoutCloseTimer.current);
+      popoutCloseTimer.current = null;
+    }
+    activeTooltipRef.current = null;
+    if (!isMenuOpen) {
+      setDockPopoutMode("left", false);
+    }
+  }, [isMenuOpen]);
+
+  // Sync dock popout mode with native window for hamburger menu
   useEffect(() => {
-    setDockPopoutMode("left", isMenuOpen);
+    if (isMenuOpen) {
+      setDockPopoutMode("left", true);
+    } else if (!activeTooltipRef.current) {
+      setDockPopoutMode("left", false);
+    }
 
     if (!isMenuOpen) return;
 
@@ -94,7 +138,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", handleBlur);
-      setDockPopoutMode("left", false);
+      if (!activeTooltipRef.current) {
+        setDockPopoutMode("left", false);
+      }
     };
   }, [isMenuOpen]);
 
@@ -160,9 +206,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
+      onMouseLeave={handleSidebarMouseLeave}
       className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
     >
-      <HudBrackets className="h-full flex flex-col justify-between p-2 overflow-visible">
+      <TooltipProvider
+        onTooltipOpen={handleTooltipOpen}
+        onTooltipClose={handleTooltipClose}
+      >
+        <HudBrackets className="h-full flex flex-col justify-between p-2 overflow-visible">
         {/* Top Header: FocusHUD & Controls (Pinned) */}
         <div className="shrink-0 flex flex-col w-full relative">
           {/* Header Row: Dual Expand/Collapse Button + Title & Controls */}
@@ -188,16 +239,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   </h1>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      ref={menuBtnRef}
-                      onClick={() => setIsMenuOpen((prev) => !prev)}
-                      title="System Menu"
-                      aria-label="System Menu"
-                      aria-expanded={isMenuOpen}
-                      className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-                    >
-                      <Menu className="w-3.5 h-3.5" />
-                    </button>
+                    <Tooltip content="System Menu" side="right" theme="cyan">
+                      <button
+                        ref={menuBtnRef}
+                        onClick={() => setIsMenuOpen((prev) => !prev)}
+                        aria-label="System Menu"
+                        aria-expanded={isMenuOpen}
+                        className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                      >
+                        <Menu className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               )}
@@ -264,25 +316,32 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
                   return (
                     <div key={item.id} className={`flex flex-col ${isIconOnly ? "w-full items-center" : ""}`}>
-                      <button
-                        onClick={() => {
-                          onSelectNav(item.id);
-                          broadcastNavChange(item.id as NavViewId);
-                        }}
-                        className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
-                          isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
-                        } ${
-                          isIconOnly
-                            ? "w-full aspect-square justify-center p-0 max-w-[44px]"
-                            : "justify-start px-3 py-2.5"
-                        }`}
-                        title={item.label}
+                      <Tooltip
+                        content={item.label}
+                        side="right"
+                        disabled={!isIconOnly}
+                        theme="cyan"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <Icon className={`w-4 h-4 ${isActive ? "text-cyan-200" : "text-cyan-400/80"}`} />
-                          {!isIconOnly && <span className="font-semibold">{item.label}</span>}
-                        </div>
-                      </button>
+                        <button
+                          onClick={() => {
+                            onSelectNav(item.id);
+                            broadcastNavChange(item.id as NavViewId);
+                          }}
+                          aria-label={item.label}
+                          className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
+                            isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
+                          } ${
+                            isIconOnly
+                              ? "w-full aspect-square justify-center p-0 max-w-[44px]"
+                              : "justify-start px-3 py-2.5"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Icon className={`w-4 h-4 ${isActive ? "text-cyan-200" : "text-cyan-400/80"}`} />
+                            {!isIconOnly && <span className="font-semibold">{item.label}</span>}
+                          </div>
+                        </button>
+                      </Tooltip>
                     </div>
                   );
                 })}
@@ -307,24 +366,31 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               isIconOnly ? "justify-center pt-0" : "justify-start border-t border-cyan-500/20 pt-1.5"
             }`}
           >
-            <button
-              onClick={onOpenSettings}
-              title="Settings"
-              aria-label="Settings"
-              className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-500/20 ${
-                isIconOnly
-                  ? "w-full aspect-square justify-center p-0 max-w-[44px]"
-                  : "w-full justify-start px-2.5 py-1.5"
-              }`}
+            <Tooltip
+              content="Settings"
+              side="right"
+              disabled={!isIconOnly}
+              theme="cyan"
             >
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-cyan-400 shrink-0" />
-                {!isIconOnly && <span className="font-semibold text-xs tracking-wider">SETTINGS</span>}
-              </div>
-            </button>
+              <button
+                onClick={onOpenSettings}
+                aria-label="Settings"
+                className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-500/20 ${
+                  isIconOnly
+                    ? "w-full aspect-square justify-center p-0 max-w-[44px]"
+                    : "w-full justify-start px-2.5 py-1.5"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-cyan-400 shrink-0" />
+                  {!isIconOnly && <span className="font-semibold text-xs tracking-wider">SETTINGS</span>}
+                </div>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </HudBrackets>
+      </TooltipProvider>
     </aside>
   );
 };
