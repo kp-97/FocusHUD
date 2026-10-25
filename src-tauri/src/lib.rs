@@ -94,6 +94,7 @@ pub fn run() {
                 orig_work.right = rc_monitor.right;
 
                 monitor::init_original_work_area(orig_work);
+                monitor::spawn_watchdog(orig_work);
 
                 let left_w = dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
                 let right_w = dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
@@ -144,6 +145,7 @@ pub fn run() {
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 let _ = monitor::restore_work_area();
+                monitor::signal_watchdog_clean_exit();
             }
         })
         .run(tauri::generate_context!())
