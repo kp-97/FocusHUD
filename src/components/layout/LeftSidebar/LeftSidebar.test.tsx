@@ -241,6 +241,7 @@ describe("LeftSidebar component", () => {
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip).toBeInTheDocument();
     expect(tooltip).toHaveTextContent("HOME");
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", true);
 
     // Moving mouse to Settings button updates tooltip
     const settingsBtn = screen.getByRole("button", { name: "Settings" });
@@ -251,8 +252,12 @@ describe("LeftSidebar component", () => {
 
     expect(screen.getByRole("tooltip")).toHaveTextContent("Settings");
 
-    // Leaving button hides tooltip
+    // Leaving sidebar hides tooltip and restores popout mode to false
+    const aside = homeBtn.closest("aside")!;
     fireEvent.mouseLeave(settingsBtn);
+    fireEvent.mouseLeave(aside);
+
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
   });
 });

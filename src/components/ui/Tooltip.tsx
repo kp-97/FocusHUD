@@ -22,7 +22,33 @@ export interface TooltipProps {
   offset?: number;
   shortcut?: string;
   className?: string;
+  onOpenChange?: (open: boolean) => void;
 }
+
+interface TooltipContextType {
+  onTooltipOpen?: (id: string) => void;
+  onTooltipClose?: (id: string) => void;
+}
+
+export const TooltipContext = React.createContext<TooltipContextType | null>(null);
+
+export interface TooltipProviderProps {
+  children: React.ReactNode;
+  onTooltipOpen?: (id: string) => void;
+  onTooltipClose?: (id: string) => void;
+}
+
+export const TooltipProvider: React.FC<TooltipProviderProps> = ({
+  children,
+  onTooltipOpen,
+  onTooltipClose,
+}) => {
+  return (
+    <TooltipContext.Provider value={{ onTooltipOpen, onTooltipClose }}>
+      {children}
+    </TooltipContext.Provider>
+  );
+};
 
 // Module-level warm-up state (VS Code style instant hover traversal)
 let isGlobalWarm = false;
@@ -70,7 +96,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
   offset = 8,
   shortcut,
   className = "",
+  onOpenChange,
 }) => {
+  const context = React.useContext(TooltipContext);
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; transform: string } | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -161,14 +189,18 @@ export const Tooltip: React.FC<TooltipProps> = ({
     if (effectiveDelay <= 0) {
       setIsVisible(true);
       markWarm();
+      onOpenChange?.(true);
+      context?.onTooltipOpen?.(tooltipId);
     } else {
       timerRef.current = setTimeout(() => {
         updateCoords();
         setIsVisible(true);
         markWarm();
+        onOpenChange?.(true);
+        context?.onTooltipOpen?.(tooltipId);
       }, effectiveDelay);
     }
-  }, [disabled, content, delay, updateCoords]);
+  }, [disabled, content, delay, updateCoords, onOpenChange, context, tooltipId]);
 
   const hideTooltip = useCallback(() => {
     if (timerRef.current) {
@@ -177,7 +209,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
     setIsVisible(false);
     scheduleCooldown();
-  }, []);
+    onOpenChange?.(false);
+    context?.onTooltipClose?.(tooltipId);
+  }, [onOpenChange, context, tooltipId]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -200,8 +234,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (isVisible) {
+        onOpenChange?.(false);
+        context?.onTooltipClose?.(tooltipId);
+      }
     };
-  }, []);
+  }, [isVisible, onOpenChange, context, tooltipId]);
 
   if (disabled || !content) {
     return children;

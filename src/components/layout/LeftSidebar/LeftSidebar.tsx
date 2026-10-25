@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Home,
   MessageSquare,
@@ -19,7 +19,7 @@ import { getSystemDiagnostics, setDockPopoutMode } from "../../../services/tauri
 import type { SystemDiagnostics } from "../../../types/diagnostics";
 import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../../../stores/layoutStore";
 import { NavViewId, NavItemConfig } from "../../../types/hud";
-import { Tooltip } from "../../ui/Tooltip";
+import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
 import { DiagnosticsCard } from "./DiagnosticsCard";
 import { NotesView } from "../../views/NotesView";
@@ -60,12 +60,50 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   });
   const [dockMode, setDockMode] = useState<"monitoring" | "notes">("monitoring");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
+  const popoutCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTooltipOpen = useCallback((id: string) => {
+    if (popoutCloseTimer.current) {
+      clearTimeout(popoutCloseTimer.current);
+      popoutCloseTimer.current = null;
+    }
+    setActiveTooltip(id);
+    setDockPopoutMode("left", true);
+  }, []);
+
+  const handleTooltipClose = useCallback((id: string) => {
+    setActiveTooltip((prev) => (prev === id ? null : prev));
+    if (popoutCloseTimer.current) {
+      clearTimeout(popoutCloseTimer.current);
+    }
+    popoutCloseTimer.current = setTimeout(() => {
+      if (!isMenuOpen) {
+        setDockPopoutMode("left", false);
+      }
+    }, 150);
+  }, [isMenuOpen]);
+
+  const handleSidebarMouseLeave = useCallback(() => {
+    if (popoutCloseTimer.current) {
+      clearTimeout(popoutCloseTimer.current);
+      popoutCloseTimer.current = null;
+    }
+    setActiveTooltip(null);
+    if (!isMenuOpen) {
+      setDockPopoutMode("left", false);
+    }
+  }, [isMenuOpen]);
 
   // Sync dock popout mode with native window and close when clicking outside, pressing Escape, or window blur
   useEffect(() => {
-    setDockPopoutMode("left", isMenuOpen);
+    if (isMenuOpen) {
+      setDockPopoutMode("left", true);
+    } else if (!activeTooltip) {
+      setDockPopoutMode("left", false);
+    }
 
     if (!isMenuOpen) return;
 
@@ -95,8 +133,26 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", handleBlur);
-      setDockPopoutMode("left", false);
+      if (!activeTooltip) {
+        setDockPopoutMode("left", false);
+      }
     };
+  }, [isMenuOpen, activeTooltip]);
+
+  // Reset popout on window blur
+  useEffect(() => {
+    const handleGlobalBlur = () => {
+      if (popoutCloseTimer.current) {
+        clearTimeout(popoutCloseTimer.current);
+        popoutCloseTimer.current = null;
+      }
+      setActiveTooltip(null);
+      if (!isMenuOpen) {
+        setDockPopoutMode("left", false);
+      }
+    };
+    window.addEventListener("blur", handleGlobalBlur);
+    return () => window.removeEventListener("blur", handleGlobalBlur);
   }, [isMenuOpen]);
 
   const toggleDiagnosticsCollapsed = () => {
@@ -161,9 +217,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
+      onMouseLeave={handleSidebarMouseLeave}
       className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
     >
-      <HudBrackets className="h-full flex flex-col justify-between p-2 overflow-visible">
+      <TooltipProvider
+        onTooltipOpen={handleTooltipOpen}
+        onTooltipClose={handleTooltipClose}
+      >
+        <HudBrackets className="h-full flex flex-col justify-between p-2 overflow-visible">
         {/* Top Header: FocusHUD & Controls (Pinned) */}
         <div className="shrink-0 flex flex-col w-full relative">
           {/* Header Row: Dual Expand/Collapse Button + Title & Controls */}
@@ -340,6 +401,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </div>
         </div>
       </HudBrackets>
+      </TooltipProvider>
     </aside>
   );
 };
