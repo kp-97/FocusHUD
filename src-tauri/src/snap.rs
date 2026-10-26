@@ -35,10 +35,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 #[cfg(target_os = "windows")]
 use crate::dock::{LEFT_DOCK_HWND, RIGHT_DOCK_HWND};
 #[cfg(target_os = "windows")]
-use crate::monitor::{
-    get_current_work_area, get_original_work_area, get_previous_work_area,
-    get_primary_monitor_rects,
-};
+use crate::monitor::{get_current_work_area, get_original_work_area, get_primary_monitor_rects};
 
 #[cfg(target_os = "windows")]
 static PID_WEBVIEW_CACHE: Mutex<Option<HashMap<u32, bool>>> = Mutex::new(None);
@@ -454,8 +451,6 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             return 1;
         }
 
-        let prev_rect = get_previous_work_area().unwrap_or(work_rect);
-
         let Some(vis) = get_visible_window_rect(hwnd) else {
             return 1;
         };
@@ -472,54 +467,8 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             return 1;
         }
 
-        let touches_left =
-            vis.left <= work_rect.left + 36 || (vis.left - prev_rect.left).abs() <= 48;
-        let touches_right =
-            vis.right >= work_rect.right - 36 || (vis.right - prev_rect.right).abs() <= 48;
-
-        let was_full_width = vis_w >= ((prev_rect.right - prev_rect.left) * 65 / 100)
-            || (touches_left && touches_right)
-            || (vis.left <= prev_rect.left + 36 && vis.right >= prev_rect.right - 36);
-        let overlaps_both = vis.left < work_rect.left + 36 && vis.right > work_rect.right - 36;
-
-        if was_full_width || overlaps_both || vis_w >= work_w {
-            fit_window_to_visible_rect(hwnd, work_rect);
-            return 1;
-        }
-
-        let mut target = vis;
-        let mut changed = false;
-
-        if touches_left {
-            target.left = work_rect.left;
-            target.right = (target.left + vis_w).min(work_rect.right);
-            if vis_h >= (work_h * 75 / 100) {
-                target.top = work_rect.top;
-                target.bottom = work_rect.bottom;
-            }
-            changed = true;
-        } else if touches_right {
-            target.right = work_rect.right;
-            target.left = (target.right - vis_w).max(work_rect.left);
-            if vis_h >= (work_h * 75 / 100) {
-                target.top = work_rect.top;
-                target.bottom = work_rect.bottom;
-            }
-            changed = true;
-        }
-
-        if target.top < work_rect.top {
-            target.top = work_rect.top;
-            changed = true;
-        }
-        if target.bottom > work_rect.bottom {
-            target.bottom = work_rect.bottom;
-            changed = true;
-        }
-
-        if changed {
-            fit_window_to_visible_rect(hwnd, target);
-        }
+        let (target, _kind) = determine_foreground_snap_target(vis, work_rect);
+        fit_window_to_visible_rect(hwnd, target);
     }
     1
 }
