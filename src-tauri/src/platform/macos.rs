@@ -101,8 +101,8 @@ pub fn check_accessibility_permissions() -> bool {
                         keys.as_ptr(),
                         values.as_ptr(),
                         1,
-                        &kCFTypeDictionaryKeyCallBacks as *const _ as *const std::ffi::c_void,
-                        &kCFTypeDictionaryValueCallBacks as *const _ as *const std::ffi::c_void,
+                        &kCFTypeDictionaryKeyCallBacks as *const _,
+                        &kCFTypeDictionaryValueCallBacks as *const _,
                     );
 
                     let trusted = AXIsProcessTrustedWithOptions(options);
