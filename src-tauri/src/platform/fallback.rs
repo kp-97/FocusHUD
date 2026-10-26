@@ -41,6 +41,8 @@ pub fn update_dock_work_area(
 ) {
 }
 
+pub fn live_resize_active_window(_app: &tauri::AppHandle, _left_width: i32, _right_width: i32) {}
+
 pub fn restore_work_area_sync() {}
 
 pub fn restore_work_area() -> Result<(), String> {

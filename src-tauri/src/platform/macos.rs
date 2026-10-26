@@ -209,6 +209,16 @@ pub fn update_dock_work_area(
     }
 }
 
+pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
+    if !check_accessibility_permissions() {
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        snap_frontmost_window_macos(app, left_width, right_width);
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn snap_frontmost_window_macos(app: &tauri::AppHandle, left_w: i32, right_w: i32) {
     #[repr(C)]

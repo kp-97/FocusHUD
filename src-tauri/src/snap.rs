@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[cfg(target_os = "windows")]
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HWND, LPARAM, POINT, RECT};
@@ -23,8 +23,8 @@ use windows_sys::Win32::System::Threading::{
 use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MOVESIZEEND, GA_ROOT,
-    GA_ROOTOWNER, GWL_EXSTYLE, GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos,
+    EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MOVESIZEEND, EnumWindows,
+    GA_ROOT, GA_ROOTOWNER, GWL_EXSTYLE, GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos,
     GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SW_RESTORE, SWP_ASYNCWINDOWPOS,
     SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos, ShowWindow,
@@ -42,6 +42,44 @@ use crate::monitor::{
 
 #[cfg(target_os = "windows")]
 static PID_WEBVIEW_CACHE: Mutex<Option<HashMap<u32, bool>>> = Mutex::new(None);
+#[cfg(target_os = "windows")]
+pub static LAST_ACTIVE_APP_HWND: AtomicIsize = AtomicIsize::new(0);
+
+#[cfg(target_os = "windows")]
+pub unsafe fn get_target_app_window() -> Option<HWND> {
+    unsafe {
+        let fg = GetForegroundWindow();
+        if is_snappable_app_window(fg) {
+            LAST_ACTIVE_APP_HWND.store(fg as isize, Ordering::Relaxed);
+            return Some(fg);
+        }
+
+        let tracked = LAST_ACTIVE_APP_HWND.load(Ordering::Relaxed) as HWND;
+        if !tracked.is_null() && is_snappable_app_window(tracked) {
+            return Some(tracked);
+        }
+
+        unsafe extern "system" fn find_topmost_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            unsafe {
+                if is_snappable_app_window(hwnd) {
+                    *(lparam as *mut HWND) = hwnd;
+                    0
+                } else {
+                    1
+                }
+            }
+        }
+
+        let mut found: HWND = std::ptr::null_mut();
+        EnumWindows(Some(find_topmost_callback), &mut found as *mut _ as LPARAM);
+        if !found.is_null() {
+            LAST_ACTIVE_APP_HWND.store(found as isize, Ordering::Relaxed);
+            Some(found)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SnapTargetKind {
@@ -190,6 +228,13 @@ pub unsafe fn get_visible_window_rect(hwnd: HWND) -> Option<RECT> {
 
 #[cfg(target_os = "windows")]
 pub unsafe fn fit_window_to_visible_rect(hwnd: HWND, target: RECT) {
+    unsafe {
+        if !is_snappable_app_window(hwnd) {
+            return;
+        }
+    }
+    LAST_ACTIVE_APP_HWND.store(hwnd as isize, Ordering::Relaxed);
+
     let mut win_rect = RECT {
         left: 0,
         top: 0,
@@ -395,12 +440,12 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
         }
 
         let is_zoomed = IsZoomed(hwnd) != 0;
-        let is_foreground = hwnd == GetForegroundWindow();
+        let target_window = get_target_app_window().unwrap_or(std::ptr::null_mut());
+        let is_target = hwnd == target_window;
 
-        // Strict foreground isolation: Only snap maximized windows (which must adapt to
-        // the modified system work area) and the current active foreground window.
+        // Strict isolation: Only snap maximized windows and the target active window.
         // Background windows are strictly left untouched.
-        if !is_zoomed && !is_foreground {
+        if !is_zoomed && !is_target {
             return 1;
         }
 
@@ -509,6 +554,7 @@ pub unsafe extern "system" fn win_event_hook_proc(
         if !is_snappable_app_window(hwnd) {
             return;
         }
+        LAST_ACTIVE_APP_HWND.store(hwnd as isize, Ordering::Relaxed);
 
         let Some(work_rect) = get_current_work_area() else {
             return;

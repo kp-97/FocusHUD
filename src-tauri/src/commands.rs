@@ -68,6 +68,8 @@ pub fn update_dock_sizes(
 
     if commit {
         platform::update_dock_work_area(&app, l_w, r_w, true);
+    } else {
+        platform::live_resize_active_window(&app, l_w, r_w);
     }
 
     Ok(())

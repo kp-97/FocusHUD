@@ -80,6 +80,35 @@ pub fn update_dock_work_area(
     }
 }
 
+pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
+    if let Some(orig) = crate::monitor::get_original_work_area() {
+        let monitor = app.primary_monitor().ok().flatten().or_else(|| {
+            app.get_webview_window("left-dock")
+                .and_then(|w| w.current_monitor().ok().flatten())
+        });
+        let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
+        let phys_left =
+            (((left_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+        let phys_right =
+            (((right_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+
+        let (new_left, new_right) =
+            crate::dock::calculate_work_area_margins(orig.left, orig.right, phys_left, phys_right);
+        let prospective_rect = windows_sys::Win32::Foundation::RECT {
+            left: new_left,
+            top: orig.top,
+            right: new_right,
+            bottom: orig.bottom,
+        };
+
+        unsafe {
+            if let Some(hwnd) = crate::snap::get_target_app_window() {
+                crate::snap::fit_window_to_visible_rect(hwnd, prospective_rect);
+            }
+        }
+    }
+}
+
 pub fn restore_work_area_sync() {
     crate::monitor::restore_work_area_sync();
 }
