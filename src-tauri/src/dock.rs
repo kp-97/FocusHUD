@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32};
+#[cfg(target_os = "windows")]
+use std::sync::atomic::{AtomicI64, AtomicIsize, Ordering};
+#[cfg(target_os = "windows")]
 use tauri::Manager;
 
 #[cfg(target_os = "windows")]

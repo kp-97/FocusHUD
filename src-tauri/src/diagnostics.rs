@@ -82,30 +82,44 @@ pub fn start_diagnostics_worker() {
                 0.0
             };
 
-            let mut gpu_name = None;
-            let mut gpu_usage = None;
-            let mut vram_used_bytes = None;
-            let mut vram_total_bytes = None;
-            let mut vram_usage = None;
-            let mut gpu_temp = None;
-
             #[cfg(target_os = "windows")]
-            if let Some(ref nv) = nvml {
-                if let Ok(dev) = nv.device_by_index(0) {
-                    gpu_name = dev.name().ok();
-                    if let Ok(util) = dev.utilization_rates() {
-                        gpu_usage = Some(util.gpu as f32);
-                    }
-                    if let Ok(mem) = dev.memory_info() {
-                        vram_used_bytes = Some(mem.used);
-                        vram_total_bytes = Some(mem.total);
-                        if mem.total > 0 {
-                            vram_usage = Some((mem.used as f32 / mem.total as f32) * 100.0);
+            let (gpu_name, gpu_usage, vram_used_bytes, vram_total_bytes, vram_usage, gpu_temp) = {
+                let mut gpu_name = None;
+                let mut gpu_usage = None;
+                let mut vram_used_bytes = None;
+                let mut vram_total_bytes = None;
+                let mut vram_usage = None;
+                let mut gpu_temp = None;
+
+                if let Some(ref nv) = nvml {
+                    if let Ok(dev) = nv.device_by_index(0) {
+                        gpu_name = dev.name().ok();
+                        if let Ok(util) = dev.utilization_rates() {
+                            gpu_usage = Some(util.gpu as f32);
                         }
+                        if let Ok(mem) = dev.memory_info() {
+                            vram_used_bytes = Some(mem.used);
+                            vram_total_bytes = Some(mem.total);
+                            if mem.total > 0 {
+                                vram_usage = Some((mem.used as f32 / mem.total as f32) * 100.0);
+                            }
+                        }
+                        gpu_temp = dev.temperature(TemperatureSensor::Gpu).ok();
                     }
-                    gpu_temp = dev.temperature(TemperatureSensor::Gpu).ok();
                 }
-            }
+                (
+                    gpu_name,
+                    gpu_usage,
+                    vram_used_bytes,
+                    vram_total_bytes,
+                    vram_usage,
+                    gpu_temp,
+                )
+            };
+
+            #[cfg(not(target_os = "windows"))]
+            let (gpu_name, gpu_usage, vram_used_bytes, vram_total_bytes, vram_usage, gpu_temp) =
+                (None, None, None, None, None, None);
 
             let diag = SystemDiagnostics {
                 cpu_usage,

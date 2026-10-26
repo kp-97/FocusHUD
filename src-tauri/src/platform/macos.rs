@@ -49,7 +49,7 @@ pub fn get_screen_metrics(app: &tauri::AppHandle) -> Result<ScreenMetrics, Strin
 pub fn check_accessibility_permissions() -> bool {
     #[cfg(target_os = "macos")]
     {
-        extern "C" {
+        unsafe extern "C" {
             fn AXIsProcessTrusted() -> bool;
             fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
         }
@@ -61,7 +61,7 @@ pub fn check_accessibility_permissions() -> bool {
                 if !AXIsProcessTrusted() {
                     // Create CFDictionary with kAXTrustedCheckOptionPrompt = true
                     #[link(name = "CoreFoundation", kind = "framework")]
-                    extern "C" {
+                    unsafe extern "C" {
                         fn CFDictionaryCreate(
                             allocator: *const std::ffi::c_void,
                             keys: *const *const std::ffi::c_void,
@@ -79,7 +79,7 @@ pub fn check_accessibility_permissions() -> bool {
                     let prompt_key_chars: Vec<u16> =
                         "AXTrustedCheckOptionPrompt".encode_utf16().collect();
                     #[link(name = "CoreFoundation", kind = "framework")]
-                    extern "C" {
+                    unsafe extern "C" {
                         fn CFStringCreateWithCharacters(
                             alloc: *const std::ffi::c_void,
                             chars: *const u16,
@@ -225,7 +225,7 @@ fn snap_frontmost_window_macos(app: &tauri::AppHandle, left_w: i32, right_w: i32
     }
 
     #[link(name = "ApplicationServices", kind = "framework")]
-    extern "C" {
+    unsafe extern "C" {
         fn AXUIElementCreateSystemWide() -> *mut std::ffi::c_void;
         fn AXUIElementCopyAttributeValue(
             element: *mut std::ffi::c_void,
@@ -246,7 +246,7 @@ fn snap_frontmost_window_macos(app: &tauri::AppHandle, left_w: i32, right_w: i32
     }
 
     #[link(name = "CoreFoundation", kind = "framework")]
-    extern "C" {
+    unsafe extern "C" {
         fn CFRelease(cf: *const std::ffi::c_void);
         fn CFStringCreateWithCharacters(
             alloc: *const std::ffi::c_void,

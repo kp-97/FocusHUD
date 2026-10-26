@@ -1,3 +1,4 @@
+#[cfg(target_os = "windows")]
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
