@@ -1,4 +1,6 @@
+#[cfg(target_os = "windows")]
 use nvml_wrapper::Nvml;
+#[cfg(target_os = "windows")]
 use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,6 +53,7 @@ pub fn start_diagnostics_worker() {
 
     std::thread::spawn(|| {
         let mut sys = System::new_all();
+        #[cfg(target_os = "windows")]
         let nvml = Nvml::init().ok();
 
         // Initial warmup for CPU delta calculation
@@ -86,6 +89,7 @@ pub fn start_diagnostics_worker() {
             let mut vram_usage = None;
             let mut gpu_temp = None;
 
+            #[cfg(target_os = "windows")]
             if let Some(ref nv) = nvml {
                 if let Ok(dev) = nv.device_by_index(0) {
                     gpu_name = dev.name().ok();

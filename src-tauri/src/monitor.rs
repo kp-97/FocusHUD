@@ -1,4 +1,3 @@
-use serde::Serialize;
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
@@ -33,15 +32,7 @@ static WATCHDOG_SPAWNED: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "windows")]
 static CONSOLE_HANDLER_INSTALLED: AtomicBool = AtomicBool::new(false);
 
-#[derive(Serialize)]
-pub struct ScreenMetrics {
-    pub screen_width: i32,
-    pub screen_height: i32,
-    pub original_left: i32,
-    pub original_top: i32,
-    pub original_right: i32,
-    pub original_bottom: i32,
-}
+pub use crate::platform::ScreenMetrics;
 
 /// Enforces Per-Monitor DPI v2 awareness so Ultrawide and high-DPI displays
 /// report true physical resolutions instead of legacy scaled bounds.
