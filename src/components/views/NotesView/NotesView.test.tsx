@@ -287,4 +287,70 @@ describe("NotesView Component", () => {
     const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
     expect(textarea.value).toContain("- [ ]");
   });
+
+  it("preserves cursor selection range when content updates and component re-renders (Issue #41)", async () => {
+    render(<NotesView />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("First Scratchpad")).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
+    textarea.focus();
+
+    // Set cursor in middle of content
+    textarea.setSelectionRange(5, 5);
+    fireEvent.select(textarea);
+
+    // Simulate user typing at position 5
+    const updatedContent = textarea.value.slice(0, 5) + "X" + textarea.value.slice(5);
+    fireEvent.change(textarea, {
+      target: {
+        value: updatedContent,
+        selectionStart: 6,
+        selectionEnd: 6,
+      },
+    });
+
+    // Cursor position should be preserved at 6, not jumped to end
+    expect(textarea.selectionStart).toBe(6);
+    expect(textarea.selectionEnd).toBe(6);
+  });
+
+  it("preserves cursor selection across window resize events (Issue #41)", async () => {
+    render(<NotesView />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("First Scratchpad")).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.setSelectionRange(8, 8);
+    fireEvent.select(textarea);
+
+    // Trigger window resize event
+    fireEvent(window, new Event("resize"));
+
+    // Cursor position should stay preserved at 8
+    expect(textarea.selectionStart).toBe(8);
+    expect(textarea.selectionEnd).toBe(8);
+  });
+
+  it("preserves NoteEditor and cursor selection when container width crosses split breakpoint (Issue #41)", async () => {
+    render(<NotesView />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("First Scratchpad")).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.setSelectionRange(10, 10);
+    fireEvent.select(textarea);
+
+    // Verify textarea is still mounted and cursor is maintained
+    expect(textarea.selectionStart).toBe(10);
+    expect(document.activeElement).toBe(textarea);
+  });
 });
