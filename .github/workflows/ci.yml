@@ -34,8 +34,16 @@ jobs:
         run: npm test
 
   backend:
-    name: Backend (Rust Tests, Clippy & Fmt)
-    runs-on: windows-latest
+    name: Backend (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows
+            os: windows-latest
+          - platform: macOS
+            os: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,6 +59,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Check Rust Formatting
+        if: matrix.platform == 'Windows'
         run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
 
       - name: Rust Clippy Lint
@@ -58,3 +67,4 @@ jobs:
 
       - name: Run Rust Unit Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+

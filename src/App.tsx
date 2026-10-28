@@ -171,12 +171,27 @@ export default function App() {
     }
   };
 
+  const leftDragRafRef = useRef<number | null>(null);
+  const rightDragRafRef = useRef<number | null>(null);
+
   // Drag handlers for Left Bar:
   const handleLeftDragChange = (newWidth: number) => {
     setLeftWidth(newWidth);
+    if (dockWindowType !== "full" || desktopDockActive) {
+      if (leftDragRafRef.current === null) {
+        leftDragRafRef.current = requestAnimationFrame(() => {
+          leftDragRafRef.current = null;
+          updateDockSizes(newWidth, null, false);
+        });
+      }
+    }
   };
 
   const handleLeftDragEnd = (finalWidth: number) => {
+    if (leftDragRafRef.current !== null) {
+      cancelAnimationFrame(leftDragRafRef.current);
+      leftDragRafRef.current = null;
+    }
     setLeftWidth(finalWidth);
     if (finalWidth >= 120) {
       setRememberedLeftWidth(finalWidth);
@@ -275,9 +290,21 @@ export default function App() {
   // Drag handlers for Right Bar:
   const handleRightDragChange = (newWidth: number) => {
     setRightWidth(newWidth);
+    if (dockWindowType !== "full" || desktopDockActive) {
+      if (rightDragRafRef.current === null) {
+        rightDragRafRef.current = requestAnimationFrame(() => {
+          rightDragRafRef.current = null;
+          updateDockSizes(null, newWidth, false);
+        });
+      }
+    }
   };
 
   const handleRightDragEnd = (finalWidth: number) => {
+    if (rightDragRafRef.current !== null) {
+      cancelAnimationFrame(rightDragRafRef.current);
+      rightDragRafRef.current = null;
+    }
     setRightWidth(finalWidth);
     if (finalWidth >= 120) {
       setRememberedRightWidth(finalWidth);

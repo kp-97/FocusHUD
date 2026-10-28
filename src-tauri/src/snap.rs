@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[cfg(target_os = "windows")]
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HWND, LPARAM, POINT, RECT};
@@ -23,8 +23,8 @@ use windows_sys::Win32::System::Threading::{
 use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MOVESIZEEND, GA_ROOT,
-    GA_ROOTOWNER, GWL_EXSTYLE, GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos,
+    EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MOVESIZEEND, EnumWindows,
+    GA_ROOT, GA_ROOTOWNER, GWL_EXSTYLE, GWL_STYLE, GetAncestor, GetClassNameW, GetCursorPos,
     GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, SW_RESTORE, SWP_ASYNCWINDOWPOS,
     SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos, ShowWindow,
@@ -35,13 +35,48 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 #[cfg(target_os = "windows")]
 use crate::dock::{LEFT_DOCK_HWND, RIGHT_DOCK_HWND};
 #[cfg(target_os = "windows")]
-use crate::monitor::{
-    get_current_work_area, get_original_work_area, get_previous_work_area,
-    get_primary_monitor_rects,
-};
+use crate::monitor::{get_current_work_area, get_original_work_area, get_primary_monitor_rects};
 
 #[cfg(target_os = "windows")]
 static PID_WEBVIEW_CACHE: Mutex<Option<HashMap<u32, bool>>> = Mutex::new(None);
+#[cfg(target_os = "windows")]
+pub static LAST_ACTIVE_APP_HWND: AtomicIsize = AtomicIsize::new(0);
+
+#[cfg(target_os = "windows")]
+pub unsafe fn get_target_app_window() -> Option<HWND> {
+    unsafe {
+        let fg = GetForegroundWindow();
+        if is_snappable_app_window(fg) {
+            LAST_ACTIVE_APP_HWND.store(fg as isize, Ordering::Relaxed);
+            return Some(fg);
+        }
+
+        let tracked = LAST_ACTIVE_APP_HWND.load(Ordering::Relaxed) as HWND;
+        if !tracked.is_null() && is_snappable_app_window(tracked) {
+            return Some(tracked);
+        }
+
+        unsafe extern "system" fn find_topmost_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            unsafe {
+                if is_snappable_app_window(hwnd) {
+                    *(lparam as *mut HWND) = hwnd;
+                    0
+                } else {
+                    1
+                }
+            }
+        }
+
+        let mut found: HWND = std::ptr::null_mut();
+        EnumWindows(Some(find_topmost_callback), &mut found as *mut _ as LPARAM);
+        if !found.is_null() {
+            LAST_ACTIVE_APP_HWND.store(found as isize, Ordering::Relaxed);
+            Some(found)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SnapTargetKind {
@@ -190,6 +225,13 @@ pub unsafe fn get_visible_window_rect(hwnd: HWND) -> Option<RECT> {
 
 #[cfg(target_os = "windows")]
 pub unsafe fn fit_window_to_visible_rect(hwnd: HWND, target: RECT) {
+    unsafe {
+        if !is_snappable_app_window(hwnd) {
+            return;
+        }
+    }
+    LAST_ACTIVE_APP_HWND.store(hwnd as isize, Ordering::Relaxed);
+
     let mut win_rect = RECT {
         left: 0,
         top: 0,
@@ -395,12 +437,12 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
         }
 
         let is_zoomed = IsZoomed(hwnd) != 0;
-        let is_foreground = hwnd == GetForegroundWindow();
+        let target_window = get_target_app_window().unwrap_or(std::ptr::null_mut());
+        let is_target = hwnd == target_window;
 
-        // Strict foreground isolation: Only snap maximized windows (which must adapt to
-        // the modified system work area) and the current active foreground window.
+        // Strict isolation: Only snap maximized windows and the target active window.
         // Background windows are strictly left untouched.
-        if !is_zoomed && !is_foreground {
+        if !is_zoomed && !is_target {
             return 1;
         }
 
@@ -408,8 +450,6 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             fit_window_to_visible_rect(hwnd, work_rect);
             return 1;
         }
-
-        let prev_rect = get_previous_work_area().unwrap_or(work_rect);
 
         let Some(vis) = get_visible_window_rect(hwnd) else {
             return 1;
@@ -427,54 +467,8 @@ pub unsafe extern "system" fn enum_windows_snap_callback(hwnd: HWND, lparam: LPA
             return 1;
         }
 
-        let touches_left =
-            vis.left <= work_rect.left + 36 || (vis.left - prev_rect.left).abs() <= 48;
-        let touches_right =
-            vis.right >= work_rect.right - 36 || (vis.right - prev_rect.right).abs() <= 48;
-
-        let was_full_width = vis_w >= ((prev_rect.right - prev_rect.left) * 65 / 100)
-            || (touches_left && touches_right)
-            || (vis.left <= prev_rect.left + 36 && vis.right >= prev_rect.right - 36);
-        let overlaps_both = vis.left < work_rect.left + 36 && vis.right > work_rect.right - 36;
-
-        if was_full_width || overlaps_both || vis_w >= work_w {
-            fit_window_to_visible_rect(hwnd, work_rect);
-            return 1;
-        }
-
-        let mut target = vis;
-        let mut changed = false;
-
-        if touches_left {
-            target.left = work_rect.left;
-            target.right = (target.left + vis_w).min(work_rect.right);
-            if vis_h >= (work_h * 75 / 100) {
-                target.top = work_rect.top;
-                target.bottom = work_rect.bottom;
-            }
-            changed = true;
-        } else if touches_right {
-            target.right = work_rect.right;
-            target.left = (target.right - vis_w).max(work_rect.left);
-            if vis_h >= (work_h * 75 / 100) {
-                target.top = work_rect.top;
-                target.bottom = work_rect.bottom;
-            }
-            changed = true;
-        }
-
-        if target.top < work_rect.top {
-            target.top = work_rect.top;
-            changed = true;
-        }
-        if target.bottom > work_rect.bottom {
-            target.bottom = work_rect.bottom;
-            changed = true;
-        }
-
-        if changed {
-            fit_window_to_visible_rect(hwnd, target);
-        }
+        let (target, _kind) = determine_foreground_snap_target(vis, work_rect);
+        fit_window_to_visible_rect(hwnd, target);
     }
     1
 }
@@ -509,6 +503,7 @@ pub unsafe extern "system" fn win_event_hook_proc(
         if !is_snappable_app_window(hwnd) {
             return;
         }
+        LAST_ACTIVE_APP_HWND.store(hwnd as isize, Ordering::Relaxed);
 
         let Some(work_rect) = get_current_work_area() else {
             return;

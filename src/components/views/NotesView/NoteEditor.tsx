@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import {
   Pin,
   Trash2,
@@ -62,6 +62,83 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Caret / Selection preservation refs across re-renders, layout changes, and document expansion
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
+  const isInternalChangeRef = useRef<boolean>(false);
+
+  // Helper to record selection on user interaction
+  const recordSelection = useCallback((el?: HTMLTextAreaElement | null) => {
+    const target = el || textareaRef.current;
+    if (target && document.activeElement === target) {
+      selectionRef.current = {
+        start: target.selectionStart,
+        end: target.selectionEnd,
+      };
+    }
+  }, []);
+
+  // Handle content changes from typing
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    isInternalChangeRef.current = true;
+    selectionRef.current = {
+      start: e.target.selectionStart,
+      end: e.target.selectionEnd,
+    };
+    onChangeContent(e.target.value);
+  };
+
+  // Restore selection synchronously before paint if cursor jumped unexpectedly (e.g. from container resize / external update)
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || !selectionRef.current) return;
+
+    if (document.activeElement === textarea) {
+      const { start, end } = selectionRef.current;
+      if (textarea.selectionStart !== start || textarea.selectionEnd !== end) {
+        const len = textarea.value.length;
+        const safeStart = Math.min(start, len);
+        const safeEnd = Math.min(end, len);
+        try {
+          textarea.setSelectionRange(safeStart, safeEnd);
+        } catch {}
+      }
+    }
+    isInternalChangeRef.current = false;
+  }, [note.content]);
+
+  // Restore selection when viewMode switches (e.g. between edit and split)
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea && selectionRef.current && (viewMode === "edit" || viewMode === "split")) {
+      const { start, end } = selectionRef.current;
+      const len = textarea.value.length;
+      try {
+        textarea.setSelectionRange(Math.min(start, len), Math.min(end, len));
+      } catch {}
+    }
+  }, [viewMode]);
+
+  // Restore selection across window and container resize events
+  useEffect(() => {
+    const handleResize = () => {
+      const textarea = textareaRef.current;
+      if (textarea && document.activeElement === textarea && selectionRef.current) {
+        const { start, end } = selectionRef.current;
+        requestAnimationFrame(() => {
+          if (textarea && document.activeElement === textarea) {
+            const len = textarea.value.length;
+            try {
+              textarea.setSelectionRange(Math.min(start, len), Math.min(end, len));
+            } catch {}
+          }
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Load goals, tasks, and action plans for contextual linking
   useEffect(() => {
@@ -268,6 +345,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       if (textareaRef.current) {
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(cursorOffsetStart, cursorOffsetEnd);
+        selectionRef.current = { start: cursorOffsetStart, end: cursorOffsetEnd };
       }
     }, 0);
   };
@@ -722,7 +800,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           <textarea
             ref={textareaRef}
             value={note.content}
-            onChange={(e) => onChangeContent(e.target.value)}
+            onChange={handleContentChange}
+            onSelect={(e) => recordSelection(e.currentTarget)}
+            onKeyUp={(e) => recordSelection(e.currentTarget)}
+            onClick={(e) => recordSelection(e.currentTarget)}
+            onPointerUp={(e) => recordSelection(e.currentTarget)}
             placeholder="Type notes here... Supports Markdown headers (#), bullets (-), checklists (- [ ]), and bold (**text**)..."
             className="flex-1 w-full p-3 bg-transparent text-cyan-200 font-mono text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
           />
@@ -742,7 +824,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             <textarea
               ref={textareaRef}
               value={note.content}
-              onChange={(e) => onChangeContent(e.target.value)}
+              onChange={handleContentChange}
+              onSelect={(e) => recordSelection(e.currentTarget)}
+              onKeyUp={(e) => recordSelection(e.currentTarget)}
+              onClick={(e) => recordSelection(e.currentTarget)}
+              onPointerUp={(e) => recordSelection(e.currentTarget)}
               placeholder="Type markdown here..."
               className="flex-1 h-full p-3 bg-transparent text-cyan-200 font-mono text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
             />

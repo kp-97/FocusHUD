@@ -41,7 +41,15 @@ export const NotesView: React.FC<NotesViewProps> = ({
   const [viewingDetailOnCompact, setViewingDetailOnCompact] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(300);
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth;
+    }
+    return 600;
+  });
+
+  const selectedNoteIdRef = useRef<string | null>(selectedNoteId);
+  selectedNoteIdRef.current = selectedNoteId;
 
   // Debounce timer ref
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,7 +61,8 @@ export const NotesView: React.FC<NotesViewProps> = ({
   useEffect(() => {
     const updateWidth = () => {
       if (containerRef.current) {
-        setContainerWidth(containerRef.current.clientWidth);
+        const w = containerRef.current.clientWidth;
+        setContainerWidth((prev) => (Math.abs(prev - w) > 2 ? w : prev));
       }
     };
     updateWidth();
@@ -127,7 +136,26 @@ export const NotesView: React.FC<NotesViewProps> = ({
             createdAt: n.createdAt,
             updatedAt: n.updatedAt,
           }));
-          setNotes(mapped);
+
+          setNotes((prevNotes) => {
+            // Guard active note's uncommitted in-memory text from being clobbered by async db roundtrip
+            const activeId = selectedNoteIdRef.current;
+            const currentActive = prevNotes.find((p) => p.id === activeId);
+
+            return mapped.map((dbN) => {
+              if (currentActive && dbN.id === activeId) {
+                if (currentActive.content !== dbN.content || currentActive.title !== dbN.title) {
+                  return {
+                    ...dbN,
+                    content: currentActive.content,
+                    title: currentActive.title,
+                  };
+                }
+              }
+              return dbN;
+            });
+          });
+
           setSelectedNoteId((prev) => (prev && mapped.some((m) => m.id === prev) ? prev : mapped[0]?.id || null));
         });
       }
@@ -136,7 +164,20 @@ export const NotesView: React.FC<NotesViewProps> = ({
     // Dual-window cross-dock synchronization via BroadcastChannel
     const handleBroadcast = (e: MessageEvent) => {
       if (e.data && e.data.type === "SYNC_NOTES" && Array.isArray(e.data.notes)) {
-        setNotes(e.data.notes);
+        setNotes((prevNotes) => {
+          const activeId = selectedNoteIdRef.current;
+          const currentActive = prevNotes.find((p) => p.id === activeId);
+          return (e.data.notes as NoteItem[]).map((incoming) => {
+            if (currentActive && incoming.id === activeId && currentActive.content !== incoming.content) {
+              return {
+                ...incoming,
+                content: currentActive.content,
+                title: currentActive.title,
+              };
+            }
+            return incoming;
+          });
+        });
         if (e.data.selectedId && e.data.broadcastSelect) {
           setSelectedNoteId(e.data.selectedId);
         }
@@ -380,51 +421,49 @@ export const NotesView: React.FC<NotesViewProps> = ({
           <span className="text-cyan-500/60 font-mono text-[9px]">LEFT DOCK</span>
         </div>
       )}
-      {/* If split master-detail is supported */}
-      {isSplitLayout ? (
-        <div className="flex-1 min-h-0 flex flex-row overflow-hidden divide-x divide-cyan-500/20">
-          {/* Left: Notes List */}
-          <div className="w-56 shrink-0 h-full overflow-hidden">
-            <NotesList
-              notes={notes}
-              selectedNoteId={selectedNoteId}
-              onSelectNote={(id) => setSelectedNoteId(id)}
-              onNewNote={handleNewNote}
-              onTogglePin={handleTogglePin}
-              onDeleteNote={handleDeleteNote}
-              filter={filter}
-              onChangeFilter={setFilter}
-              searchQuery={searchQuery}
-              onChangeSearchQuery={setSearchQuery}
-              isCompact={false}
-            />
-          </div>
-
-          {/* Right: Note Editor */}
-          <div className="flex-1 min-w-0 h-full overflow-hidden">
-            {activeNote ? (
-              <NoteEditor
-                note={activeNote}
-                onChangeTitle={handleChangeTitle}
-                onChangeContent={handleChangeContent}
-                onTogglePin={() => handleTogglePin(activeNote.id)}
-                onDeleteNote={() => handleDeleteNote(activeNote.id)}
-                onChangeLink={handleChangeLink}
-                saveStatus={saveStatus}
-                isCompact={false}
-              />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-cyan-500/40 text-xs font-tech">
-                <span>SELECT OR CREATE A NOTE</span>
-              </div>
-            )}
-          </div>
+      {/* Responsive layout: unified container to prevent unmounting NoteEditor across width thresholds */}
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden divide-x divide-cyan-500/20">
+        {/* Left: Notes List */}
+        <div
+          className={`h-full overflow-hidden ${
+            isSplitLayout
+              ? "w-56 shrink-0 block"
+              : viewingDetailOnCompact
+                ? "hidden"
+                : "w-full flex-1 block"
+          }`}
+        >
+          <NotesList
+            notes={notes}
+            selectedNoteId={selectedNoteId}
+            onSelectNote={(id) => {
+              setSelectedNoteId(id);
+              setViewingDetailOnCompact(true);
+            }}
+            onNewNote={handleNewNote}
+            onTogglePin={handleTogglePin}
+            onDeleteNote={handleDeleteNote}
+            filter={filter}
+            onChangeFilter={setFilter}
+            searchQuery={searchQuery}
+            onChangeSearchQuery={setSearchQuery}
+            isCompact={!isSplitLayout}
+          />
         </div>
-      ) : (
-        /* Single-Pane Compact Layout (Master-detail drilldown) */
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-          {viewingDetailOnCompact && activeNote ? (
+
+        {/* Right: Note Editor */}
+        <div
+          className={`h-full overflow-hidden ${
+            isSplitLayout
+              ? "flex-1 min-w-0 block"
+              : viewingDetailOnCompact
+                ? "w-full flex-1 block"
+                : "hidden"
+          }`}
+        >
+          {activeNote ? (
             <NoteEditor
+              key={activeNote.id}
               note={activeNote}
               onChangeTitle={handleChangeTitle}
               onChangeContent={handleChangeContent}
@@ -435,29 +474,16 @@ export const NotesView: React.FC<NotesViewProps> = ({
               }}
               onChangeLink={handleChangeLink}
               saveStatus={saveStatus}
-              onBackToList={() => setViewingDetailOnCompact(false)}
-              isCompact={true}
+              onBackToList={!isSplitLayout ? () => setViewingDetailOnCompact(false) : undefined}
+              isCompact={!isSplitLayout}
             />
           ) : (
-            <NotesList
-              notes={notes}
-              selectedNoteId={selectedNoteId}
-              onSelectNote={(id) => {
-                setSelectedNoteId(id);
-                setViewingDetailOnCompact(true);
-              }}
-              onNewNote={handleNewNote}
-              onTogglePin={handleTogglePin}
-              onDeleteNote={handleDeleteNote}
-              filter={filter}
-              onChangeFilter={setFilter}
-              searchQuery={searchQuery}
-              onChangeSearchQuery={setSearchQuery}
-              isCompact={true}
-            />
+            <div className="h-full flex flex-col items-center justify-center text-cyan-500/40 text-xs font-tech">
+              <span>SELECT OR CREATE A NOTE</span>
+            </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
