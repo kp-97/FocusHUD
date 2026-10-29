@@ -69,6 +69,7 @@ export interface CalendarEvent {
   startTime: string; // HH:mm (24H internally)
   endTime: string; // HH:mm (24H internally)
   isAllDay?: boolean;
+  recurrence?: string; // "none" | "daily" | "weekly" | "monthly" | "annually" | "weekday" | custom JSON
   color?: string;
   createdAt?: number;
   updatedAt?: number;

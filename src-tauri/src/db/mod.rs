@@ -70,6 +70,46 @@ mod tests {
     }
 
     #[test]
+    fn test_migration_v2_to_v3_adds_recurrence_column() {
+        let mut conn = Connection::open_in_memory().expect("failed to open memory db");
+        // Simulate a database at v2 where calendar_events lacked recurrence
+        conn.execute_batch(
+            r#"
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE calendar_events (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                location TEXT NOT NULL DEFAULT '',
+                date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                is_all_day INTEGER NOT NULL DEFAULT 0,
+                color TEXT NOT NULL DEFAULT '#00e5ff',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+            PRAGMA user_version = 2;
+            "#,
+        )
+        .unwrap();
+
+        // Run migrations
+        migrations::run_migrations(&mut conn).unwrap();
+
+        let version: i32 = conn
+            .query_row("PRAGMA user_version;", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 3);
+
+        // Verify recurrence column exists and can be queried
+        let mut stmt = conn
+            .prepare("SELECT id, recurrence FROM calendar_events")
+            .unwrap();
+        let _ = stmt.query([]).unwrap();
+    }
+
+    #[test]
     fn test_goal_crud_and_nesting() {
         let conn = init_memory_db().expect("init memory db failed");
 
@@ -388,6 +428,7 @@ mod tests {
             end_time: "10:30".into(),
             is_all_day: false,
             color: "#00e5ff".into(),
+            recurrence: Some("weekly".into()),
             created_at: 500,
             updated_at: 500,
         };

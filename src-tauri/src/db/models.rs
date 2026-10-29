@@ -107,6 +107,8 @@ pub struct CalendarEvent {
     pub end_time: String,
     #[serde(default)]
     pub is_all_day: bool,
+    #[serde(default)]
+    pub recurrence: Option<String>,
     #[serde(default = "default_event_color")]
     pub color: String,
     pub created_at: i64,

@@ -68,6 +68,7 @@ export interface DbCalendarEvent {
   startTime: string;
   endTime: string;
   isAllDay?: boolean;
+  recurrence?: string;
   color?: string;
   createdAt?: number;
   updatedAt?: number;

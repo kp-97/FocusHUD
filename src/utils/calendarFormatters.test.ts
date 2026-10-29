@@ -15,6 +15,7 @@ import {
   formatHour12,
   formatTime12,
   parse12To24,
+  isEventOccurringOnDate,
 } from "./calendarFormatters";
 
 describe("calendarFormatters", () => {
@@ -162,6 +163,50 @@ describe("calendarFormatters", () => {
       expect(parse12To24(9, 30, "AM")).toBe("09:30");
       expect(parse12To24(12, 45, "PM")).toBe("12:45");
       expect(parse12To24(2, 15, "PM")).toBe("14:15");
+    });
+  });
+
+  describe("isEventOccurringOnDate", () => {
+    it("matches single-day non-recurring events", () => {
+      expect(isEventOccurringOnDate("2026-10-29", "2026-10-29", "none")).toBe(true);
+      expect(isEventOccurringOnDate("2026-10-29", "2026-10-30", "none")).toBe(false);
+    });
+
+    it("matches daily recurrence", () => {
+      expect(isEventOccurringOnDate("2026-10-29", "2026-11-05", "daily")).toBe(true);
+      expect(isEventOccurringOnDate("2026-10-29", "2026-10-28", "daily")).toBe(false); // Before event date
+    });
+
+    it("matches weekly recurrence", () => {
+      // 2026-10-29 is Thursday. 2026-11-05 is also Thursday.
+      expect(isEventOccurringOnDate("2026-10-29", "2026-11-05", "weekly")).toBe(true);
+      // 2026-10-30 is Friday
+      expect(isEventOccurringOnDate("2026-10-29", "2026-10-30", "weekly")).toBe(false);
+    });
+
+    it("matches weekday recurrence (Mon-Fri only)", () => {
+      // 2026-10-30 is Friday
+      expect(isEventOccurringOnDate("2026-10-29", "2026-10-30", "weekday")).toBe(true);
+      // 2026-10-31 is Saturday
+      expect(isEventOccurringOnDate("2026-10-29", "2026-10-31", "weekday")).toBe(false);
+      // 2026-11-01 is Sunday
+      expect(isEventOccurringOnDate("2026-10-29", "2026-11-01", "weekday")).toBe(false);
+      // 2026-11-02 is Monday
+      expect(isEventOccurringOnDate("2026-10-29", "2026-11-02", "weekday")).toBe(true);
+    });
+
+    it("matches custom recurrence with interval and end date", () => {
+      const customConfig = JSON.stringify({
+        interval: 1,
+        unit: "week",
+        daysOfWeek: [3], // Thursday (0 = Mon, 3 = Thu)
+        endType: "on",
+        endDate: "2026-11-12",
+      });
+      // 2026-11-05 is within end date
+      expect(isEventOccurringOnDate("2026-10-29", "2026-11-05", `custom:${customConfig}`)).toBe(true);
+      // 2026-11-19 is after end date
+      expect(isEventOccurringOnDate("2026-10-29", "2026-11-19", `custom:${customConfig}`)).toBe(false);
     });
   });
 

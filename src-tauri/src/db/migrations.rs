@@ -13,6 +13,10 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         apply_migration_v2(conn)?;
     }
 
+    if version < 3 {
+        apply_migration_v3(conn)?;
+    }
+
     Ok(())
 }
 
@@ -115,6 +119,7 @@ fn apply_migration_v2(conn: &mut Connection) -> Result<()> {
             start_time TEXT NOT NULL,
             end_time TEXT NOT NULL,
             is_all_day INTEGER NOT NULL DEFAULT 0,
+            recurrence TEXT NOT NULL DEFAULT 'none',
             color TEXT NOT NULL DEFAULT '#00e5ff',
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -130,6 +135,32 @@ fn apply_migration_v2(conn: &mut Connection) -> Result<()> {
         "#,
     )?;
 
+    tx.commit()?;
+    Ok(())
+}
+
+fn apply_migration_v3(conn: &mut Connection) -> Result<()> {
+    let has_recurrence: bool = {
+        let mut stmt = conn.prepare("PRAGMA table_info(calendar_events);")?;
+        let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        let mut found = false;
+        for col in columns {
+            if col? == "recurrence" {
+                found = true;
+                break;
+            }
+        }
+        found
+    };
+
+    let tx = conn.transaction()?;
+    if !has_recurrence {
+        tx.execute(
+            "ALTER TABLE calendar_events ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none';",
+            [],
+        )?;
+    }
+    tx.execute("PRAGMA user_version = 3;", [])?;
     tx.commit()?;
     Ok(())
 }

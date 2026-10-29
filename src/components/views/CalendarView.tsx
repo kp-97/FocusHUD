@@ -26,6 +26,8 @@ import {
   DAYS_OF_WEEK_SHORT,
   formatHour12,
   formatTime12,
+  isEventOccurringOnDate,
+  calculateEventPosition,
 } from "../../utils/calendarFormatters";
 import { EventEditModal } from "./CalendarView/EventEditModal";
 import {
@@ -46,6 +48,7 @@ export interface CalendarItemDisplay {
   date: string; // YYYY-MM-DD
   startTime?: string; // HH:mm
   endTime?: string; // HH:mm
+  location?: string;
   color?: string;
   isTask?: boolean;
   completed?: boolean;
@@ -225,6 +228,7 @@ export const CalendarView: React.FC = () => {
           date: e.date,
           startTime: e.startTime,
           endTime: e.endTime,
+          location: e.location,
           color: e.color || "#00e5ff",
           isTask: false,
           originalEvent: e,
@@ -262,7 +266,7 @@ export const CalendarView: React.FC = () => {
     saveEvents(updated);
 
     if (isTauriEnvironment()) {
-      persistCalendarEvent(appEventsToDb([savedEvent])[0]).catch(() => {});
+      persistCalendarEvent(appEventsToDb([savedEvent])[0]).catch(() => { });
     }
 
     setActiveModalEvent(null);
@@ -274,7 +278,7 @@ export const CalendarView: React.FC = () => {
     saveEvents(updated);
 
     if (isTauriEnvironment()) {
-      removeCalendarEvent(eventId).catch(() => {});
+      removeCalendarEvent(eventId).catch(() => { });
     }
 
     setActiveModalEvent(null);
@@ -301,15 +305,20 @@ export const CalendarView: React.FC = () => {
     setActiveModalEvent(null);
   };
 
-  // Click on empty hour block to create new event
-  const handleSlotClick = (dateISO: string, hour: number) => {
+  // Click on empty hour block or 15-minute increment to create new event
+  const handleSlotClick = (dateISO: string, hour: number, minute: number = 0) => {
     const startH = String(hour).padStart(2, "0");
-    const endH = String((hour + 1) % 24).padStart(2, "0");
+    const startM = String(minute).padStart(2, "0");
+    const endMinutes = hour * 60 + minute + 60; // 1 hour duration
+    const endH = String(Math.floor((endMinutes / 60) % 24)).padStart(2, "0");
+    const endM = String(endMinutes % 60).padStart(2, "0");
+
     setActiveModalEvent({
       date: dateISO,
-      startTime: `${startH}:00`,
-      endTime: `${endH}:00`,
+      startTime: `${startH}:${startM}`,
+      endTime: `${endH}:${endM}`,
       title: "",
+      recurrence: "none",
     });
   };
 
@@ -406,11 +415,10 @@ export const CalendarView: React.FC = () => {
                       setIsDropdownOpen(false);
                     }}
                     data-testid={`mode-option-${opt.id}`}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition cursor-pointer ${
-                      mode === opt.id
+                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition cursor-pointer ${mode === opt.id
                         ? "bg-cyan-500/25 text-cyan-100 font-semibold border-l-2 border-cyan-400"
                         : "text-cyan-300/80 hover:bg-cyan-500/15 hover:text-cyan-100"
-                    }`}
+                      }`}
                   >
                     <span>{opt.label}</span>
                     <span className="text-[10px] font-mono text-cyan-400/60 uppercase">
@@ -423,20 +431,18 @@ export const CalendarView: React.FC = () => {
           </div>
 
           {/* Independent Events & Tasks Toggle Buttons */}
-          <div data-testid="data-type-toggle" className="flex items-center gap-1.5">
+          <div data-testid="data-type-toggle" className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setShowEvents((v) => !v)}
               title={showEvents ? "Hide Events" : "Show Events"}
               data-testid="toggle-events-button"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-tech border transition cursor-pointer ${
-                showEvents
+              className={`p-1.5 rounded-full border transition cursor-pointer ${showEvents
                   ? "bg-cyan-600/30 text-cyan-100 border-cyan-400/50 shadow-[0_0_8px_rgba(0,229,255,0.25)]"
                   : "bg-[#050b14] text-cyan-500/40 border-cyan-500/20 hover:text-cyan-400/70"
-              }`}
+                }`}
             >
               <CalendarIcon className="w-3.5 h-3.5" />
-              <span>Events</span>
             </button>
 
             <button
@@ -444,14 +450,12 @@ export const CalendarView: React.FC = () => {
               onClick={() => setShowTasks((v) => !v)}
               title={showTasks ? "Hide Tasks" : "Show Tasks"}
               data-testid="toggle-tasks-button"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-tech border transition cursor-pointer ${
-                showTasks
+              className={`p-1.5 rounded-full border transition cursor-pointer ${showTasks
                   ? "bg-cyan-600/30 text-cyan-100 border-cyan-400/50 shadow-[0_0_8px_rgba(0,229,255,0.25)]"
                   : "bg-[#050b14] text-cyan-500/40 border-cyan-500/20 hover:text-cyan-400/70"
-              }`}
+                }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Tasks</span>
             </button>
           </div>
         </div>
@@ -555,7 +559,7 @@ interface DayViewProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   timeIndicatorTop: number;
   todayISO: string;
-  onSlotClick: (dateISO: string, hour: number) => void;
+  onSlotClick: (dateISO: string, hour: number, minute?: number) => void;
   onEventClick: (item: CalendarItemDisplay) => void;
 }
 
@@ -571,7 +575,12 @@ const DayView: React.FC<DayViewProps> = ({
 }) => {
   const dateISO = formatDateISO(date);
   const isToday = dateISO === todayISO;
-  const dayItems = items.filter((item) => item.date === dateISO);
+  const dayItems = items.filter((item) =>
+    isEventOccurringOnDate(item.date, dateISO, item.originalEvent?.recurrence)
+  );
+  const [hoveredQuarter, setHoveredQuarter] = useState<{ hour: number; minute: number } | null>(
+    null
+  );
 
   return (
     <div className="h-full w-full flex flex-col bg-[#03070d]">
@@ -581,21 +590,24 @@ const DayView: React.FC<DayViewProps> = ({
           {DAYS_OF_WEEK_SHORT[(date.getDay() + 6) % 7]}
         </span>
         <span
-          className={`ml-2 text-sm font-bold ${
-            isToday ? "text-amber-300 font-orbitron" : "text-cyan-200"
-          }`}
+          className={`ml-2 text-sm font-bold ${isToday ? "text-amber-300 font-orbitron" : "text-cyan-200"
+            }`}
         >
           {date.getDate()}
         </span>
       </div>
 
-      {/* 24-hour Timetable (12H labels) */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden relative">
+      {/* 24-hour Timetable (12H labels + 15m increments) */}
+      <div
+        ref={scrollRef}
+        onMouseLeave={() => setHoveredQuarter(null)}
+        className="flex-1 overflow-y-auto overflow-x-hidden relative"
+      >
         <div className="relative min-w-[320px]" style={{ height: HOURS.length * hourHeight }}>
           {/* Current time line */}
           {isToday && (
             <div
-              className="absolute left-16 right-0 z-10 pointer-events-none flex items-center"
+              className="absolute left-16 right-0 z-20 pointer-events-none flex items-center"
               style={{ top: timeIndicatorTop }}
             >
               <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
@@ -603,49 +615,99 @@ const DayView: React.FC<DayViewProps> = ({
             </div>
           )}
 
-          {/* Hourly Slots */}
+          {/* 1-Hour Dynamic Hover Preview Block (lights up 4 x 15m intervals) */}
+          {hoveredQuarter && (
+            <div
+              data-testid="day-hover-preview"
+              className="absolute left-16 right-0 z-5 pointer-events-none rounded border border-cyan-400/20 bg-cyan-500/8 transition-[top,height] duration-75 ease-out will-change-[top,height]"
+              style={{
+                top: hoveredQuarter.hour * hourHeight + (hoveredQuarter.minute / 60) * hourHeight,
+                height: Math.min(
+                  hourHeight,
+                  HOURS.length * hourHeight -
+                  (hoveredQuarter.hour * hourHeight + (hoveredQuarter.minute / 60) * hourHeight)
+                ),
+              }}
+            />
+          )}
+
+          {/* Hourly Slots Grid Background */}
           {HOURS.map((hour) => {
             const time12Label = formatHour12(hour);
-            const slotItems = dayItems.filter((it) => {
-              const startH = it.startTime ? parseInt(it.startTime.split(":")[0], 10) : 9;
-              return startH === hour;
-            });
 
             return (
               <div
                 key={hour}
-                onClick={() => onSlotClick(dateISO, hour)}
                 data-testid={`day-slot-${hour}`}
-                className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition cursor-pointer group"
+                className="flex border-b border-cyan-500/20 transition relative group"
                 style={{ height: hourHeight }}
               >
-                <div className="w-16 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
+                <div className="w-16 shrink-0 text-[10px] text-cyan-400 font-mono text-center pt-1 select-none font-semibold">
                   {time12Label}
                 </div>
-                <div className="flex-1 border-l border-cyan-500/15 p-1 relative flex flex-col gap-1">
-                  {slotItems.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEventClick(item);
-                      }}
-                      data-testid={`event-item-${item.id}`}
-                      style={{ borderLeftColor: item.color || "#00e5ff" }}
-                      className="px-2 py-1 rounded bg-[#071322] border-l-2 text-xs font-tech text-cyan-100 flex items-center justify-between shadow-[0_0_8px_rgba(0,229,255,0.15)] hover:bg-cyan-900/40 transition truncate"
-                    >
-                      <span className="truncate">{item.title}</span>
-                      {item.startTime && (
-                        <span className="text-[10px] font-mono text-cyan-400/60 ml-2 shrink-0">
-                          {formatTime12(item.startTime)}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+
+                {/* 15-minute hover/click increments container */}
+                <div className="flex-1 border-l border-cyan-500/20 relative">
+                  {/* 4 x 15-minute hover zones */}
+                  <div className="absolute inset-0 grid grid-rows-4 z-0">
+                    {[0, 15, 30, 45].map((minute) => (
+                      <div
+                        key={minute}
+                        onMouseEnter={() => setHoveredQuarter({ hour, minute })}
+                        onClick={() => onSlotClick(dateISO, hour, minute)}
+                        title={`${formatTime12(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`)} - Click to add 1-hour event`}
+                        data-testid={`day-quarter-${hour}-${minute}`}
+                        className="transition cursor-pointer"
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             );
           })}
+
+          {/* Rendered Event Chips positioned precisely by start and end minute */}
+          <div className="absolute left-16 right-0 top-0 bottom-0 pointer-events-none z-10 p-1">
+            {dayItems.map((item) => {
+              const { top, height } = calculateEventPosition(
+                item.startTime,
+                item.endTime,
+                hourHeight
+              );
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEventClick(item);
+                  }}
+                  data-testid={`event-item-${item.id}`}
+                  style={{
+                    top: `${top}px`,
+                    height: `${height}px`,
+                    borderLeftColor: item.color || "#00e5ff",
+                  }}
+                  className="absolute left-1 right-6 pointer-events-auto px-2 py-1 rounded bg-[#071322]/95 border-l-2 text-xs font-tech text-cyan-100 flex flex-col justify-start gap-0.5 shadow-[0_0_8px_rgba(0,229,255,0.15)] hover:bg-cyan-900/50 hover:shadow-[0_0_12px_rgba(0,229,255,0.3)] transition overflow-hidden cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate font-medium">{item.title}</span>
+                    {item.startTime && (
+                      <span className="text-[10px] font-mono text-cyan-400/80 shrink-0">
+                        {formatTime12(item.startTime)}
+                        {item.endTime ? ` – ${formatTime12(item.endTime)}` : ""}
+                      </span>
+                    )}
+                  </div>
+                  {item.location && height >= 36 && (
+                    <span className="text-[10px] font-tech text-cyan-500/70 truncate">
+                      {item.location}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -663,7 +725,7 @@ interface WeekViewProps {
   timeIndicatorTop: number;
   todayISO: string;
   onSelectDay: (d: Date) => void;
-  onSlotClick: (dateISO: string, hour: number) => void;
+  onSlotClick: (dateISO: string, hour: number, minute?: number) => void;
   onEventClick: (item: CalendarItemDisplay) => void;
 }
 
@@ -691,112 +753,194 @@ const WeekView: React.FC<WeekViewProps> = ({
       isToday: iso === todayISO,
     };
   });
+  const [hoveredQuarter, setHoveredQuarter] = useState<{
+    iso: string;
+    dayIndex: number;
+    hour: number;
+    minute: number;
+  } | null>(null);
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#03070d]">
-      {/* 7-Day Header */}
-      <div className="h-12 shrink-0 flex border-b border-cyan-500/20 bg-[#050b14]/70">
-        <div className="w-16 shrink-0" />
-        {weekDays.map((wd) => (
-          <button
-            key={wd.iso}
-            onClick={() => onSelectDay(wd.date)}
-            className={`flex-1 flex flex-col items-center justify-center border-l border-cyan-500/15 transition cursor-pointer hover:bg-cyan-500/10 ${
-              wd.isToday ? "bg-amber-950/20" : ""
-            }`}
-          >
-            <span className="text-[9px] font-tech text-cyan-500/60 uppercase">{wd.dayName}</span>
-            <span
-              className={`text-xs font-semibold ${
-                wd.isToday
-                  ? "w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold shadow-[0_0_8px_#ffb300]"
-                  : "text-cyan-200"
+    <div
+      ref={scrollRef}
+      className="h-full w-full flex flex-col bg-[#03070d] overflow-auto relative"
+    >
+      <div className="min-w-[560px] flex-1 flex flex-col relative">
+        {/* 7-Day Header */}
+        <div
+          data-testid="week-days-header"
+          className="sticky top-0 z-30 h-12 shrink-0 flex border-b border-cyan-500/20 bg-[#050b14] shadow-sm"
+        >
+          <div className="w-16 shrink-0 bg-[#050b14]" />
+          {weekDays.map((wd) => (
+            <button
+              key={wd.iso}
+              onClick={() => onSelectDay(wd.date)}
+              className={`flex-1 flex flex-col items-center justify-center border-l border-cyan-500/15 transition cursor-pointer hover:bg-cyan-500/10 ${
+                wd.isToday ? "bg-amber-950/20" : ""
               }`}
             >
-              {wd.dateNum}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Timetable grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-auto relative">
-        <div className="relative min-w-[560px]" style={{ height: HOURS.length * hourHeight }}>
-          {/* Current time line across today */}
-          {weekDays.some((w) => w.isToday) && (
-            <div
-              className="absolute left-16 right-0 z-10 pointer-events-none flex items-center"
-              style={{ top: timeIndicatorTop }}
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
-              <div className="flex-1 h-[2px] bg-red-400 shadow-[0_0_6px_#ff5252]" />
-            </div>
-          )}
-
-          {HOURS.map((hour) => {
-            const time12Label = formatHour12(hour);
-
-            return (
-              <div
-                key={hour}
-                className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition"
-                style={{ height: hourHeight }}
+              <span className="text-[9px] font-tech text-cyan-500/60 uppercase">{wd.dayName}</span>
+              <span
+                className={`text-xs font-semibold ${
+                  wd.isToday
+                    ? "w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold shadow-[0_0_8px_#ffb300]"
+                    : "text-cyan-200"
+                }`}
               >
-                <div className="w-16 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
-                  {time12Label}
-                </div>
-                {weekDays.map((wd) => {
-                  const cellItems = items.filter((it) => {
-                    if (it.date !== wd.iso) return false;
-                    const startH = it.startTime ? parseInt(it.startTime.split(":")[0], 10) : 9;
-                    return startH === hour;
-                  });
+                {wd.dateNum}
+              </span>
+            </button>
+          ))}
+        </div>
 
-                  return (
-                    <div
-                      key={wd.iso}
-                      onClick={() => onSlotClick(wd.iso, hour)}
-                      data-testid={`week-slot-${wd.iso}-${hour}`}
-                      className="flex-1 border-l border-cyan-500/15 p-0.5 relative flex flex-col gap-1 overflow-hidden cursor-pointer hover:bg-cyan-500/10 transition"
-                    >
-                      {cellItems.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEventClick(item);
-                          }}
-                          data-testid={`event-item-${item.id}`}
-                          style={{ borderLeftColor: item.color || "#00e5ff" }}
-                          className="px-1 py-0.5 rounded bg-[#071322] border-l-2 text-[10px] font-tech text-cyan-100 truncate shadow-[0_0_6px_rgba(0,229,255,0.15)] hover:bg-cyan-900/40 transition cursor-pointer"
-                        >
-                          {item.title}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+        {/* Timetable grid */}
+        <div
+          onMouseLeave={() => setHoveredQuarter(null)}
+          className="flex-1 relative"
+        >
+          <div className="relative w-full" style={{ height: HOURS.length * hourHeight }}>
+            {/* Current time line across today */}
+            {weekDays.some((w) => w.isToday) && (
+              <div
+                className="absolute left-16 right-0 z-20 pointer-events-none flex items-center"
+                style={{ top: timeIndicatorTop }}
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
+                <div className="flex-1 h-[2px] bg-red-400 shadow-[0_0_6px_#ff5252]" />
               </div>
-            );
-          })}
+            )}
+
+            {HOURS.map((hour) => {
+              const time12Label = formatHour12(hour);
+
+              return (
+                <div
+                  key={hour}
+                  className="flex border-b border-cyan-500/20 transition"
+                  style={{ height: hourHeight }}
+                >
+                  <div className="w-16 shrink-0 text-[10px] text-cyan-400 font-mono text-center pt-1 select-none font-semibold">
+                    {time12Label}
+                  </div>
+                  {weekDays.map((wd, dayIdx) => {
+                    return (
+                      <div
+                        key={wd.iso}
+                        data-testid={`week-slot-${wd.iso}-${hour}`}
+                        className="flex-1 border-l border-cyan-500/20 relative overflow-hidden group/cell"
+                      >
+                        {/* 4 x 15-minute hover hit areas */}
+                        <div className="absolute inset-0 grid grid-rows-4 z-10">
+                          {[0, 15, 30, 45].map((minute) => (
+                            <div
+                              key={minute}
+                              onMouseEnter={() =>
+                                setHoveredQuarter({
+                                  iso: wd.iso,
+                                  dayIndex: dayIdx,
+                                  hour,
+                                  minute,
+                                })
+                              }
+                              onClick={() => onSlotClick(wd.iso, hour, minute)}
+                              title={`${formatTime12(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`)} - Click to add 1-hour event`}
+                              data-testid={`week-quarter-${wd.iso}-${hour}-${minute}`}
+                              className="transition cursor-pointer"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Rendered Event Chips positioned precisely by start and end minute in each day column */}
+            {weekDays.map((wd, dayIdx) => {
+              const dayEvents = items.filter((it) =>
+                isEventOccurringOnDate(it.date, wd.iso, it.originalEvent?.recurrence)
+              );
+
+              return (
+                <div
+                  key={`events-col-${wd.iso}`}
+                  className="absolute top-0 bottom-0 pointer-events-none z-10"
+                  style={{
+                    left: `calc(4rem + ${dayIdx} * ((100% - 4rem) / 7))`,
+                    width: `calc((100% - 4rem) / 7)`,
+                  }}
+                >
+                  {/* 1-Hour Dynamic Hover Preview Block in this column */}
+                  {hoveredQuarter && hoveredQuarter.iso === wd.iso && (
+                    <div
+                      data-testid="week-hover-preview"
+                      className="absolute left-0 right-0 z-5 pointer-events-none rounded border border-cyan-400/20 bg-cyan-500/8 transition-[top,height] duration-75 ease-out will-change-[top,height]"
+                      style={{
+                        top: `${hoveredQuarter.hour * hourHeight + (hoveredQuarter.minute / 60) * hourHeight}px`,
+                        height: `${Math.min(
+                          hourHeight,
+                          HOURS.length * hourHeight -
+                            (hoveredQuarter.hour * hourHeight + (hoveredQuarter.minute / 60) * hourHeight)
+                        )}px`,
+                      }}
+                    />
+                  )}
+
+                  {dayEvents.map((item) => {
+                    const { top, height } = calculateEventPosition(
+                      item.startTime,
+                      item.endTime,
+                      hourHeight
+                    );
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEventClick(item);
+                        }}
+                        data-testid={`event-item-${item.id}`}
+                        style={{
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          borderLeftColor: item.color || "#00e5ff",
+                        }}
+                        className="absolute left-0.5 right-4 pointer-events-auto px-1 py-0.5 rounded bg-[#071322]/95 border-l-2 text-[10px] font-tech text-cyan-100 flex flex-col justify-start shadow-[0_0_6px_rgba(0,229,255,0.15)] hover:bg-cyan-900/50 hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition overflow-hidden cursor-pointer"
+                      >
+                        <span className="truncate font-medium">{item.title}</span>
+                        {item.startTime && height >= 28 && (
+                          <span className="text-[9px] font-mono text-cyan-400/80 truncate">
+                            {formatTime12(item.startTime)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// =========================================================================
-// 3. 4 DAYS VIEW
-// =========================================================================
-interface FourDaysViewProps {
-  date: Date;
-  items: CalendarItemDisplay[];
-  hourHeight: number;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  timeIndicatorTop: number;
-  todayISO: string;
+      // =========================================================================
+      // 3. 4 DAYS VIEW
+      // =========================================================================
+      interface FourDaysViewProps {
+        date: Date;
+      items: CalendarItemDisplay[];
+      hourHeight: number;
+      scrollRef: React.RefObject<HTMLDivElement | null>;
+      timeIndicatorTop: number;
+      todayISO: string;
   onSelectDay: (d: Date) => void;
-  onSlotClick: (dateISO: string, hour: number) => void;
+  onSlotClick: (dateISO: string, hour: number, minute?: number) => void;
   onEventClick: (item: CalendarItemDisplay) => void;
 }
 
@@ -823,393 +967,476 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
       isToday: iso === todayISO,
     };
   });
+  const [hoveredQuarter, setHoveredQuarter] = useState<{
+    iso: string;
+    dayIndex: number;
+    hour: number;
+    minute: number;
+  } | null>(null);
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#03070d]">
-      {/* 4 Days Header */}
-      <div className="h-12 shrink-0 flex border-b border-cyan-500/20 bg-[#050b14]/70">
-        <div className="w-16 shrink-0" />
-        {fourDays.map((fd) => (
-          <button
-            key={fd.iso}
-            onClick={() => onSelectDay(fd.date)}
-            className={`flex-1 flex flex-col items-center justify-center border-l border-cyan-500/15 transition cursor-pointer hover:bg-cyan-500/10 ${
-              fd.isToday ? "bg-amber-950/20" : ""
-            }`}
-          >
-            <span className="text-[9px] font-tech text-cyan-500/60 uppercase">{fd.dayName}</span>
-            <span
-              className={`text-xs font-semibold ${
-                fd.isToday
-                  ? "w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold shadow-[0_0_8px_#ffb300]"
-                  : "text-cyan-200"
+    <div
+      ref={scrollRef}
+      className="h-full w-full flex flex-col bg-[#03070d] overflow-auto relative"
+    >
+      <div className="min-w-[440px] flex-1 flex flex-col relative">
+        {/* 4 Days Header */}
+        <div
+          data-testid="four-days-header"
+          className="sticky top-0 z-30 h-12 shrink-0 flex border-b border-cyan-500/20 bg-[#050b14] shadow-sm"
+        >
+          <div className="w-16 shrink-0 bg-[#050b14]" />
+          {fourDays.map((fd) => (
+            <button
+              key={fd.iso}
+              onClick={() => onSelectDay(fd.date)}
+              className={`flex-1 flex flex-col items-center justify-center border-l border-cyan-500/15 transition cursor-pointer hover:bg-cyan-500/10 ${
+                fd.isToday ? "bg-amber-950/20" : ""
               }`}
             >
-              {fd.dateNum}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Timetable grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-auto relative">
-        <div className="relative min-w-[440px]" style={{ height: HOURS.length * hourHeight }}>
-          {fourDays.some((w) => w.isToday) && (
-            <div
-              className="absolute left-16 right-0 z-10 pointer-events-none flex items-center"
-              style={{ top: timeIndicatorTop }}
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
-              <div className="flex-1 h-[2px] bg-red-400 shadow-[0_0_6px_#ff5252]" />
-            </div>
-          )}
-
-          {HOURS.map((hour) => {
-            const time12Label = formatHour12(hour);
-
-            return (
-              <div
-                key={hour}
-                className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition"
-                style={{ height: hourHeight }}
+              <span className="text-[9px] font-tech text-cyan-500/60 uppercase">{fd.dayName}</span>
+              <span
+                className={`text-xs font-semibold ${
+                  fd.isToday
+                    ? "w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold shadow-[0_0_8px_#ffb300]"
+                    : "text-cyan-200"
+                }`}
               >
-                <div className="w-16 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
-                  {time12Label}
-                </div>
-                {fourDays.map((fd) => {
-                  const cellItems = items.filter((it) => {
-                    if (it.date !== fd.iso) return false;
-                    const startH = it.startTime ? parseInt(it.startTime.split(":")[0], 10) : 9;
-                    return startH === hour;
-                  });
+                {fd.dateNum}
+              </span>
+            </button>
+          ))}
+        </div>
 
-                  return (
-                    <div
-                      key={fd.iso}
-                      onClick={() => onSlotClick(fd.iso, hour)}
-                      data-testid={`fourdays-slot-${fd.iso}-${hour}`}
-                      className="flex-1 border-l border-cyan-500/15 p-1 relative flex flex-col gap-1 overflow-hidden cursor-pointer hover:bg-cyan-500/10 transition"
-                    >
-                      {cellItems.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEventClick(item);
-                          }}
-                          data-testid={`event-item-${item.id}`}
-                          style={{ borderLeftColor: item.color || "#00e5ff" }}
-                          className="px-1.5 py-0.5 rounded bg-[#071322] border-l-2 text-xs font-tech text-cyan-100 truncate shadow-[0_0_6px_rgba(0,229,255,0.15)] hover:bg-cyan-900/40 transition cursor-pointer"
-                        >
-                          {item.title}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+        {/* Timetable grid */}
+        <div
+          onMouseLeave={() => setHoveredQuarter(null)}
+          className="flex-1 relative"
+        >
+          <div className="relative w-full" style={{ height: HOURS.length * hourHeight }}>
+            {fourDays.some((w) => w.isToday) && (
+              <div
+                className="absolute left-16 right-0 z-20 pointer-events-none flex items-center"
+                style={{ top: timeIndicatorTop }}
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
+                <div className="flex-1 h-[2px] bg-red-400 shadow-[0_0_6px_#ff5252]" />
               </div>
-            );
-          })}
+            )}
+
+            {HOURS.map((hour) => {
+              const time12Label = formatHour12(hour);
+
+              return (
+                <div
+                  key={hour}
+                  className="flex border-b border-cyan-500/20 transition"
+                  style={{ height: hourHeight }}
+                >
+                  <div className="w-16 shrink-0 text-[10px] text-cyan-400 font-mono text-center pt-1 select-none font-semibold">
+                    {time12Label}
+                  </div>
+                  {fourDays.map((fd, dayIdx) => {
+                    return (
+                      <div
+                        key={fd.iso}
+                        data-testid={`fourdays-slot-${fd.iso}-${hour}`}
+                        className="flex-1 border-l border-cyan-500/20 relative overflow-hidden group/cell"
+                      >
+                        {/* 4 x 15-minute hover hit areas */}
+                        <div className="absolute inset-0 grid grid-rows-4 z-0">
+                          {[0, 15, 30, 45].map((minute) => (
+                            <div
+                              key={minute}
+                              onMouseEnter={() =>
+                                setHoveredQuarter({
+                                  iso: fd.iso,
+                                  dayIndex: dayIdx,
+                                  hour,
+                                  minute,
+                                })
+                              }
+                              onClick={() => onSlotClick(fd.iso, hour, minute)}
+                              title={`${formatTime12(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`)} - Click to add 1-hour event`}
+                              data-testid={`fourdays-quarter-${fd.iso}-${hour}-${minute}`}
+                              className="transition cursor-pointer"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Rendered Event Chips positioned precisely by start and end minute in each 4-days column */}
+            {fourDays.map((fd, dayIdx) => {
+              const dayEvents = items.filter((it) =>
+                isEventOccurringOnDate(it.date, fd.iso, it.originalEvent?.recurrence)
+              );
+
+              return (
+                <div
+                  key={`events-col-${fd.iso}`}
+                  className="absolute top-0 bottom-0 pointer-events-none z-10"
+                  style={{
+                    left: `calc(4rem + ${dayIdx} * ((100% - 4rem) / 4))`,
+                    width: `calc((100% - 4rem) / 4)`,
+                  }}
+                >
+                  {/* 1-Hour Dynamic Hover Preview Block in this column */}
+                  {hoveredQuarter && hoveredQuarter.iso === fd.iso && (
+                    <div
+                      data-testid="fourdays-hover-preview"
+                      className="absolute left-0 right-0 z-5 pointer-events-none rounded border border-cyan-400/20 bg-cyan-500/8 transition-[top,height] duration-75 ease-out will-change-[top,height]"
+                      style={{
+                        top: `${hoveredQuarter.hour * hourHeight + (hoveredQuarter.minute / 60) * hourHeight}px`,
+                        height: `${Math.min(
+                          hourHeight,
+                          HOURS.length * hourHeight -
+                            (hoveredQuarter.hour * hourHeight + (hoveredQuarter.minute / 60) * hourHeight)
+                        )}px`,
+                      }}
+                    />
+                  )}
+
+                  {dayEvents.map((item) => {
+                    const { top, height } = calculateEventPosition(
+                      item.startTime,
+                      item.endTime,
+                      hourHeight
+                    );
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEventClick(item);
+                        }}
+                        data-testid={`event-item-${item.id}`}
+                        style={{
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          borderLeftColor: item.color || "#00e5ff",
+                        }}
+                        className="absolute left-0.5 right-5 pointer-events-auto px-1.5 py-0.5 rounded bg-[#071322]/95 border-l-2 text-xs font-tech text-cyan-100 flex flex-col justify-start shadow-[0_0_6px_rgba(0,229,255,0.15)] hover:bg-cyan-900/50 hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition overflow-hidden cursor-pointer"
+                      >
+                        <span className="truncate font-medium">{item.title}</span>
+                        {item.startTime && height >= 28 && (
+                          <span className="text-[10px] font-mono text-cyan-400/80 truncate">
+                            {formatTime12(item.startTime)}
+                            {item.endTime ? ` – ${formatTime12(item.endTime)}` : ""}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// =========================================================================
-// 4. MONTH VIEW
-// =========================================================================
-interface MonthViewProps {
-  date: Date;
-  items: CalendarItemDisplay[];
-  todayISO: string;
+        // =========================================================================
+        // 4. MONTH VIEW
+        // =========================================================================
+        interface MonthViewProps {
+          date: Date;
+        items: CalendarItemDisplay[];
+        todayISO: string;
   onSelectDay: (d: Date) => void;
   onEventClick: (item: CalendarItemDisplay) => void;
 }
 
-const MonthView: React.FC<MonthViewProps> = ({
-  date,
-  items,
-  todayISO,
-  onSelectDay,
-  onEventClick,
+        const MonthView: React.FC<MonthViewProps> = ({
+          date,
+          items,
+          todayISO,
+          onSelectDay,
+          onEventClick,
 }) => {
   const year = date.getFullYear();
-  const month = date.getMonth();
+          const month = date.getMonth();
 
-  const firstDay = new Date(year, month, 1);
-  const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
-  const startDayOfWeek = (firstDay.getDay() + 6) % 7;
+          const firstDay = new Date(year, month, 1);
+          const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+          const startDayOfWeek = (firstDay.getDay() + 6) % 7;
 
-  const prevMonthDays = new Date(year, month, 0).getDate();
-  const leadingDays = Array.from({ length: startDayOfWeek }, (_, i) => {
+          const prevMonthDays = new Date(year, month, 0).getDate();
+          const leadingDays = Array.from({length: startDayOfWeek }, (_, i) => {
     const dayNum = prevMonthDays - startDayOfWeek + i + 1;
-    const d = new Date(year, month - 1, dayNum);
-    return { date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: false };
+          const d = new Date(year, month - 1, dayNum);
+          return {date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: false };
   });
 
-  const currentMonthDays = Array.from({ length: daysInCurrentMonth }, (_, i) => {
+          const currentMonthDays = Array.from({length: daysInCurrentMonth }, (_, i) => {
     const dayNum = i + 1;
-    const d = new Date(year, month, dayNum);
-    return { date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: true };
+          const d = new Date(year, month, dayNum);
+          return {date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: true };
   });
 
-  const totalCellsSoFar = leadingDays.length + currentMonthDays.length;
+          const totalCellsSoFar = leadingDays.length + currentMonthDays.length;
   const targetTotal = totalCellsSoFar > 35 ? 42 : 35;
-  const trailingDays = Array.from({ length: targetTotal - totalCellsSoFar }, (_, i) => {
+          const trailingDays = Array.from({length: targetTotal - totalCellsSoFar }, (_, i) => {
     const dayNum = i + 1;
-    const d = new Date(year, month + 1, dayNum);
-    return { date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: false };
+          const d = new Date(year, month + 1, dayNum);
+          return {date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: false };
   });
 
-  const allMonthCells = [...leadingDays, ...currentMonthDays, ...trailingDays];
-
-  return (
-    <div className="h-full w-full flex flex-col bg-[#03070d]">
-      {/* Day header row */}
-      <div className="grid grid-cols-7 border-b border-cyan-500/20 bg-[#050b14]/70 text-center py-1.5 text-[10px] font-tech text-cyan-500/70">
-        {DAYS_OF_WEEK_SHORT.map((d) => (
-          <div key={d}>{d}</div>
-        ))}
-      </div>
-
-      {/* Month 7x5 or 7x6 Grid */}
-      <div className="flex-1 grid grid-cols-7 grid-rows-5 md:grid-rows-6 border-b border-cyan-500/15">
-        {allMonthCells.map((cell) => {
-          const isToday = cell.iso === todayISO;
-          const dayItems = items.filter((it) => it.date === cell.iso);
-          const visibleItems = dayItems.slice(0, 2);
-          const moreCount = dayItems.length - visibleItems.length;
+          const allMonthCells = [...leadingDays, ...currentMonthDays, ...trailingDays];
 
           return (
-            <div
-              key={cell.iso}
-              onClick={() => onSelectDay(cell.date)}
-              className={`border-r border-b border-cyan-500/10 p-1 flex flex-col justify-start transition cursor-pointer hover:bg-cyan-500/10 ${
-                cell.isCurrentMonth ? "bg-[#03070d]" : "bg-[#020509]/80 opacity-40"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={`text-[11px] font-tech rounded-full px-1.5 py-0.5 ${
-                    isToday
-                      ? "bg-amber-400 text-black font-bold shadow-[0_0_8px_#ffb300]"
-                      : "text-cyan-300/80"
-                  }`}
-                >
-                  {cell.dayNum}
-                </span>
-                {dayItems.length > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00e5ff]" />
-                )}
-              </div>
-
-              <div className="mt-1 flex flex-col gap-0.5 overflow-hidden">
-                {visibleItems.map((it) => (
-                  <div
-                    key={it.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick(it);
-                    }}
-                    style={{ borderLeftColor: it.color || "#00e5ff" }}
-                    className="px-1 py-0.5 rounded bg-[#071322] border-l-2 text-[9px] font-tech text-cyan-100 truncate cursor-pointer hover:bg-cyan-900/40"
-                  >
-                    {it.title}
-                  </div>
-                ))}
-                {moreCount > 0 && (
-                  <span className="text-[8.5px] font-mono text-cyan-400/60 pl-1">
-                    +{moreCount} more
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// =========================================================================
-// 5. YEAR VIEW
-// =========================================================================
-interface YearViewProps {
-  date: Date;
-  items: CalendarItemDisplay[];
-  todayISO: string;
-  onSelectDay: (d: Date) => void;
-}
-
-const YearView: React.FC<YearViewProps> = ({ date, items, todayISO, onSelectDay }) => {
-  const year = date.getFullYear();
-  const months = Array.from({ length: 12 }, (_, i) => i);
-
-  return (
-    <div className="h-full w-full overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-[#03070d]">
-      {months.map((m) => {
-        const firstDay = new Date(year, m, 1);
-        const daysInMonth = new Date(year, m + 1, 0).getDate();
-        const startDayOfWeek = (firstDay.getDay() + 6) % 7;
-        const monthName = firstDay.toLocaleString("en-US", { month: "short" });
-
-        return (
-          <div
-            key={m}
-            className="p-2.5 rounded-lg border border-cyan-500/20 bg-[#050b14] flex flex-col shadow-[0_0_12px_rgba(0,229,255,0.05)]"
-          >
-            <div className="text-xs font-orbitron font-bold text-cyan-200 mb-1.5 uppercase tracking-wider">
-              {monthName}
-            </div>
-
-            <div className="grid grid-cols-7 text-center text-[8px] font-tech text-cyan-500/50 pb-1 border-b border-cyan-500/10">
-              {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-                <span key={i}>{d}</span>
+          <div className="h-full w-full flex flex-col bg-[#03070d]">
+            {/* Day header row */}
+            <div className="grid grid-cols-7 border-b border-cyan-500/20 bg-[#050b14]/70 text-center py-1.5 text-[10px] font-tech text-cyan-500/70">
+              {DAYS_OF_WEEK_SHORT.map((d) => (
+                <div key={d}>{d}</div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-tech mt-1">
-              {Array.from({ length: startDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="p-0.5" />
-              ))}
-
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const dayNum = i + 1;
-                const d = new Date(year, m, dayNum);
-                const iso = formatDateISO(d);
-                const isToday = iso === todayISO;
-                const hasItems = items.some((it) => it.date === iso);
+            {/* Month 7x5 or 7x6 Grid */}
+            <div className="flex-1 grid grid-cols-7 grid-rows-5 md:grid-rows-6 border-b border-cyan-500/15">
+              {allMonthCells.map((cell) => {
+                const isToday = cell.iso === todayISO;
+                const dayItems = items.filter((it) =>
+                  isEventOccurringOnDate(it.date, cell.iso, it.originalEvent?.recurrence)
+                );
+                const visibleItems = dayItems.slice(0, 2);
+                const moreCount = dayItems.length - visibleItems.length;
 
                 return (
-                  <button
-                    key={iso}
-                    onClick={() => onSelectDay(d)}
-                    className={`p-0.5 rounded flex flex-col items-center justify-center transition cursor-pointer hover:bg-cyan-500/20 ${
-                      isToday
-                        ? "bg-amber-400 text-black font-bold"
-                        : hasItems
-                        ? "text-cyan-100 font-medium"
-                        : "text-cyan-400/60"
-                    }`}
+                  <div
+                    key={cell.iso}
+                    onClick={() => onSelectDay(cell.date)}
+                    className={`border-r border-b border-cyan-500/10 p-1 flex flex-col justify-start transition cursor-pointer hover:bg-cyan-500/10 ${cell.isCurrentMonth ? "bg-[#03070d]" : "bg-[#020509]/80 opacity-40"
+                      }`}
                   >
-                    <span>{dayNum}</span>
-                    {hasItems && !isToday && (
-                      <span className="w-1 h-1 rounded-full bg-cyan-400 mt-0.5 shadow-[0_0_3px_#00e5ff]" />
-                    )}
-                  </button>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[11px] font-tech rounded-full px-1.5 py-0.5 ${isToday
+                            ? "bg-amber-400 text-black font-bold shadow-[0_0_8px_#ffb300]"
+                            : "text-cyan-300/80"
+                          }`}
+                      >
+                        {cell.dayNum}
+                      </span>
+                      {dayItems.length > 0 && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#00e5ff]" />
+                      )}
+                    </div>
+
+                    <div className="mt-1 flex flex-col gap-0.5 overflow-hidden">
+                      {visibleItems.map((it) => (
+                        <div
+                          key={it.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick(it);
+                          }}
+                          style={{ borderLeftColor: it.color || "#00e5ff" }}
+                          className="px-1 py-0.5 rounded bg-[#071322] border-l-2 text-[9px] font-tech text-cyan-100 truncate cursor-pointer hover:bg-cyan-900/40"
+                        >
+                          {it.title}
+                        </div>
+                      ))}
+                      {moreCount > 0 && (
+                        <span className="text-[8.5px] font-mono text-cyan-400/60 pl-1">
+                          +{moreCount} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
-        );
-      })}
-    </div>
-  );
+          );
 };
 
-// =========================================================================
-// 6. SCHEDULE VIEW
-// =========================================================================
-interface ScheduleViewProps {
-  date: Date;
-  items: CalendarItemDisplay[];
-  todayISO: string;
+          // =========================================================================
+          // 5. YEAR VIEW
+          // =========================================================================
+          interface YearViewProps {
+            date: Date;
+          items: CalendarItemDisplay[];
+          todayISO: string;
+  onSelectDay: (d: Date) => void;
+}
+
+          const YearView: React.FC<YearViewProps> = ({date, items, todayISO, onSelectDay}) => {
+  const year = date.getFullYear();
+            const months = Array.from({length: 12 }, (_, i) => i);
+
+            return (
+            <div className="h-full w-full overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-[#03070d]">
+              {months.map((m) => {
+                const firstDay = new Date(year, m, 1);
+                const daysInMonth = new Date(year, m + 1, 0).getDate();
+                const startDayOfWeek = (firstDay.getDay() + 6) % 7;
+                const monthName = firstDay.toLocaleString("en-US", { month: "short" });
+
+                return (
+                  <div
+                    key={m}
+                    className="p-2.5 rounded-lg border border-cyan-500/20 bg-[#050b14] flex flex-col shadow-[0_0_12px_rgba(0,229,255,0.05)]"
+                  >
+                    <div className="text-xs font-orbitron font-bold text-cyan-200 mb-1.5 uppercase tracking-wider">
+                      {monthName}
+                    </div>
+
+                    <div className="grid grid-cols-7 text-center text-[8px] font-tech text-cyan-500/50 pb-1 border-b border-cyan-500/10">
+                      {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                        <span key={i}>{d}</span>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-tech mt-1">
+                      {Array.from({ length: startDayOfWeek }).map((_, i) => (
+                        <div key={`empty-${i}`} className="p-0.5" />
+                      ))}
+
+                      {Array.from({ length: daysInMonth }).map((_, i) => {
+                        const dayNum = i + 1;
+                        const d = new Date(year, m, dayNum);
+                        const iso = formatDateISO(d);
+                        const isToday = iso === todayISO;
+                        const hasItems = items.some((it) =>
+                          isEventOccurringOnDate(it.date, iso, it.originalEvent?.recurrence)
+                        );
+
+                        return (
+                          <button
+                            key={iso}
+                            onClick={() => onSelectDay(d)}
+                            className={`p-0.5 rounded flex flex-col items-center justify-center transition cursor-pointer hover:bg-cyan-500/20 ${isToday
+                                ? "bg-amber-400 text-black font-bold"
+                                : hasItems
+                                  ? "text-cyan-100 font-medium"
+                                  : "text-cyan-400/60"
+                              }`}
+                          >
+                            <span>{dayNum}</span>
+                            {hasItems && !isToday && (
+                              <span className="w-1 h-1 rounded-full bg-cyan-400 mt-0.5 shadow-[0_0_3px_#00e5ff]" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            );
+};
+
+            // =========================================================================
+            // 6. SCHEDULE VIEW
+            // =========================================================================
+            interface ScheduleViewProps {
+              date: Date;
+            items: CalendarItemDisplay[];
+            todayISO: string;
   onEventClick: (item: CalendarItemDisplay) => void;
 }
 
-const ScheduleView: React.FC<ScheduleViewProps> = ({ date, items, todayISO, onEventClick }) => {
+            const ScheduleView: React.FC<ScheduleViewProps> = ({date, items, todayISO, onEventClick}) => {
   const monday = getMondayOfWeek(date);
-  const daysFeed = Array.from({ length: 14 }, (_, i) => {
+              const daysFeed = Array.from({length: 14 }, (_, i) => {
     const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    const iso = formatDateISO(d);
-    return {
-      date: d,
-      iso,
-      dayName: DAYS_OF_WEEK_SHORT[(d.getDay() + 6) % 7],
-      fullDateLabel: d.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
+              d.setDate(monday.getDate() + i);
+              const iso = formatDateISO(d);
+              return {
+                date: d,
+              iso,
+              dayName: DAYS_OF_WEEK_SHORT[(d.getDay() + 6) % 7],
+              fullDateLabel: d.toLocaleDateString("en-US", {
+                weekday: "short",
+              month: "short",
+              day: "numeric",
       }),
-      isToday: iso === todayISO,
-      items: items.filter((it) => it.date === iso),
+              isToday: iso === todayISO,
+      items: items.filter((it) =>
+              isEventOccurringOnDate(it.date, iso, it.originalEvent?.recurrence)
+              ),
     };
   });
 
   const activeDays = daysFeed.filter((d) => d.items.length > 0 || d.isToday);
 
-  return (
-    <div className="h-full w-full overflow-y-auto p-4 bg-[#03070d]">
-      {activeDays.length === 0 ? (
-        <div className="h-full flex flex-col items-center justify-center text-center text-cyan-500/50 font-tech">
-          <CalendarIcon className="w-8 h-8 mb-2 opacity-30 text-cyan-400" />
-          <p className="text-sm">No scheduled events or tasks in this period</p>
-        </div>
-      ) : (
-        <div className="max-w-2xl mx-auto flex flex-col gap-4">
-          {activeDays.map((d) => (
-            <div
-              key={d.iso}
-              className={`p-3 rounded-lg border transition ${
-                d.isToday
-                  ? "border-amber-400/40 bg-amber-950/10 shadow-[0_0_12px_rgba(255,179,0,0.1)]"
-                  : "border-cyan-500/20 bg-[#050b14]"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-cyan-500/15">
-                <span
-                  className={`text-xs font-orbitron font-bold tracking-wider ${
-                    d.isToday ? "text-amber-300" : "text-cyan-200"
-                  }`}
-                >
-                  {d.fullDateLabel}
-                </span>
-                {d.isToday && (
-                  <span className="text-[9px] font-tech uppercase px-1.5 py-0.2 rounded bg-amber-400/20 border border-amber-400/50 text-amber-200">
-                    TODAY
-                  </span>
+              return (
+              <div className="h-full w-full overflow-y-auto p-4 bg-[#03070d]">
+                {activeDays.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-cyan-500/50 font-tech">
+                    <CalendarIcon className="w-8 h-8 mb-2 opacity-30 text-cyan-400" />
+                    <p className="text-sm">No scheduled events or tasks in this period</p>
+                  </div>
+                ) : (
+                  <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                    {activeDays.map((d) => (
+                      <div
+                        key={d.iso}
+                        className={`p-3 rounded-lg border transition ${d.isToday
+                            ? "border-amber-400/40 bg-amber-950/10 shadow-[0_0_12px_rgba(255,179,0,0.1)]"
+                            : "border-cyan-500/20 bg-[#050b14]"
+                          }`}
+                      >
+                        <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-cyan-500/15">
+                          <span
+                            className={`text-xs font-orbitron font-bold tracking-wider ${d.isToday ? "text-amber-300" : "text-cyan-200"
+                              }`}
+                          >
+                            {d.fullDateLabel}
+                          </span>
+                          {d.isToday && (
+                            <span className="text-[9px] font-tech uppercase px-1.5 py-0.2 rounded bg-amber-400/20 border border-amber-400/50 text-amber-200">
+                              TODAY
+                            </span>
+                          )}
+                        </div>
+
+                        {d.items.length === 0 ? (
+                          <p className="text-[11px] font-tech text-cyan-500/40 italic">
+                            No scheduled items for this date
+                          </p>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {d.items.map((it) => (
+                              <div
+                                key={it.id}
+                                onClick={() => onEventClick(it)}
+                                style={{ borderLeftColor: it.color || "#00e5ff" }}
+                                className="px-2.5 py-1.5 rounded bg-[#071322] border-l-2 flex items-center justify-between text-xs font-tech text-cyan-100 shadow-[0_0_6px_rgba(0,229,255,0.1)] hover:bg-cyan-900/30 transition cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  {it.isTask && (
+                                    <span
+                                      className={`w-2 h-2 rounded-full ${it.completed ? "bg-emerald-400" : "bg-amber-400"
+                                        }`}
+                                    />
+                                  )}
+                                  <span className="truncate">{it.title}</span>
+                                </div>
+                                {it.startTime && (
+                                  <span className="text-[10px] font-mono text-cyan-400/60 ml-3 shrink-0">
+                                    {formatTime12(it.startTime)}
+                                    {it.endTime ? ` - ${formatTime12(it.endTime)}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-
-              {d.items.length === 0 ? (
-                <p className="text-[11px] font-tech text-cyan-500/40 italic">
-                  No scheduled items for this date
-                </p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {d.items.map((it) => (
-                    <div
-                      key={it.id}
-                      onClick={() => onEventClick(it)}
-                      style={{ borderLeftColor: it.color || "#00e5ff" }}
-                      className="px-2.5 py-1.5 rounded bg-[#071322] border-l-2 flex items-center justify-between text-xs font-tech text-cyan-100 shadow-[0_0_6px_rgba(0,229,255,0.1)] hover:bg-cyan-900/30 transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        {it.isTask && (
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              it.completed ? "bg-emerald-400" : "bg-amber-400"
-                            }`}
-                          />
-                        )}
-                        <span className="truncate">{it.title}</span>
-                      </div>
-                      {it.startTime && (
-                        <span className="text-[10px] font-mono text-cyan-400/60 ml-3 shrink-0">
-                          {formatTime12(it.startTime)}
-                          {it.endTime ? ` - ${formatTime12(it.endTime)}` : ""}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+              );
 };

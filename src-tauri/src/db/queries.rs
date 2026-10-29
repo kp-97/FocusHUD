@@ -553,7 +553,7 @@ pub fn sync_notes(conn: &mut Connection, notes: &[Note]) -> Result<()> {
 
 pub fn get_all_calendar_events(conn: &Connection) -> Result<Vec<CalendarEvent>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, description, location, date, start_time, end_time, is_all_day, color, created_at, updated_at
+        "SELECT id, title, description, location, date, start_time, end_time, is_all_day, color, created_at, updated_at, recurrence
          FROM calendar_events
          ORDER BY date ASC, start_time ASC",
     )?;
@@ -572,6 +572,7 @@ pub fn get_all_calendar_events(conn: &Connection) -> Result<Vec<CalendarEvent>> 
             color: row.get(8)?,
             created_at: row.get(9)?,
             updated_at: row.get(10)?,
+            recurrence: row.get(11)?,
         })
     })?;
 
@@ -591,10 +592,11 @@ pub fn upsert_calendar_event(conn: &Connection, event: &CalendarEvent) -> Result
     };
     let updated_at = now;
     let is_all_day_int = if event.is_all_day { 1 } else { 0 };
+    let recurrence_str = event.recurrence.as_deref().unwrap_or("none");
 
     conn.execute(
-        "INSERT INTO calendar_events (id, title, description, location, date, start_time, end_time, is_all_day, color, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "INSERT INTO calendar_events (id, title, description, location, date, start_time, end_time, is_all_day, color, created_at, updated_at, recurrence)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
          ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             description = excluded.description,
@@ -604,7 +606,8 @@ pub fn upsert_calendar_event(conn: &Connection, event: &CalendarEvent) -> Result
             end_time = excluded.end_time,
             is_all_day = excluded.is_all_day,
             color = excluded.color,
-            updated_at = excluded.updated_at",
+            updated_at = excluded.updated_at,
+            recurrence = excluded.recurrence",
         params![
             event.id,
             event.title,
@@ -617,6 +620,7 @@ pub fn upsert_calendar_event(conn: &Connection, event: &CalendarEvent) -> Result
             event.color,
             created_at,
             updated_at,
+            recurrence_str,
         ],
     )?;
     Ok(())
@@ -657,9 +661,10 @@ pub fn sync_calendar_events(conn: &mut Connection, events: &[CalendarEvent]) -> 
             now
         };
         let is_all_day_int = if event.is_all_day { 1 } else { 0 };
+        let recurrence_str = event.recurrence.as_deref().unwrap_or("none");
         tx.execute(
-            "INSERT INTO calendar_events (id, title, description, location, date, start_time, end_time, is_all_day, color, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "INSERT INTO calendar_events (id, title, description, location, date, start_time, end_time, is_all_day, color, created_at, updated_at, recurrence)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
                 description = excluded.description,
@@ -669,7 +674,8 @@ pub fn sync_calendar_events(conn: &mut Connection, events: &[CalendarEvent]) -> 
                 end_time = excluded.end_time,
                 is_all_day = excluded.is_all_day,
                 color = excluded.color,
-                updated_at = excluded.updated_at",
+                updated_at = excluded.updated_at,
+                recurrence = excluded.recurrence",
             params![
                 event.id,
                 event.title,
@@ -682,6 +688,7 @@ pub fn sync_calendar_events(conn: &mut Connection, events: &[CalendarEvent]) -> 
                 event.color,
                 created_at,
                 updated_at,
+                recurrence_str,
             ],
         )?;
     }

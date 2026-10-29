@@ -141,8 +141,8 @@ describe("CalendarView Component", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
     });
 
-    // Click 10 AM slot
-    const slot10 = screen.getByTestId("day-slot-10");
+    // Click 10 AM slot (specifically the 00-minute quarter)
+    const slot10 = screen.getByTestId("day-quarter-10-0");
     fireEvent.click(slot10);
 
     // Modal should appear
@@ -203,5 +203,102 @@ describe("CalendarView Component", () => {
     fireEvent.click(prevBtn);
     const backTitle = screen.getByTestId("calendar-header-title").textContent;
     expect(backTitle).toBe(initialTitle);
+  });
+
+  it("supports 15-minute fine-grained slot selection", () => {
+    render(<CalendarView />);
+
+    // Switch to Day view
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
+    });
+
+    // Click 10:45 AM quarter
+    const quarter45 = screen.getByTestId("day-quarter-10-45");
+    fireEvent.click(quarter45);
+
+    expect(screen.getByTestId("event-modal-content")).toBeDefined();
+    const startTimeInput = screen.getByTestId("event-starttime-input") as HTMLInputElement;
+    expect(startTimeInput.value).toBe("10:45");
+  });
+
+  it("configures event recurrence (weekly and custom)", () => {
+    render(<CalendarView />);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
+    });
+
+    // Open creation modal
+    fireEvent.click(screen.getByTestId("day-quarter-10-0"));
+
+    // Open recurrence dropdown
+    fireEvent.click(screen.getByTestId("recurrence-dropdown-btn"));
+    expect(screen.getByTestId("recurrence-menu")).toBeDefined();
+
+    // Select daily
+    fireEvent.click(screen.getByTestId("recurrence-opt-daily"));
+    expect(screen.getByTestId("recurrence-dropdown-btn")).toHaveTextContent("Daily");
+
+    // Open dropdown again and choose Custom...
+    fireEvent.click(screen.getByTestId("recurrence-dropdown-btn"));
+    fireEvent.click(screen.getByTestId("recurrence-opt-custom"));
+
+    // Custom overlay appears
+    expect(screen.getByTestId("custom-recurrence-overlay")).toBeDefined();
+    expect(screen.getByText("Custom recurrence")).toBeDefined();
+
+    // Click Done in custom recurrence
+    fireEvent.click(screen.getByTestId("custom-recurrence-done-btn"));
+    expect(screen.queryByTestId("custom-recurrence-overlay")).toBeNull();
+  });
+
+  it("supports searching and quick-creating notes in event modal (Approach C)", () => {
+    render(<CalendarView />);
+
+    // Switch to Day view
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
+    });
+
+    // Open creation modal
+    fireEvent.click(screen.getByTestId("day-quarter-10-0"));
+    expect(screen.getByTestId("event-modal-content")).toBeDefined();
+
+    // Type query into note search input
+    const noteSearchInput = screen.getByTestId("note-search-input");
+    fireEvent.change(noteSearchInput, { target: { value: "Sprint Planning" } });
+
+    // Quick-create row appears in dropdown
+    expect(screen.getByTestId("note-quick-create-btn")).toBeDefined();
+    expect(screen.getByTestId("note-quick-create-btn")).toHaveTextContent('Create & attach "Sprint Planning"');
+
+    // Click quick-create
+    fireEvent.click(screen.getByTestId("note-quick-create-btn"));
+
+    // Check attached chip
+    expect(screen.getByText("Sprint Planning")).toBeDefined();
+  });
+
+  it("pins/anchors the days of the week header to the top during scroll in week and 4-days modes", () => {
+    render(<CalendarView />);
+
+    // Week view is active by default
+    const weekHeader = screen.getByTestId("week-days-header");
+    expect(weekHeader).toBeDefined();
+    expect(weekHeader.className).toContain("sticky");
+    expect(weekHeader.className).toContain("top-0");
+    expect(weekHeader.className).toContain("z-30");
+
+    // Switch to 4-days mode
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "x", altKey: true }));
+    });
+
+    const fourDaysHeader = screen.getByTestId("four-days-header");
+    expect(fourDaysHeader).toBeDefined();
+    expect(fourDaysHeader.className).toContain("sticky");
+    expect(fourDaysHeader.className).toContain("top-0");
+    expect(fourDaysHeader.className).toContain("z-30");
   });
 });

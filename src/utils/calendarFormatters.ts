@@ -57,15 +57,107 @@ export const formatTime12 = (time24?: string): string => {
   return `${h12}:${m} ${period}`;
 };
 
-/**
- * Converts a 12-hour string (e.g. "2:30 PM", "9:00 AM") or components to 24-hour "HH:mm"
- */
 export const parse12To24 = (h12: number, minutes: number, period: "AM" | "PM"): string => {
   let h24 = h12 % 12;
   if (period === "PM") {
     h24 += 12;
   }
   return `${String(h24).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+/**
+ * Checks if a recurring event falls on a specific date (YYYY-MM-DD)
+ */
+export const isEventOccurringOnDate = (
+  eventDateISO: string,
+  targetDateISO: string,
+  recurrence?: string
+): boolean => {
+  if (!recurrence || recurrence === "none") {
+    return eventDateISO === targetDateISO;
+  }
+
+  // An event cannot occur before its initial creation date
+  if (targetDateISO < eventDateISO) {
+    return false;
+  }
+
+  const [eY, eM, eD] = eventDateISO.split("-").map(Number);
+  const [tY, tM, tD] = targetDateISO.split("-").map(Number);
+  const eventDate = new Date(eY, eM - 1, eD);
+  const targetDate = new Date(tY, tM - 1, tD);
+
+  if (recurrence === "daily") {
+    return true;
+  }
+
+  if (recurrence === "weekday") {
+    const day = targetDate.getDay();
+    return day >= 1 && day <= 5; // Monday to Friday
+  }
+
+  if (recurrence === "weekly") {
+    return targetDate.getDay() === eventDate.getDay();
+  }
+
+  if (recurrence === "monthly_last") {
+    if (targetDate.getDay() !== eventDate.getDay()) return false;
+    // Check if it's the last occurrence of this weekday in target month
+    const nextWeek = new Date(tY, tM - 1, tD + 7);
+    return nextWeek.getMonth() !== targetDate.getMonth();
+  }
+
+  if (recurrence === "annually") {
+    return targetDate.getMonth() === eventDate.getMonth() && targetDate.getDate() === eventDate.getDate();
+  }
+
+  if (recurrence.startsWith("custom:")) {
+    try {
+      const config = JSON.parse(recurrence.replace("custom:", ""));
+      const diffTime = targetDate.getTime() - eventDate.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (config.endType === "on" && config.endDate && targetDateISO > config.endDate) {
+        return false;
+      }
+
+      const unit = config.unit || "week";
+      const interval = config.interval || 1;
+
+      if (unit === "day") {
+        if (diffDays % interval !== 0) return false;
+        if (config.endType === "after" && config.occurrences) {
+          const occ = Math.floor(diffDays / interval) + 1;
+          if (occ > config.occurrences) return false;
+        }
+        return true;
+      }
+
+      if (unit === "week") {
+        const targetDayIdx = (targetDate.getDay() + 6) % 7; // 0 = Mon
+        if (!config.daysOfWeek?.includes(targetDayIdx)) return false;
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks % interval !== 0) return false;
+        return true;
+      }
+
+      if (unit === "month") {
+        const monthDiff = (tY - eY) * 12 + (tM - eM);
+        if (monthDiff % interval !== 0) return false;
+        return tD === eD;
+      }
+
+      if (unit === "year") {
+        const yearDiff = tY - eY;
+        if (yearDiff % interval !== 0) return false;
+        return tM === eM && tD === eD;
+      }
+    } catch {
+      return eventDateISO === targetDateISO;
+    }
+  }
+
+  return eventDateISO === targetDateISO;
 };
 
 /**
@@ -208,4 +300,39 @@ export const navigateDate = (currentDate: Date, mode: CalendarMode, direction: -
       return d;
   }
 };
+
+/**
+ * Converts a time string "HH:mm" into total minutes from start of day (0..1439).
+ * Returns default 540 (9:00 AM) if undefined or invalid.
+ */
+export const timeToMinutes = (time24?: string, defaultMinutes: number = 540): number => {
+  if (!time24) return defaultMinutes;
+  const parts = time24.split(":");
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h)) return defaultMinutes;
+  return Math.max(0, Math.min(1439, h * 60 + (isNaN(m) ? 0 : m)));
+};
+
+/**
+ * Calculates top offset (px) and height (px) for an event starting at startTime and ending at endTime.
+ */
+export const calculateEventPosition = (
+  startTime: string | undefined,
+  endTime: string | undefined,
+  hourHeight: number = 52
+): { top: number; height: number } => {
+  const startMin = timeToMinutes(startTime, 540); // default 9:00 AM
+  let endMin = timeToMinutes(endTime, startMin + 60); // default 1 hour after start
+  if (endMin <= startMin) {
+    endMin = Math.min(1440, startMin + 60);
+  }
+
+  const pxPerMin = hourHeight / 60;
+  const top = startMin * pxPerMin;
+  const height = Math.max(18, (endMin - startMin) * pxPerMin); // at least 18px so text is legible
+
+  return { top, height };
+};
+
 
