@@ -43,6 +43,7 @@ export interface TaskItem {
   title: string;
   completed: boolean;
   completedAt?: string;
+  dueDate?: string | null;
   goalId?: string | null;
   parentId?: string | null;
   status: "todo" | "in_progress" | "done";

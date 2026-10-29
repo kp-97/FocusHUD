@@ -133,6 +133,7 @@ export const DEFAULT_TASKS: TaskItem[] = [
     id: "t3",
     title: "SPLIT HOME VIEW DUAL SLOTS",
     completed: false,
+    dueDate: getTodayString(),
     goalId: "g1",
     status: "in_progress",
     subtasks: [
@@ -144,6 +145,7 @@ export const DEFAULT_TASKS: TaskItem[] = [
     id: "t4",
     title: "CONFIGURE CALENDAR HORIZONTAL WEEK SCROLL",
     completed: false,
+    dueDate: getTodayString(),
     goalId: null,
     status: "todo",
   },
