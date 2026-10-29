@@ -163,6 +163,7 @@ mod tests {
             goal_id: Some("g_alpha".into()),
             task_id: Some("t_core".into()),
             action_plan_id: Some("ap_1".into()),
+            calendar_event_id: None,
             title: "Design Notes".into(),
             content: "Remember to check WAL mode".into(),
             is_pinned: true,
@@ -326,6 +327,7 @@ mod tests {
             goal_id: None,
             task_id: None,
             action_plan_id: None,
+            calendar_event_id: None,
             title: "Note 1".into(),
             content: "Content 1".into(),
             is_pinned: false,
@@ -345,6 +347,7 @@ mod tests {
                 goal_id: None,
                 task_id: None,
                 action_plan_id: None,
+                calendar_event_id: None,
                 title: "Note 1 Updated".into(),
                 content: "Content Updated".into(),
                 is_pinned: true,
@@ -358,6 +361,7 @@ mod tests {
                 goal_id: None,
                 task_id: None,
                 action_plan_id: None,
+                calendar_event_id: None,
                 title: "Note 2".into(),
                 content: "Content 2".into(),
                 is_pinned: false,
@@ -372,5 +376,28 @@ mod tests {
         assert_eq!(notes[0].id, "n_sync_1");
         assert!(notes[0].is_pinned);
         assert_eq!(notes[1].id, "n_sync_2");
+
+        // Test calendar_events CRUD & sync
+        let event = models::CalendarEvent {
+            id: "ev_1".into(),
+            title: "Sprint Planning".into(),
+            description: "Review sprint backlog".into(),
+            location: "Room A".into(),
+            date: "2026-10-29".into(),
+            start_time: "09:00".into(),
+            end_time: "10:30".into(),
+            is_all_day: false,
+            color: "#00e5ff".into(),
+            created_at: 500,
+            updated_at: 500,
+        };
+        queries::upsert_calendar_event(&conn, &event).unwrap();
+        let events = queries::get_all_calendar_events(&conn).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].title, "Sprint Planning");
+
+        queries::delete_calendar_event(&conn, "ev_1").unwrap();
+        let events_after = queries::get_all_calendar_events(&conn).unwrap();
+        assert_eq!(events_after.len(), 0);
     }
 }

@@ -1,6 +1,6 @@
 import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NavViewId, NavItemConfig, NoteItem } from "../types/hud";
-import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans, syncNotes } from "../services/dbService";
-import { treeToGoalsFlat, treeToTasksFlat, treeToActionPlansFlat } from "../services/dbAdapters";
+import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans, syncNotes, syncCalendarEvents } from "../services/dbService";
+import { treeToGoalsFlat, treeToTasksFlat, treeToActionPlansFlat, appEventsToDb } from "../services/dbAdapters";
 
 export const getTodayString = (): string => {
   return new Date().toISOString().split("T")[0];
@@ -246,6 +246,9 @@ export const loadEvents = (): CalendarEvent[] => {
 
 export const saveEvents = (events: CalendarEvent[]) => {
   localStorage.setItem("focushud_events", JSON.stringify(events));
+  if (isTauriEnvironment()) {
+    syncCalendarEvents(appEventsToDb(events)).catch(() => {});
+  }
 };
 
 // Remembered expanded widths for left and right panes (used when expanding from collapsed mode)

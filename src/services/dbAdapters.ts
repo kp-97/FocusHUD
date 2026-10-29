@@ -1,5 +1,5 @@
-import type { GoalNode, TaskItem, ActionPlanNode } from "../types/hud";
-import type { DbGoal, DbTask, DbActionPlan } from "./dbService";
+import type { GoalNode, TaskItem, ActionPlanNode, CalendarEvent } from "../types/hud";
+import type { DbGoal, DbTask, DbActionPlan, DbCalendarEvent } from "./dbService";
 
 // ========================================================
 // Goals Tree <-> Flat DB Conversion
@@ -178,3 +178,39 @@ export function treeToPlansFlat(nodes: ActionPlanNode[], parentId: string | null
 
 export const dbActionPlansToTree = dbPlansToTree;
 export const treeToActionPlansFlat = treeToPlansFlat;
+
+// ========================================================
+// Calendar Events DB Conversion
+// ========================================================
+
+export function dbEventsToApp(flat: DbCalendarEvent[]): CalendarEvent[] {
+  return flat.map((e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description || "",
+    location: e.location || "",
+    date: e.date,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    isAllDay: !!e.isAllDay,
+    color: e.color || "#00e5ff",
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }));
+}
+
+export function appEventsToDb(events: CalendarEvent[]): DbCalendarEvent[] {
+  return events.map((e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description || "",
+    location: e.location || "",
+    date: e.date,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    isAllDay: !!e.isAllDay,
+    color: e.color || "#00e5ff",
+    createdAt: e.createdAt || Date.now(),
+    updatedAt: e.updatedAt || Date.now(),
+  }));
+}

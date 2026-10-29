@@ -80,6 +80,7 @@ pub struct Note {
     pub goal_id: Option<String>,
     pub task_id: Option<String>,
     pub action_plan_id: Option<String>,
+    pub calendar_event_id: Option<String>,
     #[serde(default)]
     pub title: String,
     #[serde(default)]
@@ -90,6 +91,30 @@ pub struct Note {
     pub sort_order: i32,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEvent {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub location: String,
+    pub date: String,
+    pub start_time: String,
+    pub end_time: String,
+    #[serde(default)]
+    pub is_all_day: bool,
+    #[serde(default = "default_event_color")]
+    pub color: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+fn default_event_color() -> String {
+    "#00e5ff".to_string()
 }
 
 /// DTO for cross-dock real-time cache event broadcast

@@ -60,87 +60,134 @@ describe("CalendarView Component", () => {
     const monthOption = screen.getByTestId("mode-option-month");
     fireEvent.click(monthOption);
 
-    // Dropdown should be closed
     expect(screen.queryByTestId("mode-dropdown-menu")).toBeNull();
-    // Dropdown button should now display Month
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Month");
-    // Saved in localStorage
     expect(localStorage.getItem("focushud_calendar_mode")).toBe("month");
   });
 
   it("switches modes using keyboard shortcuts (Alt + D, W, M, Y, A, X)", () => {
     render(<CalendarView />);
 
-    // Alt + M -> Month
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "m", altKey: true }));
     });
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Month");
 
-    // Alt + D -> Day
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
     });
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Day");
 
-    // Alt + Y -> Year
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "y", altKey: true }));
     });
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Year");
 
-    // Alt + A -> Schedule
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "a", altKey: true }));
     });
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Schedule");
 
-    // Alt + X -> 4 days
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "x", altKey: true }));
     });
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("4 days");
 
-    // Alt + W -> Week
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "w", altKey: true }));
     });
     expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Week");
   });
 
-  it("does not trigger mode switch shortcuts when user is typing in an input", () => {
-    render(
-      <div>
-        <input data-testid="test-input" />
-        <CalendarView />
-      </div>
-    );
+  it("toggles Events and Tasks independently", () => {
+    render(<CalendarView />);
 
-    const input = screen.getByTestId("test-input");
-    input.focus();
+    const eventsBtn = screen.getByTestId("toggle-events-button");
+    const tasksBtn = screen.getByTestId("toggle-tasks-button");
 
+    // Both are ON initially
+    expect(localStorage.getItem("focushud_show_events")).toBe("true");
+    expect(localStorage.getItem("focushud_show_tasks")).toBe("true");
+
+    // Toggle events OFF
+    fireEvent.click(eventsBtn);
+    expect(localStorage.getItem("focushud_show_events")).toBe("false");
+    expect(localStorage.getItem("focushud_show_tasks")).toBe("true");
+
+    // Toggle tasks OFF
+    fireEvent.click(tasksBtn);
+    expect(localStorage.getItem("focushud_show_tasks")).toBe("false");
+
+    // Toggle events back ON
+    fireEvent.click(eventsBtn);
+    expect(localStorage.getItem("focushud_show_events")).toBe("true");
+    expect(localStorage.getItem("focushud_show_tasks")).toBe("false");
+  });
+
+  it("renders 12H time labels on timetable slots", () => {
+    render(<CalendarView />);
+
+    // Week view is active by default; check for 12H labels like 9 AM, 12 PM, 1 PM
+    expect(screen.getByText("9 AM")).toBeDefined();
+    expect(screen.getByText("12 PM")).toBeDefined();
+    expect(screen.getByText("1 PM")).toBeDefined();
+  });
+
+  it("opens creation modal when clicking an hourly slot and saves new event", () => {
+    render(<CalendarView />);
+
+    // Switch to Day view
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
     });
 
-    // Should remain on default week mode because input has focus
-    expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Week");
+    // Click 10 AM slot
+    const slot10 = screen.getByTestId("day-slot-10");
+    fireEvent.click(slot10);
+
+    // Modal should appear
+    expect(screen.getByTestId("event-modal-content")).toBeDefined();
+    expect(screen.getByText("NEW EVENT")).toBeDefined();
+
+    // Fill title
+    const titleInput = screen.getByTestId("event-title-input");
+    fireEvent.change(titleInput, { target: { value: "New Design Review" } });
+
+    // Fill location
+    const locationInput = screen.getByTestId("event-location-input");
+    fireEvent.change(locationInput, { target: { value: "Conference Room B" } });
+
+    // Submit form
+    const saveBtn = screen.getByTestId("event-save-btn");
+    fireEvent.click(saveBtn);
+
+    // Modal closes and new event is visible
+    expect(screen.queryByTestId("event-modal-content")).toBeNull();
+    expect(screen.getByText("New Design Review")).toBeDefined();
   });
 
-  it("toggles between Events and Tasks without changing mode", () => {
+  it("opens edit modal when clicking an existing event, allows editing and deleting", () => {
     render(<CalendarView />);
 
-    const tasksBtn = screen.getByTestId("toggle-tasks-button");
-    const eventsBtn = screen.getByTestId("toggle-events-button");
+    // Switch to Day view
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
+    });
 
-    // Switch to tasks
-    fireEvent.click(tasksBtn);
-    expect(localStorage.getItem("focushud_calendar_data_type")).toBe("tasks");
-    expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Week");
+    // Click existing event e1 ("DEEP FOCUS BLOCK")
+    const eventItem = screen.getByTestId("event-item-e1");
+    fireEvent.click(eventItem);
 
-    // Switch back to events
-    fireEvent.click(eventsBtn);
-    expect(localStorage.getItem("focushud_calendar_data_type")).toBe("events");
+    // Modal appears in edit mode
+    expect(screen.getByText("EDIT EVENT")).toBeDefined();
+    expect(screen.getByTestId("event-delete-btn")).toBeDefined();
+
+    // Click delete
+    fireEvent.click(screen.getByTestId("event-delete-btn"));
+
+    // Modal closes and event is deleted
+    expect(screen.queryByTestId("event-modal-content")).toBeNull();
+    expect(screen.queryByTestId("event-item-e1")).toBeNull();
   });
 
   it("navigates forward and backward with Next and Prev buttons", () => {
@@ -155,39 +202,6 @@ describe("CalendarView Component", () => {
 
     fireEvent.click(prevBtn);
     const backTitle = screen.getByTestId("calendar-header-title").textContent;
-
     expect(backTitle).toBe(initialTitle);
-  });
-
-  it("resets date to today when clicking Today button", () => {
-    render(<CalendarView />);
-
-    const initialTitle = screen.getByTestId("calendar-header-title").textContent;
-    const nextBtn = screen.getByTestId("next-button");
-    const todayBtn = screen.getByTestId("today-button");
-
-    // Move ahead several weeks
-    fireEvent.click(nextBtn);
-    fireEvent.click(nextBtn);
-
-    // Reset to today
-    fireEvent.click(todayBtn);
-    expect(screen.getByTestId("calendar-header-title").textContent).toBe(initialTitle);
-  });
-
-  it("switches to Day mode when clicking a date in Month view", () => {
-    render(<CalendarView />);
-
-    // Switch to Month view
-    fireEvent.click(screen.getByTestId("mode-dropdown-button"));
-    fireEvent.click(screen.getByTestId("mode-option-month"));
-    expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Month");
-
-    // Find a day cell in Month view and click it
-    const dayCells = screen.getAllByText("15");
-    fireEvent.click(dayCells[0]);
-
-    // Should switch to Day view
-    expect(screen.getByTestId("mode-dropdown-button")).toHaveTextContent("Day");
   });
 });

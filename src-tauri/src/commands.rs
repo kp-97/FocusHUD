@@ -413,6 +413,74 @@ pub fn sync_notes(
 }
 
 #[tauri::command]
+pub fn get_calendar_events(
+    state: tauri::State<'_, crate::db::DbState>,
+) -> Result<Vec<crate::db::models::CalendarEvent>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::get_all_calendar_events(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_calendar_event(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    event: crate::db::models::CalendarEvent,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::upsert_calendar_event(&conn, &event).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "calendar_events".into(),
+            action: "save".into(),
+            id: Some(event.id),
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_calendar_event(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    id: String,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::delete_calendar_event(&conn, &id).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "calendar_events".into(),
+            action: "delete".into(),
+            id: Some(id),
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn sync_calendar_events(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::db::DbState>,
+    events: Vec<crate::db::models::CalendarEvent>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::sync_calendar_events(&mut conn, &events).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: "calendar_events".into(),
+            action: "save".into(),
+            id: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn migrate_legacy_data(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::db::DbState>,

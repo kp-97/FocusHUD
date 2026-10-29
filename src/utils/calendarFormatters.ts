@@ -34,6 +34,41 @@ const FULL_MONTHS = [
 export const DAYS_OF_WEEK_SHORT = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 /**
+ * Formats a 24-hour hour number (0..23) into 12-hour AM/PM label (e.g. 12 AM, 9 AM, 12 PM, 2 PM)
+ */
+export const formatHour12 = (hour24: number): string => {
+  const normalized = Math.max(0, Math.min(23, hour24));
+  const period = normalized >= 12 ? "PM" : "AM";
+  const h12 = normalized % 12 === 0 ? 12 : normalized % 12;
+  return `${h12} ${period}`;
+};
+
+/**
+ * Formats a 24-hour time string "HH:mm" into 12-hour "h:mm AM/PM" (e.g. "9:00 AM", "2:30 PM")
+ */
+export const formatTime12 = (time24?: string): string => {
+  if (!time24) return "";
+  const parts = time24.split(":");
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] || "00";
+  if (isNaN(h)) return time24;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m} ${period}`;
+};
+
+/**
+ * Converts a 12-hour string (e.g. "2:30 PM", "9:00 AM") or components to 24-hour "HH:mm"
+ */
+export const parse12To24 = (h12: number, minutes: number, period: "AM" | "PM"): string => {
+  let h24 = h12 % 12;
+  if (period === "PM") {
+    h24 += 12;
+  }
+  return `${String(h24).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+/**
  * Returns ISO string YYYY-MM-DD using local year/month/date
  */
 export const formatDateISO = (d: Date): string => {
@@ -173,3 +208,4 @@ export const navigateDate = (currentDate: Date, mode: CalendarMode, direction: -
       return d;
   }
 };
+
