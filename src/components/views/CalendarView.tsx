@@ -688,7 +688,7 @@ const DayView: React.FC<DayViewProps> = ({
                     height: `${height}px`,
                     borderLeftColor: item.color || "#00e5ff",
                   }}
-                  className="absolute left-1 right-6 pointer-events-auto px-2 py-1 rounded bg-[#071322]/95 border-l-2 text-xs font-tech text-cyan-100 flex flex-col justify-between shadow-[0_0_8px_rgba(0,229,255,0.15)] hover:bg-cyan-900/50 hover:shadow-[0_0_12px_rgba(0,229,255,0.3)] transition overflow-hidden cursor-pointer"
+                  className="absolute left-1 right-6 pointer-events-auto px-2 py-1 rounded bg-[#071322]/95 border-l-2 text-xs font-tech text-cyan-100 flex flex-col justify-start gap-0.5 shadow-[0_0_8px_rgba(0,229,255,0.15)] hover:bg-cyan-900/50 hover:shadow-[0_0_12px_rgba(0,229,255,0.3)] transition overflow-hidden cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span className="truncate font-medium">{item.title}</span>
