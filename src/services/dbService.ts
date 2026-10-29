@@ -50,6 +50,7 @@ export interface DbNote {
   goalId?: string | null;
   taskId?: string | null;
   actionPlanId?: string | null;
+  calendarEventId?: string | null;
   title: string;
   content: string;
   isPinned?: boolean;
@@ -58,8 +59,22 @@ export interface DbNote {
   updatedAt?: number;
 }
 
+export interface DbCalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  isAllDay?: boolean;
+  color?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface DbChangePayload {
-  entity: "goals" | "tasks" | "action_plans" | "notes" | "all" | string;
+  entity: "goals" | "tasks" | "action_plans" | "notes" | "calendar_events" | "all" | string;
   action: "save" | "delete" | "migrate" | string;
   id?: string | null;
 }
@@ -265,6 +280,49 @@ export async function syncNotes(notes: DbNote[]): Promise<boolean> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("sync_notes", { notes });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ========================================================
+// Calendar Events API
+// ========================================================
+
+export async function fetchCalendarEvents(): Promise<DbCalendarEvent[]> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<DbCalendarEvent[]>("get_calendar_events");
+  } catch {
+    return [];
+  }
+}
+
+export async function saveCalendarEvent(event: DbCalendarEvent): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("save_calendar_event", { event });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteCalendarEvent(id: string): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("delete_calendar_event", { id });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function syncCalendarEvents(events: DbCalendarEvent[]): Promise<boolean> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sync_calendar_events", { events });
     return true;
   } catch {
     return false;

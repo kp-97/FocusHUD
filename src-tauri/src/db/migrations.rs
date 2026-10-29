@@ -9,6 +9,10 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         apply_migration_v1(conn)?;
     }
 
+    if version < 2 {
+        apply_migration_v2(conn)?;
+    }
+
     Ok(())
 }
 
@@ -89,6 +93,40 @@ fn apply_migration_v1(conn: &mut Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(is_pinned DESC, updated_at DESC);
 
         PRAGMA user_version = 1;
+        "#,
+    )?;
+
+    tx.commit()?;
+    Ok(())
+}
+
+fn apply_migration_v2(conn: &mut Connection) -> Result<()> {
+    let tx = conn.transaction()?;
+
+    tx.execute_batch(
+        r#"
+        -- 5. Calendar Events
+        CREATE TABLE IF NOT EXISTS calendar_events (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            location TEXT NOT NULL DEFAULT '',
+            date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            is_all_day INTEGER NOT NULL DEFAULT 0,
+            color TEXT NOT NULL DEFAULT '#00e5ff',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(date);
+
+        -- Add calendar_event_id to notes table if not present
+        ALTER TABLE notes ADD COLUMN calendar_event_id TEXT REFERENCES calendar_events(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_notes_calendar_event ON notes(calendar_event_id);
+
+        PRAGMA user_version = 2;
         "#,
     )?;
 

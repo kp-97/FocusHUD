@@ -21,6 +21,7 @@ export interface NoteItem {
   goalId?: string | null;
   taskId?: string | null;
   actionPlanId?: string | null;
+  calendarEventId?: string | null;
   title: string;
   content: string;
   isPinned?: boolean;
@@ -62,10 +63,15 @@ export interface ActionPlanNode {
 export interface CalendarEvent {
   id: string;
   title: string;
+  description?: string;
+  location?: string;
   date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  startTime: string; // HH:mm (24H internally)
+  endTime: string; // HH:mm (24H internally)
+  isAllDay?: boolean;
   color?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface ChatMessage {

@@ -67,6 +67,10 @@ pub fn run() {
             commands::save_note,
             commands::delete_note,
             commands::sync_notes,
+            commands::get_calendar_events,
+            commands::save_calendar_event,
+            commands::delete_calendar_event,
+            commands::sync_calendar_events,
             commands::migrate_legacy_data
         ])
         .setup(|app| {

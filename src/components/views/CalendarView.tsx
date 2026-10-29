@@ -6,18 +6,36 @@ import {
   Calendar as CalendarIcon,
   CheckCircle2,
 } from "lucide-react";
-import { loadEvents, loadTasks, getTodayString } from "../../stores/layoutStore";
-import { CalendarEvent, TaskItem } from "../../types/hud";
+import {
+  loadEvents,
+  saveEvents,
+  loadTasks,
+  loadNotes,
+  saveNotes,
+  getTodayString,
+  broadcastNavChange,
+} from "../../stores/layoutStore";
+import { CalendarEvent, TaskItem, NoteItem } from "../../types/hud";
 import {
   CalendarMode,
-  CalendarDataType,
   CALENDAR_MODES,
   formatDateISO,
   getMondayOfWeek,
   getCalendarHeaderTitle,
   navigateDate,
   DAYS_OF_WEEK_SHORT,
+  formatHour12,
+  formatTime12,
 } from "../../utils/calendarFormatters";
+import { EventEditModal } from "./CalendarView/EventEditModal";
+import {
+  fetchCalendarEvents,
+  saveCalendarEvent as persistCalendarEvent,
+  deleteCalendarEvent as removeCalendarEvent,
+  onDbChange,
+  isTauriEnvironment,
+} from "../../services/dbService";
+import { dbEventsToApp, appEventsToDb } from "../../services/dbAdapters";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 52; // pixels per hour in timetable
@@ -31,6 +49,7 @@ export interface CalendarItemDisplay {
   color?: string;
   isTask?: boolean;
   completed?: boolean;
+  originalEvent?: CalendarEvent;
 }
 
 // Helper to recursively flatten tasks
@@ -49,17 +68,24 @@ const flattenTasks = (taskList: TaskItem[]): TaskItem[] => {
 };
 
 export const CalendarView: React.FC = () => {
-  const [events] = useState<CalendarEvent[]>(loadEvents);
+  const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
   const [tasks] = useState<TaskItem[]>(loadTasks);
+  const [notes, setNotes] = useState<NoteItem[]>(loadNotes);
 
   const [mode, setMode] = useState<CalendarMode>(() => {
     const saved = localStorage.getItem("focushud_calendar_mode");
     return (saved as CalendarMode) || "week";
   });
 
-  const [dataType, setDataType] = useState<CalendarDataType>(() => {
-    const saved = localStorage.getItem("focushud_calendar_data_type");
-    return (saved as CalendarDataType) || "events";
+  // Independent Events and Tasks toggle states
+  const [showEvents, setShowEvents] = useState<boolean>(() => {
+    const saved = localStorage.getItem("focushud_show_events");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const [showTasks, setShowTasks] = useState<boolean>(() => {
+    const saved = localStorage.getItem("focushud_show_tasks");
+    return saved !== null ? saved === "true" : true;
   });
 
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
@@ -67,14 +93,49 @@ export const CalendarView: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const timetableScrollRef = useRef<HTMLDivElement>(null);
 
-  // Persist mode & data type
+  // Modal State for Create / Edit
+  const [activeModalEvent, setActiveModalEvent] = useState<Partial<CalendarEvent> | null>(null);
+
+  // Sync with Tauri SQLite backend if available
+  useEffect(() => {
+    let active = true;
+    if (isTauriEnvironment()) {
+      fetchCalendarEvents().then((dbEvents) => {
+        if (active && dbEvents.length > 0) {
+          setEvents(dbEventsToApp(dbEvents));
+        }
+      });
+    }
+
+    const unlistenPromise = onDbChange((payload) => {
+      if (payload.entity === "calendar_events" || payload.entity === "all") {
+        fetchCalendarEvents().then((dbEvents) => {
+          if (active) setEvents(dbEventsToApp(dbEvents));
+        });
+      }
+      if (payload.entity === "notes" || payload.entity === "all") {
+        setNotes(loadNotes());
+      }
+    });
+
+    return () => {
+      active = false;
+      unlistenPromise.then((unlisten) => unlisten && unlisten());
+    };
+  }, []);
+
+  // Persist mode & independent display toggles
   useEffect(() => {
     localStorage.setItem("focushud_calendar_mode", mode);
   }, [mode]);
 
   useEffect(() => {
-    localStorage.setItem("focushud_calendar_data_type", dataType);
-  }, [dataType]);
+    localStorage.setItem("focushud_show_events", String(showEvents));
+  }, [showEvents]);
+
+  useEffect(() => {
+    localStorage.setItem("focushud_show_tasks", String(showTasks));
+  }, [showTasks]);
 
   // Close dropdown on outside click or Esc
   useEffect(() => {
@@ -100,6 +161,8 @@ export const CalendarView: React.FC = () => {
   // Keyboard Shortcuts: Alt + D, W, M, Y, A, X & standard single keys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeModalEvent) return; // Do not intercept shortcuts when edit modal is open
+
       const activeEl = document.activeElement;
       if (
         activeEl &&
@@ -139,7 +202,7 @@ export const CalendarView: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode]);
+  }, [mode, activeModalEvent]);
 
   // Auto-scroll timetable to morning / current hour on initial load or mode switch
   useEffect(() => {
@@ -150,32 +213,111 @@ export const CalendarView: React.FC = () => {
     }
   }, [mode]);
 
-  // Unified items mapped from either Events or Tasks
+  // Unified items mapped from both Events and Tasks independently
   const displayItems = useMemo<CalendarItemDisplay[]>(() => {
-    if (dataType === "events") {
-      return events.map((e) => ({
-        id: e.id,
-        title: e.title,
-        date: e.date,
-        startTime: e.startTime,
-        endTime: e.endTime,
-        color: e.color || "#00e5ff",
-        isTask: false,
-      }));
-    } else {
-      const flat = flattenTasks(tasks);
-      return flat.map((t) => ({
-        id: t.id,
-        title: t.title,
-        date: t.dueDate || t.completedAt || getTodayString(),
-        startTime: "09:00",
-        endTime: "10:00",
-        color: t.completed ? "#00e676" : "#ff9100",
-        isTask: true,
-        completed: t.completed,
-      }));
+    const list: CalendarItemDisplay[] = [];
+
+    if (showEvents) {
+      events.forEach((e) => {
+        list.push({
+          id: e.id,
+          title: e.title,
+          date: e.date,
+          startTime: e.startTime,
+          endTime: e.endTime,
+          color: e.color || "#00e5ff",
+          isTask: false,
+          originalEvent: e,
+        });
+      });
     }
-  }, [dataType, events, tasks]);
+
+    if (showTasks) {
+      const flat = flattenTasks(tasks);
+      flat.forEach((t) => {
+        list.push({
+          id: t.id,
+          title: t.title,
+          date: t.dueDate || t.completedAt || getTodayString(),
+          startTime: "09:00",
+          endTime: "10:00",
+          color: t.completed ? "#00e676" : "#ff9100",
+          isTask: true,
+          completed: t.completed,
+        });
+      });
+    }
+
+    return list;
+  }, [showEvents, showTasks, events, tasks]);
+
+  // CRUD Operations
+  const handleSaveEvent = (savedEvent: CalendarEvent) => {
+    const exists = events.some((e) => e.id === savedEvent.id);
+    const updated = exists
+      ? events.map((e) => (e.id === savedEvent.id ? savedEvent : e))
+      : [...events, savedEvent];
+
+    setEvents(updated);
+    saveEvents(updated);
+
+    if (isTauriEnvironment()) {
+      persistCalendarEvent(appEventsToDb([savedEvent])[0]).catch(() => {});
+    }
+
+    setActiveModalEvent(null);
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    const updated = events.filter((e) => e.id !== eventId);
+    setEvents(updated);
+    saveEvents(updated);
+
+    if (isTauriEnvironment()) {
+      removeCalendarEvent(eventId).catch(() => {});
+    }
+
+    setActiveModalEvent(null);
+  };
+
+  const handleCreateNoteForEvent = (title: string, calendarEventId?: string): NoteItem => {
+    const newNote: NoteItem = {
+      id: `note_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title,
+      content: "",
+      calendarEventId: calendarEventId || null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const updatedNotes = [newNote, ...notes];
+    setNotes(updatedNotes);
+    saveNotes(updatedNotes);
+    return newNote;
+  };
+
+  const handleNavigateToNote = (noteId: string) => {
+    localStorage.setItem("focushud_active_note_id", noteId);
+    broadcastNavChange("notes");
+    setActiveModalEvent(null);
+  };
+
+  // Click on empty hour block to create new event
+  const handleSlotClick = (dateISO: string, hour: number) => {
+    const startH = String(hour).padStart(2, "0");
+    const endH = String((hour + 1) % 24).padStart(2, "0");
+    setActiveModalEvent({
+      date: dateISO,
+      startTime: `${startH}:00`,
+      endTime: `${endH}:00`,
+      title: "",
+    });
+  };
+
+  // Click on existing event chip to edit
+  const handleEventClick = (item: CalendarItemDisplay) => {
+    if (item.isTask || !item.originalEvent) return;
+    setActiveModalEvent(item.originalEvent);
+  };
 
   // Navigation handlers
   const handleToday = () => setCurrentDate(new Date());
@@ -238,7 +380,7 @@ export const CalendarView: React.FC = () => {
           </h1>
         </div>
 
-        {/* Right Controls: Mode Dropdown + Events/Tasks Toggle */}
+        {/* Right Controls: Mode Dropdown + Independent Events/Tasks Toggles */}
         <div className="flex items-center gap-2 relative">
           {/* View Mode Switcher Dropdown */}
           <div className="relative" ref={dropdownRef}>
@@ -280,34 +422,36 @@ export const CalendarView: React.FC = () => {
             )}
           </div>
 
-          {/* Events vs Tasks Segmented Toggle */}
-          <div
-            data-testid="data-type-toggle"
-            className="flex items-center rounded-full border border-cyan-500/30 bg-[#050b14] p-0.5 overflow-hidden shadow-[0_0_10px_rgba(0,229,255,0.05)]"
-          >
+          {/* Independent Events & Tasks Toggle Buttons */}
+          <div data-testid="data-type-toggle" className="flex items-center gap-1.5">
             <button
-              onClick={() => setDataType("events")}
-              title="Show Events"
+              type="button"
+              onClick={() => setShowEvents((v) => !v)}
+              title={showEvents ? "Hide Events" : "Show Events"}
               data-testid="toggle-events-button"
-              className={`p-1.5 rounded-full transition cursor-pointer ${
-                dataType === "events"
-                  ? "bg-cyan-600/40 text-cyan-100 shadow-[0_0_8px_rgba(0,229,255,0.3)] border border-cyan-400/40"
-                  : "text-cyan-500/60 hover:text-cyan-300"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-tech border transition cursor-pointer ${
+                showEvents
+                  ? "bg-cyan-600/30 text-cyan-100 border-cyan-400/50 shadow-[0_0_8px_rgba(0,229,255,0.25)]"
+                  : "bg-[#050b14] text-cyan-500/40 border-cyan-500/20 hover:text-cyan-400/70"
               }`}
             >
               <CalendarIcon className="w-3.5 h-3.5" />
+              <span>Events</span>
             </button>
+
             <button
-              onClick={() => setDataType("tasks")}
-              title="Show Tasks"
+              type="button"
+              onClick={() => setShowTasks((v) => !v)}
+              title={showTasks ? "Hide Tasks" : "Show Tasks"}
               data-testid="toggle-tasks-button"
-              className={`p-1.5 rounded-full transition cursor-pointer ${
-                dataType === "tasks"
-                  ? "bg-cyan-600/40 text-cyan-100 shadow-[0_0_8px_rgba(0,229,255,0.3)] border border-cyan-400/40"
-                  : "text-cyan-500/60 hover:text-cyan-300"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-tech border transition cursor-pointer ${
+                showTasks
+                  ? "bg-cyan-600/30 text-cyan-100 border-cyan-400/50 shadow-[0_0_8px_rgba(0,229,255,0.25)]"
+                  : "bg-[#050b14] text-cyan-500/40 border-cyan-500/20 hover:text-cyan-400/70"
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Tasks</span>
             </button>
           </div>
         </div>
@@ -323,6 +467,8 @@ export const CalendarView: React.FC = () => {
             scrollRef={timetableScrollRef}
             timeIndicatorTop={timeIndicatorTop}
             todayISO={todayISO}
+            onSlotClick={handleSlotClick}
+            onEventClick={handleEventClick}
           />
         )}
 
@@ -335,6 +481,8 @@ export const CalendarView: React.FC = () => {
             timeIndicatorTop={timeIndicatorTop}
             todayISO={todayISO}
             onSelectDay={jumpToDay}
+            onSlotClick={handleSlotClick}
+            onEventClick={handleEventClick}
           />
         )}
 
@@ -347,6 +495,8 @@ export const CalendarView: React.FC = () => {
             timeIndicatorTop={timeIndicatorTop}
             todayISO={todayISO}
             onSelectDay={jumpToDay}
+            onSlotClick={handleSlotClick}
+            onEventClick={handleEventClick}
           />
         )}
 
@@ -356,6 +506,7 @@ export const CalendarView: React.FC = () => {
             items={displayItems}
             todayISO={todayISO}
             onSelectDay={jumpToDay}
+            onEventClick={handleEventClick}
           />
         )}
 
@@ -369,9 +520,27 @@ export const CalendarView: React.FC = () => {
         )}
 
         {mode === "schedule" && (
-          <ScheduleView date={currentDate} items={displayItems} todayISO={todayISO} />
+          <ScheduleView
+            date={currentDate}
+            items={displayItems}
+            todayISO={todayISO}
+            onEventClick={handleEventClick}
+          />
         )}
       </div>
+
+      {/* Quick-Add / Edit Modal */}
+      {activeModalEvent && (
+        <EventEditModal
+          initialEvent={activeModalEvent}
+          availableNotes={notes}
+          onSave={handleSaveEvent}
+          onDelete={activeModalEvent.id ? handleDeleteEvent : undefined}
+          onClose={() => setActiveModalEvent(null)}
+          onCreateNote={handleCreateNoteForEvent}
+          onNavigateToNote={handleNavigateToNote}
+        />
+      )}
     </div>
   );
 };
@@ -386,6 +555,8 @@ interface DayViewProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   timeIndicatorTop: number;
   todayISO: string;
+  onSlotClick: (dateISO: string, hour: number) => void;
+  onEventClick: (item: CalendarItemDisplay) => void;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -395,6 +566,8 @@ const DayView: React.FC<DayViewProps> = ({
   scrollRef,
   timeIndicatorTop,
   todayISO,
+  onSlotClick,
+  onEventClick,
 }) => {
   const dateISO = formatDateISO(date);
   const isToday = dateISO === todayISO;
@@ -416,13 +589,13 @@ const DayView: React.FC<DayViewProps> = ({
         </span>
       </div>
 
-      {/* 24-hour Timetable */}
+      {/* 24-hour Timetable (12H labels) */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden relative">
         <div className="relative min-w-[320px]" style={{ height: HOURS.length * hourHeight }}>
           {/* Current time line */}
           {isToday && (
             <div
-              className="absolute left-14 right-0 z-10 pointer-events-none flex items-center"
+              className="absolute left-16 right-0 z-10 pointer-events-none flex items-center"
               style={{ top: timeIndicatorTop }}
             >
               <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
@@ -432,7 +605,7 @@ const DayView: React.FC<DayViewProps> = ({
 
           {/* Hourly Slots */}
           {HOURS.map((hour) => {
-            const timeLabel = `${String(hour).padStart(2, "0")}:00`;
+            const time12Label = formatHour12(hour);
             const slotItems = dayItems.filter((it) => {
               const startH = it.startTime ? parseInt(it.startTime.split(":")[0], 10) : 9;
               return startH === hour;
@@ -441,23 +614,30 @@ const DayView: React.FC<DayViewProps> = ({
             return (
               <div
                 key={hour}
-                className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition group"
+                onClick={() => onSlotClick(dateISO, hour)}
+                data-testid={`day-slot-${hour}`}
+                className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition cursor-pointer group"
                 style={{ height: hourHeight }}
               >
-                <div className="w-14 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
-                  {timeLabel}
+                <div className="w-16 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
+                  {time12Label}
                 </div>
                 <div className="flex-1 border-l border-cyan-500/15 p-1 relative flex flex-col gap-1">
                   {slotItems.map((item) => (
                     <div
                       key={item.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(item);
+                      }}
+                      data-testid={`event-item-${item.id}`}
                       style={{ borderLeftColor: item.color || "#00e5ff" }}
-                      className="px-2 py-1 rounded bg-[#071322] border-l-2 text-xs font-tech text-cyan-100 flex items-center justify-between shadow-[0_0_8px_rgba(0,229,255,0.15)] hover:bg-cyan-900/30 transition truncate"
+                      className="px-2 py-1 rounded bg-[#071322] border-l-2 text-xs font-tech text-cyan-100 flex items-center justify-between shadow-[0_0_8px_rgba(0,229,255,0.15)] hover:bg-cyan-900/40 transition truncate"
                     >
                       <span className="truncate">{item.title}</span>
                       {item.startTime && (
                         <span className="text-[10px] font-mono text-cyan-400/60 ml-2 shrink-0">
-                          {item.startTime}
+                          {formatTime12(item.startTime)}
                         </span>
                       )}
                     </div>
@@ -483,6 +663,8 @@ interface WeekViewProps {
   timeIndicatorTop: number;
   todayISO: string;
   onSelectDay: (d: Date) => void;
+  onSlotClick: (dateISO: string, hour: number) => void;
+  onEventClick: (item: CalendarItemDisplay) => void;
 }
 
 const WeekView: React.FC<WeekViewProps> = ({
@@ -493,6 +675,8 @@ const WeekView: React.FC<WeekViewProps> = ({
   timeIndicatorTop,
   todayISO,
   onSelectDay,
+  onSlotClick,
+  onEventClick,
 }) => {
   const monday = getMondayOfWeek(date);
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -512,7 +696,7 @@ const WeekView: React.FC<WeekViewProps> = ({
     <div className="h-full w-full flex flex-col bg-[#03070d]">
       {/* 7-Day Header */}
       <div className="h-12 shrink-0 flex border-b border-cyan-500/20 bg-[#050b14]/70">
-        <div className="w-14 shrink-0" />
+        <div className="w-16 shrink-0" />
         {weekDays.map((wd) => (
           <button
             key={wd.iso}
@@ -541,7 +725,7 @@ const WeekView: React.FC<WeekViewProps> = ({
           {/* Current time line across today */}
           {weekDays.some((w) => w.isToday) && (
             <div
-              className="absolute left-14 right-0 z-10 pointer-events-none flex items-center"
+              className="absolute left-16 right-0 z-10 pointer-events-none flex items-center"
               style={{ top: timeIndicatorTop }}
             >
               <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
@@ -550,7 +734,7 @@ const WeekView: React.FC<WeekViewProps> = ({
           )}
 
           {HOURS.map((hour) => {
-            const timeLabel = `${String(hour).padStart(2, "0")}:00`;
+            const time12Label = formatHour12(hour);
 
             return (
               <div
@@ -558,8 +742,8 @@ const WeekView: React.FC<WeekViewProps> = ({
                 className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition"
                 style={{ height: hourHeight }}
               >
-                <div className="w-14 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
-                  {timeLabel}
+                <div className="w-16 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
+                  {time12Label}
                 </div>
                 {weekDays.map((wd) => {
                   const cellItems = items.filter((it) => {
@@ -571,11 +755,18 @@ const WeekView: React.FC<WeekViewProps> = ({
                   return (
                     <div
                       key={wd.iso}
-                      className="flex-1 border-l border-cyan-500/15 p-0.5 relative flex flex-col gap-1 overflow-hidden"
+                      onClick={() => onSlotClick(wd.iso, hour)}
+                      data-testid={`week-slot-${wd.iso}-${hour}`}
+                      className="flex-1 border-l border-cyan-500/15 p-0.5 relative flex flex-col gap-1 overflow-hidden cursor-pointer hover:bg-cyan-500/10 transition"
                     >
                       {cellItems.map((item) => (
                         <div
                           key={item.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick(item);
+                          }}
+                          data-testid={`event-item-${item.id}`}
                           style={{ borderLeftColor: item.color || "#00e5ff" }}
                           className="px-1 py-0.5 rounded bg-[#071322] border-l-2 text-[10px] font-tech text-cyan-100 truncate shadow-[0_0_6px_rgba(0,229,255,0.15)] hover:bg-cyan-900/40 transition cursor-pointer"
                         >
@@ -605,6 +796,8 @@ interface FourDaysViewProps {
   timeIndicatorTop: number;
   todayISO: string;
   onSelectDay: (d: Date) => void;
+  onSlotClick: (dateISO: string, hour: number) => void;
+  onEventClick: (item: CalendarItemDisplay) => void;
 }
 
 const FourDaysView: React.FC<FourDaysViewProps> = ({
@@ -615,6 +808,8 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
   timeIndicatorTop,
   todayISO,
   onSelectDay,
+  onSlotClick,
+  onEventClick,
 }) => {
   const fourDays = Array.from({ length: 4 }, (_, i) => {
     const d = new Date(date);
@@ -633,7 +828,7 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
     <div className="h-full w-full flex flex-col bg-[#03070d]">
       {/* 4 Days Header */}
       <div className="h-12 shrink-0 flex border-b border-cyan-500/20 bg-[#050b14]/70">
-        <div className="w-14 shrink-0" />
+        <div className="w-16 shrink-0" />
         {fourDays.map((fd) => (
           <button
             key={fd.iso}
@@ -661,7 +856,7 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
         <div className="relative min-w-[440px]" style={{ height: HOURS.length * hourHeight }}>
           {fourDays.some((w) => w.isToday) && (
             <div
-              className="absolute left-14 right-0 z-10 pointer-events-none flex items-center"
+              className="absolute left-16 right-0 z-10 pointer-events-none flex items-center"
               style={{ top: timeIndicatorTop }}
             >
               <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_#ff5252] -ml-1" />
@@ -670,7 +865,7 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
           )}
 
           {HOURS.map((hour) => {
-            const timeLabel = `${String(hour).padStart(2, "0")}:00`;
+            const time12Label = formatHour12(hour);
 
             return (
               <div
@@ -678,8 +873,8 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
                 className="flex border-b border-cyan-500/10 hover:bg-cyan-500/5 transition"
                 style={{ height: hourHeight }}
               >
-                <div className="w-14 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
-                  {timeLabel}
+                <div className="w-16 shrink-0 text-[10px] text-cyan-500/60 font-mono text-center pt-1 select-none">
+                  {time12Label}
                 </div>
                 {fourDays.map((fd) => {
                   const cellItems = items.filter((it) => {
@@ -691,11 +886,18 @@ const FourDaysView: React.FC<FourDaysViewProps> = ({
                   return (
                     <div
                       key={fd.iso}
-                      className="flex-1 border-l border-cyan-500/15 p-1 relative flex flex-col gap-1 overflow-hidden"
+                      onClick={() => onSlotClick(fd.iso, hour)}
+                      data-testid={`fourdays-slot-${fd.iso}-${hour}`}
+                      className="flex-1 border-l border-cyan-500/15 p-1 relative flex flex-col gap-1 overflow-hidden cursor-pointer hover:bg-cyan-500/10 transition"
                     >
                       {cellItems.map((item) => (
                         <div
                           key={item.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick(item);
+                          }}
+                          data-testid={`event-item-${item.id}`}
                           style={{ borderLeftColor: item.color || "#00e5ff" }}
                           className="px-1.5 py-0.5 rounded bg-[#071322] border-l-2 text-xs font-tech text-cyan-100 truncate shadow-[0_0_6px_rgba(0,229,255,0.15)] hover:bg-cyan-900/40 transition cursor-pointer"
                         >
@@ -722,20 +924,23 @@ interface MonthViewProps {
   items: CalendarItemDisplay[];
   todayISO: string;
   onSelectDay: (d: Date) => void;
+  onEventClick: (item: CalendarItemDisplay) => void;
 }
 
-const MonthView: React.FC<MonthViewProps> = ({ date, items, todayISO, onSelectDay }) => {
+const MonthView: React.FC<MonthViewProps> = ({
+  date,
+  items,
+  todayISO,
+  onSelectDay,
+  onEventClick,
+}) => {
   const year = date.getFullYear();
   const month = date.getMonth();
 
-  // First day of current month
   const firstDay = new Date(year, month, 1);
   const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
-
-  // Monday-based offset (0 = Mon, 6 = Sun)
   const startDayOfWeek = (firstDay.getDay() + 6) % 7;
 
-  // Previous month trailing days
   const prevMonthDays = new Date(year, month, 0).getDate();
   const leadingDays = Array.from({ length: startDayOfWeek }, (_, i) => {
     const dayNum = prevMonthDays - startDayOfWeek + i + 1;
@@ -743,14 +948,12 @@ const MonthView: React.FC<MonthViewProps> = ({ date, items, todayISO, onSelectDa
     return { date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: false };
   });
 
-  // Current month days
   const currentMonthDays = Array.from({ length: daysInCurrentMonth }, (_, i) => {
     const dayNum = i + 1;
     const d = new Date(year, month, dayNum);
     return { date: d, iso: formatDateISO(d), dayNum, isCurrentMonth: true };
   });
 
-  // Next month leading days to fill grid (total 35 or 42 cells)
   const totalCellsSoFar = leadingDays.length + currentMonthDays.length;
   const targetTotal = totalCellsSoFar > 35 ? 42 : 35;
   const trailingDays = Array.from({ length: targetTotal - totalCellsSoFar }, (_, i) => {
@@ -786,7 +989,6 @@ const MonthView: React.FC<MonthViewProps> = ({ date, items, todayISO, onSelectDa
                 cell.isCurrentMonth ? "bg-[#03070d]" : "bg-[#020509]/80 opacity-40"
               }`}
             >
-              {/* Day Number */}
               <div className="flex items-center justify-between">
                 <span
                   className={`text-[11px] font-tech rounded-full px-1.5 py-0.5 ${
@@ -802,13 +1004,16 @@ const MonthView: React.FC<MonthViewProps> = ({ date, items, todayISO, onSelectDa
                 )}
               </div>
 
-              {/* Event/Task badges */}
               <div className="mt-1 flex flex-col gap-0.5 overflow-hidden">
                 {visibleItems.map((it) => (
                   <div
                     key={it.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEventClick(it);
+                    }}
                     style={{ borderLeftColor: it.color || "#00e5ff" }}
-                    className="px-1 py-0.5 rounded bg-[#071322] border-l-2 text-[9px] font-tech text-cyan-100 truncate"
+                    className="px-1 py-0.5 rounded bg-[#071322] border-l-2 text-[9px] font-tech text-cyan-100 truncate cursor-pointer hover:bg-cyan-900/40"
                   >
                     {it.title}
                   </div>
@@ -910,10 +1115,10 @@ interface ScheduleViewProps {
   date: Date;
   items: CalendarItemDisplay[];
   todayISO: string;
+  onEventClick: (item: CalendarItemDisplay) => void;
 }
 
-const ScheduleView: React.FC<ScheduleViewProps> = ({ date, items, todayISO }) => {
-  // Generate 14-day chronological schedule feed starting from Monday of active week
+const ScheduleView: React.FC<ScheduleViewProps> = ({ date, items, todayISO, onEventClick }) => {
   const monday = getMondayOfWeek(date);
   const daysFeed = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(monday);
@@ -933,7 +1138,6 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ date, items, todayISO }) =>
     };
   });
 
-  // Filter to days that have items or is today
   const activeDays = daysFeed.filter((d) => d.items.length > 0 || d.isToday);
 
   return (
@@ -978,8 +1182,9 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ date, items, todayISO }) =>
                   {d.items.map((it) => (
                     <div
                       key={it.id}
+                      onClick={() => onEventClick(it)}
                       style={{ borderLeftColor: it.color || "#00e5ff" }}
-                      className="px-2.5 py-1.5 rounded bg-[#071322] border-l-2 flex items-center justify-between text-xs font-tech text-cyan-100 shadow-[0_0_6px_rgba(0,229,255,0.1)] hover:bg-cyan-900/30 transition"
+                      className="px-2.5 py-1.5 rounded bg-[#071322] border-l-2 flex items-center justify-between text-xs font-tech text-cyan-100 shadow-[0_0_6px_rgba(0,229,255,0.1)] hover:bg-cyan-900/30 transition cursor-pointer"
                     >
                       <div className="flex items-center gap-2 truncate">
                         {it.isTask && (
@@ -993,8 +1198,8 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ date, items, todayISO }) =>
                       </div>
                       {it.startTime && (
                         <span className="text-[10px] font-mono text-cyan-400/60 ml-3 shrink-0">
-                          {it.startTime}
-                          {it.endTime ? ` - ${it.endTime}` : ""}
+                          {formatTime12(it.startTime)}
+                          {it.endTime ? ` - ${formatTime12(it.endTime)}` : ""}
                         </span>
                       )}
                     </div>

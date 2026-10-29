@@ -12,6 +12,9 @@ import {
   getCalendarHeaderTitle,
   navigateDate,
   CALENDAR_MODES,
+  formatHour12,
+  formatTime12,
+  parse12To24,
 } from "./calendarFormatters";
 
 describe("calendarFormatters", () => {
@@ -136,6 +139,32 @@ describe("calendarFormatters", () => {
     });
   });
 
+  describe("12-hour time formatters", () => {
+    it("formats 24-hour hour numbers to 12-hour AM/PM correctly", () => {
+      expect(formatHour12(0)).toBe("12 AM");
+      expect(formatHour12(1)).toBe("1 AM");
+      expect(formatHour12(11)).toBe("11 AM");
+      expect(formatHour12(12)).toBe("12 PM");
+      expect(formatHour12(13)).toBe("1 PM");
+      expect(formatHour12(23)).toBe("11 PM");
+    });
+
+    it("formats HH:mm 24-hour string to 12-hour time format", () => {
+      expect(formatTime12("09:00")).toBe("9:00 AM");
+      expect(formatTime12("13:30")).toBe("1:30 PM");
+      expect(formatTime12("00:15")).toBe("12:15 AM");
+      expect(formatTime12("12:00")).toBe("12:00 PM");
+      expect(formatTime12("")).toBe("");
+    });
+
+    it("converts 12-hour components back to 24-hour HH:mm string", () => {
+      expect(parse12To24(12, 0, "AM")).toBe("00:00");
+      expect(parse12To24(9, 30, "AM")).toBe("09:30");
+      expect(parse12To24(12, 45, "PM")).toBe("12:45");
+      expect(parse12To24(2, 15, "PM")).toBe("14:15");
+    });
+  });
+
   describe("CALENDAR_MODES", () => {
     it("has all 6 modes with correct shortcuts", () => {
       expect(CALENDAR_MODES.map((m) => m.id)).toEqual([
@@ -150,3 +179,4 @@ describe("calendarFormatters", () => {
     });
   });
 });
+
