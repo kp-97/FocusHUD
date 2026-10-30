@@ -24,6 +24,8 @@ import {
   getMaxRightWidth,
 } from "./stores/layoutStore";
 import { runLegacyStorageMigrationIfNeeded } from "./services/storageMigration";
+import { checkForUpdates, AppUpdateInfo } from "./services/updaterService";
+import { UpdateNotificationToast } from "./components/ui/UpdateNotificationToast";
 
 const SNAP_POINTS = [
   { value: 68, label: "SQUARE ICONS" },
@@ -51,6 +53,18 @@ export default function App() {
   const [snapMode, setSnapMode] = useState<"fluid" | "grid-snap" | "ratio-16-9">("fluid");
   const [activeNav, setActiveNav] = useState<string>("home");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+
+  // Check for updates on startup
+  useEffect(() => {
+    checkForUpdates(false)
+      .then((info) => {
+        if (info && info.available) {
+          setUpdateInfo(info);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Check if opened as dedicated dock window (e.g. ?dock=left or ?dock=right or ?dock=settings)
   const [dockWindowType] = useState<"left" | "right" | "settings" | "full">(() => {
@@ -554,6 +568,15 @@ export default function App() {
           onOpenSettings={handleOpenSettings}
         />
       </div>
+
+      {/* Update Notification Toast */}
+      {updateInfo && updateInfo.available && (
+        <UpdateNotificationToast
+          updateInfo={updateInfo}
+          onOpenSettings={handleOpenSettings}
+          onDismiss={() => setUpdateInfo(null)}
+        />
+      )}
 
       {/* Settings Modal Dialog */}
       <SettingsModal
