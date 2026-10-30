@@ -6,7 +6,7 @@ import { formatTime12 } from "../../../utils/calendarFormatters";
 interface EventEditModalProps {
   initialEvent?: Partial<CalendarEvent>;
   availableNotes: NoteItem[];
-  onSave: (event: CalendarEvent) => void;
+  onSave: (event: CalendarEvent, attachedNoteIds?: string[]) => void;
   onDelete?: (eventId: string) => void;
   onClose: () => void;
   onCreateNote?: (title: string, calendarEventId?: string) => NoteItem;
@@ -129,7 +129,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
       updatedAt: Date.now(),
     };
 
-    onSave(eventToSave);
+    onSave(eventToSave, selectedNoteIds);
   };
 
   const handleCreateAndAttachNote = (titleToCreate?: string) => {

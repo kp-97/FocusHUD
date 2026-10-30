@@ -1,5 +1,5 @@
-import type { GoalNode, TaskItem, ActionPlanNode, CalendarEvent } from "../types/hud";
-import type { DbGoal, DbTask, DbActionPlan, DbCalendarEvent } from "./dbService";
+import type { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NoteItem } from "../types/hud";
+import type { DbGoal, DbTask, DbActionPlan, DbCalendarEvent, DbNote } from "./dbService";
 
 // ========================================================
 // Goals Tree <-> Flat DB Conversion
@@ -214,5 +214,43 @@ export function appEventsToDb(events: CalendarEvent[]): DbCalendarEvent[] {
     color: e.color || "#00e5ff",
     createdAt: e.createdAt || Date.now(),
     updatedAt: e.updatedAt || Date.now(),
+  }));
+}
+
+// ========================================================
+// Notes DB Conversion
+// ========================================================
+
+export function dbNotesToApp(flat: DbNote[]): NoteItem[] {
+  return flat.map((n) => ({
+    id: n.id,
+    parentId: n.parentId,
+    goalId: n.goalId,
+    taskId: n.taskId,
+    actionPlanId: n.actionPlanId,
+    calendarEventId: n.calendarEventId,
+    title: n.title,
+    content: n.content,
+    isPinned: n.isPinned,
+    sortOrder: n.sortOrder,
+    createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
+  }));
+}
+
+export function appNotesToDb(notes: NoteItem[]): DbNote[] {
+  return notes.map((n) => ({
+    id: n.id,
+    parentId: n.parentId ?? null,
+    goalId: n.goalId ?? null,
+    taskId: n.taskId ?? null,
+    actionPlanId: n.actionPlanId ?? null,
+    calendarEventId: n.calendarEventId ?? null,
+    title: n.title,
+    content: n.content,
+    isPinned: !!n.isPinned,
+    sortOrder: n.sortOrder ?? 0,
+    createdAt: n.createdAt || Date.now(),
+    updatedAt: n.updatedAt || Date.now(),
   }));
 }

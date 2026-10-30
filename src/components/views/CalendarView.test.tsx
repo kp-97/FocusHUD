@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { CalendarView } from "./CalendarView";
+import * as dbService from "../../services/dbService";
 
 describe("CalendarView Component", () => {
   beforeEach(() => {
@@ -300,5 +301,50 @@ describe("CalendarView Component", () => {
     expect(fourDaysHeader.className).toContain("sticky");
     expect(fourDaysHeader.className).toContain("top-0");
     expect(fourDaysHeader.className).toContain("z-30");
+  });
+
+  it("fetches notes and tasks from SQLite when running in a Tauri environment (Issue #51)", async () => {
+    vi.spyOn(dbService, "isTauriEnvironment").mockReturnValue(true);
+    vi.spyOn(dbService, "fetchCalendarEvents").mockResolvedValue([]);
+    vi.spyOn(dbService, "fetchNotes").mockResolvedValue([
+      {
+        id: "note-sqlite-1",
+        title: "Engineering Architecture Review",
+        content: "Notes content from SQLite",
+        isPinned: false,
+        sortOrder: 0,
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+      {
+        id: "note-sqlite-2",
+        title: "Release 0.2.0 Checklist",
+        content: "Checklist items",
+        isPinned: false,
+        sortOrder: 1,
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+    ]);
+    vi.spyOn(dbService, "fetchTasks").mockResolvedValue([]);
+
+    render(<CalendarView />);
+
+    // Switch to Day view
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", altKey: true }));
+    });
+
+    // Open creation modal
+    fireEvent.click(screen.getByTestId("day-quarter-10-0"));
+
+    // Focus the note search input to open dropdown
+    const noteSearchInput = screen.getByTestId("note-search-input");
+    fireEvent.focus(noteSearchInput);
+
+    await waitFor(() => {
+      expect(screen.getByText("Engineering Architecture Review")).toBeDefined();
+      expect(screen.getByText("Release 0.2.0 Checklist")).toBeDefined();
+    });
   });
 });
