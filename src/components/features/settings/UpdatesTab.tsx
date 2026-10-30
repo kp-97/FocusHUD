@@ -12,12 +12,15 @@ import {
   downloadAndInstallUpdate,
   relaunchApp,
   snoozeUpdate,
+  getAppCurrentVersion,
+  APP_VERSION,
   AppUpdateInfo,
 } from "../../../services/updaterService";
 
 export const UpdatesTab: React.FC = () => {
   const [isChecking, setIsChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<string>(APP_VERSION);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isReadyToRestart, setIsReadyToRestart] = useState(false);
@@ -25,6 +28,7 @@ export const UpdatesTab: React.FC = () => {
 
   // Check on tab mount
   useEffect(() => {
+    getAppCurrentVersion().then(setCurrentVersion);
     handleCheck(false);
   }, []);
 
@@ -85,7 +89,7 @@ export const UpdatesTab: React.FC = () => {
           </span>
         </div>
         <span className="text-[10px] text-cyan-400/60 uppercase">
-          Current: {updateInfo?.currentVersion || "0.2.0"}
+          Current: {updateInfo?.currentVersion || currentVersion}
         </span>
       </div>
 

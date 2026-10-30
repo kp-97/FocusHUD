@@ -1,4 +1,7 @@
+import packageInfo from "../../package.json";
 import { isTauriEnvironment } from "./dbService";
+
+export const APP_VERSION = packageInfo.version;
 
 export interface AppUpdateInfo {
   available: boolean;
@@ -50,14 +53,31 @@ export function snoozeUpdate(version: string, hours: number = 48): void {
 }
 
 /**
+ * Retrieves the current installed app version dynamically from the Tauri runtime.
+ */
+export async function getAppCurrentVersion(): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      const { getVersion } = await import("@tauri-apps/api/app");
+      return await getVersion();
+    } catch {
+      // Graceful fallback
+    }
+  }
+  return APP_VERSION;
+}
+
+/**
  * Checks whether an update is available via the Tauri updater plugin.
  * Respects snoozed versions unless `force` is set to true.
  */
 export async function checkForUpdates(force = false): Promise<AppUpdateInfo> {
+  const currentVersion = await getAppCurrentVersion();
+
   if (!isTauriEnvironment()) {
     return {
       available: false,
-      currentVersion: "0.2.0 (web preview)",
+      currentVersion: `${currentVersion} (web preview)`,
     };
   }
 
@@ -68,20 +88,20 @@ export async function checkForUpdates(force = false): Promise<AppUpdateInfo> {
     if (!update || !update.available) {
       return {
         available: false,
-        currentVersion: update?.currentVersion || "0.2.0",
+        currentVersion: update?.currentVersion || currentVersion,
       };
     }
 
     if (!force && isUpdateSnoozed(update.version)) {
       return {
         available: false,
-        currentVersion: update.currentVersion,
+        currentVersion: update.currentVersion || currentVersion,
       };
     }
 
     return {
       available: true,
-      currentVersion: update.currentVersion,
+      currentVersion: update.currentVersion || currentVersion,
       version: update.version,
       date: update.date,
       body: update.body || "",
@@ -91,7 +111,7 @@ export async function checkForUpdates(force = false): Promise<AppUpdateInfo> {
     console.warn("Failed to check for updates:", error);
     return {
       available: false,
-      currentVersion: "0.2.0",
+      currentVersion,
     };
   }
 }
