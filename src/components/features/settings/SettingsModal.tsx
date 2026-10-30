@@ -17,6 +17,7 @@ import { NavItemConfig } from "../../../types/hud";
 import { ViewCustomizationTab } from "./ViewCustomizationTab";
 import { PaneLimitsTab } from "./PaneLimitsTab";
 import { AppearanceTab } from "./AppearanceTab";
+import { UpdatesTab } from "./UpdatesTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -177,6 +178,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             onResetDefaults={handleResetDefaults}
             resetSuccess={resetSuccess}
           />
+
+          {/* Software Updates & Build */}
+          <UpdatesTab />
         </div>
 
         {/* Footer */}
