@@ -6,8 +6,10 @@ import {
   treeToTasksFlat,
   dbPlansToTree,
   treeToPlansFlat,
+  dbNotesToApp,
+  appNotesToDb,
 } from "./dbAdapters";
-import type { DbGoal, DbTask, DbActionPlan } from "./dbService";
+import type { DbGoal, DbTask, DbActionPlan, DbNote } from "./dbService";
 
 describe("dbAdapters", () => {
   it("converts flat goals with parentId into nested GoalNode tree and back", () => {
@@ -65,5 +67,34 @@ describe("dbAdapters", () => {
     const backToFlat = treeToPlansFlat(tree);
     expect(backToFlat).toHaveLength(2);
     expect(backToFlat[1].parentId).toBe("p1");
+  });
+
+  it("converts flat db notes to app notes and back", () => {
+    const flatNotes: DbNote[] = [
+      {
+        id: "n1",
+        title: "Test Note",
+        content: "Content 123",
+        calendarEventId: "ev1",
+        isPinned: true,
+        sortOrder: 0,
+        createdAt: 500,
+        updatedAt: 600,
+      },
+    ];
+
+    const appNotes = dbNotesToApp(flatNotes);
+    expect(appNotes).toHaveLength(1);
+    expect(appNotes[0].id).toBe("n1");
+    expect(appNotes[0].title).toBe("Test Note");
+    expect(appNotes[0].calendarEventId).toBe("ev1");
+    expect(appNotes[0].isPinned).toBe(true);
+
+    const backToDb = appNotesToDb(appNotes);
+    expect(backToDb).toHaveLength(1);
+    expect(backToDb[0].id).toBe("n1");
+    expect(backToDb[0].title).toBe("Test Note");
+    expect(backToDb[0].calendarEventId).toBe("ev1");
+    expect(backToDb[0].isPinned).toBe(true);
   });
 });

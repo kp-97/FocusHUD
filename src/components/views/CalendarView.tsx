@@ -34,10 +34,19 @@ import {
   fetchCalendarEvents,
   saveCalendarEvent as persistCalendarEvent,
   deleteCalendarEvent as removeCalendarEvent,
+  fetchNotes,
+  fetchTasks,
+  persistNote,
   onDbChange,
   isTauriEnvironment,
 } from "../../services/dbService";
-import { dbEventsToApp, appEventsToDb } from "../../services/dbAdapters";
+import {
+  dbEventsToApp,
+  appEventsToDb,
+  dbNotesToApp,
+  appNotesToDb,
+  dbTasksToTree,
+} from "../../services/dbAdapters";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 52; // pixels per hour in timetable
@@ -72,7 +81,7 @@ const flattenTasks = (taskList: TaskItem[]): TaskItem[] => {
 
 export const CalendarView: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
-  const [tasks] = useState<TaskItem[]>(loadTasks);
+  const [tasks, setTasks] = useState<TaskItem[]>(loadTasks);
   const [notes, setNotes] = useState<NoteItem[]>(loadNotes);
 
   const [mode, setMode] = useState<CalendarMode>(() => {
@@ -104,8 +113,18 @@ export const CalendarView: React.FC = () => {
     let active = true;
     if (isTauriEnvironment()) {
       fetchCalendarEvents().then((dbEvents) => {
-        if (active && dbEvents.length > 0) {
+        if (active && dbEvents && dbEvents.length > 0) {
           setEvents(dbEventsToApp(dbEvents));
+        }
+      });
+      fetchNotes().then((dbNotes) => {
+        if (active && dbNotes && dbNotes.length > 0) {
+          setNotes(dbNotesToApp(dbNotes));
+        }
+      });
+      fetchTasks().then((dbTasks) => {
+        if (active && dbTasks && dbTasks.length > 0) {
+          setTasks(dbTasksToTree(dbTasks));
         }
       });
     }
@@ -113,11 +132,30 @@ export const CalendarView: React.FC = () => {
     const unlistenPromise = onDbChange((payload) => {
       if (payload.entity === "calendar_events" || payload.entity === "all") {
         fetchCalendarEvents().then((dbEvents) => {
-          if (active) setEvents(dbEventsToApp(dbEvents));
+          if (active && dbEvents) setEvents(dbEventsToApp(dbEvents));
         });
       }
       if (payload.entity === "notes" || payload.entity === "all") {
-        setNotes(loadNotes());
+        if (isTauriEnvironment()) {
+          fetchNotes().then((dbNotes) => {
+            if (active && dbNotes) {
+              setNotes(dbNotesToApp(dbNotes));
+            }
+          });
+        } else {
+          setNotes(loadNotes());
+        }
+      }
+      if (payload.entity === "tasks" || payload.entity === "all") {
+        if (isTauriEnvironment()) {
+          fetchTasks().then((dbTasks) => {
+            if (active && dbTasks) {
+              setTasks(dbTasksToTree(dbTasks));
+            }
+          });
+        } else {
+          setTasks(loadTasks());
+        }
       }
     });
 
@@ -256,7 +294,7 @@ export const CalendarView: React.FC = () => {
   }, [showEvents, showTasks, events, tasks]);
 
   // CRUD Operations
-  const handleSaveEvent = (savedEvent: CalendarEvent) => {
+  const handleSaveEvent = (savedEvent: CalendarEvent, attachedNoteIds?: string[]) => {
     const exists = events.some((e) => e.id === savedEvent.id);
     const updated = exists
       ? events.map((e) => (e.id === savedEvent.id ? savedEvent : e))
@@ -267,6 +305,25 @@ export const CalendarView: React.FC = () => {
 
     if (isTauriEnvironment()) {
       persistCalendarEvent(appEventsToDb([savedEvent])[0]).catch(() => { });
+    }
+
+    if (attachedNoteIds) {
+      let notesChanged = false;
+      const updatedNotes = notes.map((n) => {
+        if (attachedNoteIds.includes(n.id) && n.calendarEventId !== savedEvent.id) {
+          notesChanged = true;
+          return { ...n, calendarEventId: savedEvent.id, updatedAt: Date.now() };
+        } else if (!attachedNoteIds.includes(n.id) && n.calendarEventId === savedEvent.id) {
+          notesChanged = true;
+          return { ...n, calendarEventId: null, updatedAt: Date.now() };
+        }
+        return n;
+      });
+
+      if (notesChanged) {
+        setNotes(updatedNotes);
+        saveNotes(updatedNotes);
+      }
     }
 
     setActiveModalEvent(null);
@@ -296,6 +353,9 @@ export const CalendarView: React.FC = () => {
     const updatedNotes = [newNote, ...notes];
     setNotes(updatedNotes);
     saveNotes(updatedNotes);
+    if (isTauriEnvironment()) {
+      persistNote(appNotesToDb([newNote])[0]).catch(() => {});
+    }
     return newNote;
   };
 
