@@ -12,7 +12,11 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prepare": "simple-git-hooks",
-    "test:ci": "npm run typecheck && npm test && cargo fmt --check --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml"
+    "test:ci": "npm run typecheck && npm test && cargo fmt --check --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml",
+    "bump": "node scripts/bump-version.js",
+    "bump:patch": "node scripts/bump-version.js patch",
+    "bump:minor": "node scripts/bump-version.js minor",
+    "bump:major": "node scripts/bump-version.js major"
   },
   "simple-git-hooks": {
     "pre-commit": "npm run typecheck && npm test"
