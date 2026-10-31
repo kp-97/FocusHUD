@@ -63,25 +63,25 @@ const THEME_POMODORO: Record<string, PomodoroThemeStyle> = {
     stop1: "#fb7185",
     stop2: "#f43f5e",
     stop3: "#ec4899",
-    trackColor: "rgba(244, 63, 94, 0.16)",
-    tickColor: "rgba(244, 63, 94, 0.28)",
-    innerRingColor: "rgba(244, 63, 94, 0.22)",
+    trackColor: "rgba(244, 63, 94, 0.2)",
+    tickColor: "rgba(244, 63, 94, 0.35)",
+    innerRingColor: "rgba(244, 63, 94, 0.25)",
     glowColor: "rgba(244, 63, 94, 0.45)",
     digitsColor: "#831843",
     digitsShadow: "0 2px 8px rgba(244, 63, 94, 0.25)",
-    modeBadgeColor: "text-rose-700",
-    subtextColor: "text-rose-600/80",
-    btnBorder: "border-rose-300 hover:border-rose-400",
+    modeBadgeColor: "text-rose-900 font-extrabold",
+    subtextColor: "text-rose-950 font-bold",
+    btnBorder: "border-rose-300 hover:border-rose-500",
     btnBg: "bg-white/95 hover:bg-rose-50 shadow-sm",
-    btnText: "text-rose-700 hover:text-rose-900",
-    activeBtnBg: "bg-rose-500 hover:bg-rose-600 border border-rose-600 text-white shadow-[0_0_10px_rgba(244,63,94,0.35)]",
-    tallyBg: "bg-white/90 shadow-sm",
-    tallyBorder: "border-rose-200",
-    tallyText: "text-rose-700",
+    btnText: "text-rose-900 hover:text-rose-950 font-bold",
+    activeBtnBg: "bg-rose-500 hover:bg-rose-600 border border-rose-600 text-white font-bold shadow-[0_0_10px_rgba(244,63,94,0.35)]",
+    tallyBg: "bg-white/95 shadow-sm",
+    tallyBorder: "border-rose-300",
+    tallyText: "text-rose-950 font-bold",
     tallyHighlight: "text-rose-950 font-extrabold",
     modalBg: "bg-white/98 shadow-2xl",
     modalBorder: "border-rose-300 shadow-[0_8px_32px_rgba(244,63,94,0.2)]",
-    modalHeaderBg: "border-rose-200 text-rose-800",
+    modalHeaderBg: "border-rose-200 text-rose-950 font-bold",
   },
   amber: {
     stop1: "#ffb000",
@@ -159,25 +159,25 @@ const THEME_POMODORO: Record<string, PomodoroThemeStyle> = {
     stop1: "#0284c7",
     stop2: "#0369a1",
     stop3: "#1d4ed8",
-    trackColor: "rgba(148, 163, 184, 0.22)",
-    tickColor: "rgba(148, 163, 184, 0.35)",
-    innerRingColor: "rgba(148, 163, 184, 0.2)",
+    trackColor: "rgba(148, 163, 184, 0.25)",
+    tickColor: "rgba(148, 163, 184, 0.45)",
+    innerRingColor: "rgba(148, 163, 184, 0.25)",
     glowColor: "rgba(2, 132, 199, 0.35)",
     digitsColor: "#0f172a",
     digitsShadow: "0 1px 4px rgba(15, 23, 42, 0.15)",
-    modeBadgeColor: "text-sky-700",
-    subtextColor: "text-slate-600",
+    modeBadgeColor: "text-sky-900 font-extrabold",
+    subtextColor: "text-slate-900 font-bold",
     btnBorder: "border-slate-300 hover:border-sky-500",
     btnBg: "bg-white hover:bg-slate-100 shadow-sm",
-    btnText: "text-slate-700 hover:text-slate-900",
-    activeBtnBg: "bg-sky-600 hover:bg-sky-700 border border-sky-700 text-white shadow-[0_0_8px_rgba(2,132,199,0.3)]",
+    btnText: "text-slate-900 hover:text-slate-950 font-bold",
+    activeBtnBg: "bg-sky-600 hover:bg-sky-700 border border-sky-700 text-white font-bold shadow-[0_0_8px_rgba(2,132,199,0.3)]",
     tallyBg: "bg-white shadow-sm",
-    tallyBorder: "border-slate-200",
-    tallyText: "text-slate-600",
-    tallyHighlight: "text-slate-900 font-extrabold",
+    tallyBorder: "border-slate-300",
+    tallyText: "text-slate-900 font-bold",
+    tallyHighlight: "text-slate-950 font-extrabold",
     modalBg: "bg-white/98 shadow-2xl",
     modalBorder: "border-slate-300 shadow-xl",
-    modalHeaderBg: "border-slate-200 text-slate-800",
+    modalHeaderBg: "border-slate-200 text-slate-900 font-bold",
   },
   dark: {
     stop1: "#f8fafc",
@@ -669,11 +669,11 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
       {/* 6. Daily Completed Pomodoro & Focus Time Tally */}
       <div className={`w-full flex justify-between items-center rounded px-2 py-1 mt-2 text-[9px] font-tech border ${themeStyle.tallyBg} ${themeStyle.tallyBorder} ${themeStyle.tallyText}`}>
         <span className="flex items-center gap-1">
-          <span className="opacity-70">COMPLETED:</span>
+          <span className="font-semibold">COMPLETED:</span>
           <span className={`font-bold ${themeStyle.tallyHighlight}`}>{dailyStats.completedPomodoros} POMOS</span>
         </span>
         <span className="flex items-center gap-1">
-          <span className="opacity-70">FOCUS:</span>
+          <span className="font-semibold">FOCUS:</span>
           <span className={`font-bold ${themeStyle.tallyHighlight}`}>
             {Math.floor(dailyStats.totalFocusMinutes / 60)}H {dailyStats.totalFocusMinutes % 60}M
           </span>
