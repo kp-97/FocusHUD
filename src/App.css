@@ -172,10 +172,10 @@
     --hud-secondary-rgb: 235, 203, 139;
     --hud-border: rgba(136, 192, 208, 0.25);
     --hud-border-dim: rgba(136, 192, 208, 0.14);
-    --hud-text-primary: #eceff4;
+    --hud-text-primary: #ffffff;
     --hud-text-accent: #88c0d0;
-    --hud-text-muted: #d8dee9;
-    --hud-text-dim: #4c566a;
+    --hud-text-muted: #e5e9f0;
+    --hud-text-dim: #d8dee9;
     --hud-scanlines-opacity: 0.15;
     --hud-btn-bg: rgba(59, 66, 82, 0.75);
     --hud-btn-hover: rgba(136, 192, 208, 0.2);
@@ -673,12 +673,146 @@
   color: #00ff66 !important;
 }
 
+/* Arctic Slate (Nord) High-Contrast Snow White Readability Rules */
 [data-theme="nord"] {
-  color: #eceff4;
+  color: #ffffff;
 }
 
-[data-theme="nord"] [class*="text-cyan-"] {
+[data-theme="nord"] .text-white {
+  color: #ffffff !important;
+}
+
+/* Sidebar navigation buttons in Nord */
+[data-theme="nord"] aside nav .hud-btn {
+  background-color: rgba(59, 66, 82, 0.75) !important;
+  border-color: rgba(136, 192, 208, 0.25) !important;
+  color: #e5e9f0 !important;   /* Bright snow white */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+[data-theme="nord"] aside nav .hud-btn svg {
+  color: #88c0d0 !important;   /* Frost ice blue icon */
+}
+[data-theme="nord"] aside nav .hud-btn:hover {
+  background-color: rgba(67, 76, 94, 0.9) !important;
+  border-color: #88c0d0 !important;
+  color: #ffffff !important;
+}
+[data-theme="nord"] aside nav .hud-btn:hover svg {
+  color: #ffffff !important;
+}
+[data-theme="nord"] aside nav .hud-btn-active {
+  background-color: rgba(136, 192, 208, 0.25) !important;
+  border-color: #88c0d0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(136, 192, 208, 0.35) !important;
+}
+[data-theme="nord"] aside nav .hud-btn-active svg,
+[data-theme="nord"] aside nav .hud-btn-active * {
+  color: #ffffff !important;
+}
+
+/* Sidebar bottom Settings button in Nord */
+[data-theme="nord"] aside .hud-btn {
+  color: #e5e9f0 !important;
+}
+[data-theme="nord"] aside .hud-btn svg {
   color: #88c0d0 !important;
+}
+[data-theme="nord"] aside .hud-btn:hover {
+  color: #ffffff !important;
+}
+
+/* Mode Switcher (MONITORING / NOTES) */
+[data-theme="nord"] aside [class*="bg-black/60"] {
+  background-color: rgba(36, 41, 51, 0.9) !important;
+  border-color: rgba(136, 192, 208, 0.3) !important;
+}
+[data-theme="nord"] aside [class*="bg-black/60"] button:not([class*="bg-cyan-500/20"]) {
+  color: #d8dee9 !important; /* Silver snow white */
+}
+[data-theme="nord"] aside [class*="bg-black/60"] button:hover {
+  color: #ffffff !important;
+}
+[data-theme="nord"] aside [class*="bg-black/60"] [class*="bg-cyan-500/20"] {
+  background-color: rgba(136, 192, 208, 0.3) !important;
+  color: #ffffff !important;
+  border-color: #88c0d0 !important;
+  box-shadow: 0 0 8px rgba(136, 192, 208, 0.3) !important;
+}
+
+/* All shades of white across Nord */
+[data-theme="nord"] [class*="text-cyan-100"],
+[data-theme="nord"] [class*="text-cyan-200"] {
+  color: #ffffff !important; /* Pure white */
+}
+
+[data-theme="nord"] [class*="text-cyan-300"] {
+  color: #eceff4 !important; /* Snow storm white */
+}
+
+[data-theme="nord"] [class*="text-cyan-400"]:not([class*="/"]),
+[data-theme="nord"] [class*="text-cyan-500"]:not([class*="/"]) {
+  color: #88c0d0 !important; /* Frost ice cyan-blue */
+}
+
+[data-theme="nord"] [class*="text-cyan-400/"],
+[data-theme="nord"] [class*="text-cyan-300/"],
+[data-theme="nord"] [class*="text-cyan-200/"],
+[data-theme="nord"] [class*="text-cyan-500/"],
+[data-theme="nord"] [class*="text-cyan-600"],
+[data-theme="nord"] [class*="text-cyan-700"] {
+  color: #e5e9f0 !important; /* Bright snow storm white (Nord5) */
+}
+
+[data-theme="nord"] [class*="text-neutral-"],
+[data-theme="nord"] [class*="text-gray-"],
+[data-theme="nord"] [class*="text-slate-"],
+[data-theme="nord"] [class*="text-zinc-"],
+[data-theme="nord"] [class*="text-stone-"] {
+  color: #d8dee9 !important; /* Silver snow white (Nord4) */
+}
+
+/* Headings and primary typography in Nord */
+[data-theme="nord"] h1,
+[data-theme="nord"] h2,
+[data-theme="nord"] h3,
+[data-theme="nord"] h4,
+[data-theme="nord"] h5,
+[data-theme="nord"] h6 {
+  color: #ffffff !important;
+}
+
+/* Form inputs, textareas, selects in Nord */
+[data-theme="nord"] input,
+[data-theme="nord"] textarea,
+[data-theme="nord"] select {
+  color: #ffffff !important;
+  background-color: #2e3440 !important;
+  border-color: rgba(136, 192, 208, 0.3) !important;
+}
+
+[data-theme="nord"] input::placeholder,
+[data-theme="nord"] textarea::placeholder {
+  color: #d8dee9 !important;
+}
+
+/* Prevent low-opacity washouts on dark slate backgrounds */
+[data-theme="nord"] [class*="opacity-40"],
+[data-theme="nord"] [class*="opacity-50"],
+[data-theme="nord"] [class*="opacity-60"] {
+  opacity: 0.88 !important;
+}
+
+/* Generic unselected hud-btn */
+[data-theme="nord"] .hud-btn:not(.hud-btn-active) {
+  background-color: rgba(59, 66, 82, 0.7) !important;
+  color: #e5e9f0 !important;
+  border-color: rgba(136, 192, 208, 0.25) !important;
+}
+[data-theme="nord"] .hud-btn:not(.hud-btn-active):hover {
+  background-color: rgba(67, 76, 94, 0.85) !important;
+  color: #ffffff !important;
+  border-color: #88c0d0 !important;
 }
 
 [data-theme="dark"] {
