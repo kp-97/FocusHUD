@@ -1,22 +1,194 @@
 @import "tailwindcss";
 
 @layer base {
-  :root {
-    --hud-cyan: #00e5ff;
-    --hud-cyan-dim: #008ba3;
-    --hud-cyan-glow: rgba(0, 229, 255, 0.45);
-    --hud-orange: #ff5722;
-    --hud-amber: #ff9100;
-    --hud-bg-dark: #070d14;
+  :root,
+  [data-theme="cyber"] {
+    --hud-theme: "cyber";
+    --hud-bg-dark: #03070d;
+    --hud-bg-main: #03070d;
+    --hud-bg-panel: #050e18;
     --hud-card-bg: rgba(6, 17, 28, 0.78);
+    --hud-card-solid: #061524;
+    --hud-accent: #00e5ff;
+    --hud-accent-rgb: 0, 229, 255;
+    --hud-accent-dim: #008ba3;
+    --hud-accent-glow: rgba(0, 229, 255, 0.45);
+    --hud-secondary: #ff9100;
+    --hud-secondary-rgb: 255, 145, 0;
     --hud-border: rgba(0, 229, 255, 0.28);
+    --hud-border-dim: rgba(0, 229, 255, 0.15);
+    --hud-text-primary: #c5e1ec;
+    --hud-text-accent: #00e5ff;
+    --hud-text-muted: rgba(0, 229, 255, 0.7);
+    --hud-text-dim: rgba(0, 229, 255, 0.4);
+    --hud-scanlines-opacity: 0.4;
+    --hud-btn-bg: rgba(10, 25, 40, 0.65);
+    --hud-btn-hover: rgba(0, 229, 255, 0.15);
+    --hud-scrollbar-thumb: rgba(0, 229, 255, 0.3);
+    --hud-scrollbar-thumb-hover: rgba(0, 229, 255, 0.6);
+  }
+
+  [data-theme="dark"] {
+    --hud-theme: "dark";
+    --hud-bg-dark: #0a0a0c;
+    --hud-bg-main: #0a0a0c;
+    --hud-bg-panel: #121318;
+    --hud-card-bg: rgba(18, 19, 24, 0.85);
+    --hud-card-solid: #16171d;
+    --hud-accent: #f1f5f9;
+    --hud-accent-rgb: 241, 245, 249;
+    --hud-accent-dim: #94a3b8;
+    --hud-accent-glow: rgba(241, 245, 249, 0.2);
+    --hud-secondary: #64748b;
+    --hud-secondary-rgb: 100, 116, 139;
+    --hud-border: rgba(148, 163, 184, 0.22);
+    --hud-border-dim: rgba(148, 163, 184, 0.12);
+    --hud-text-primary: #f8fafc;
+    --hud-text-accent: #ffffff;
+    --hud-text-muted: #94a3b8;
+    --hud-text-dim: #64748b;
+    --hud-scanlines-opacity: 0.08;
+    --hud-btn-bg: rgba(24, 25, 32, 0.75);
+    --hud-btn-hover: rgba(148, 163, 184, 0.18);
+    --hud-scrollbar-thumb: rgba(148, 163, 184, 0.25);
+    --hud-scrollbar-thumb-hover: rgba(148, 163, 184, 0.5);
+  }
+
+  [data-theme="light"] {
+    --hud-theme: "light";
+    --hud-bg-dark: #f8fafc;
+    --hud-bg-main: #f8fafc;
+    --hud-bg-panel: #ffffff;
+    --hud-card-bg: rgba(255, 255, 255, 0.92);
+    --hud-card-solid: #ffffff;
+    --hud-accent: #0284c7;
+    --hud-accent-rgb: 2, 132, 199;
+    --hud-accent-dim: #0369a1;
+    --hud-accent-glow: rgba(2, 132, 199, 0.25);
+    --hud-secondary: #ea580c;
+    --hud-secondary-rgb: 234, 88, 12;
+    --hud-border: rgba(2, 132, 199, 0.25);
+    --hud-border-dim: rgba(148, 163, 184, 0.25);
+    --hud-text-primary: #0f172a;
+    --hud-text-accent: #0284c7;
+    --hud-text-muted: #475569;
+    --hud-text-dim: #94a3b8;
+    --hud-scanlines-opacity: 0;
+    --hud-btn-bg: rgba(241, 245, 249, 0.9);
+    --hud-btn-hover: rgba(2, 132, 199, 0.12);
+    --hud-scrollbar-thumb: rgba(2, 132, 199, 0.3);
+    --hud-scrollbar-thumb-hover: rgba(2, 132, 199, 0.6);
+  }
+
+  [data-theme="pink"] {
+    --hud-theme: "pink";
+    --hud-bg-dark: #0d0814;
+    --hud-bg-main: #0d0814;
+    --hud-bg-panel: #160c22;
+    --hud-card-bg: rgba(22, 12, 34, 0.82);
+    --hud-card-solid: #1c0f2d;
+    --hud-accent: #ff2a85;
+    --hud-accent-rgb: 255, 42, 133;
+    --hud-accent-dim: #d11266;
+    --hud-accent-glow: rgba(255, 42, 133, 0.45);
+    --hud-secondary: #c084fc;
+    --hud-secondary-rgb: 192, 132, 252;
+    --hud-border: rgba(255, 42, 133, 0.3);
+    --hud-border-dim: rgba(255, 42, 133, 0.15);
+    --hud-text-primary: #fce7f3;
+    --hud-text-accent: #ff2a85;
+    --hud-text-muted: #f472b6;
+    --hud-text-dim: rgba(244, 114, 182, 0.5);
+    --hud-scanlines-opacity: 0.35;
+    --hud-btn-bg: rgba(30, 15, 45, 0.7);
+    --hud-btn-hover: rgba(255, 42, 133, 0.2);
+    --hud-scrollbar-thumb: rgba(255, 42, 133, 0.35);
+    --hud-scrollbar-thumb-hover: rgba(255, 42, 133, 0.7);
+  }
+
+  [data-theme="amber"] {
+    --hud-theme: "amber";
+    --hud-bg-dark: #100d08;
+    --hud-bg-main: #100d08;
+    --hud-bg-panel: #1a140a;
+    --hud-card-bg: rgba(26, 20, 10, 0.82);
+    --hud-card-solid: #21190c;
+    --hud-accent: #ffb000;
+    --hud-accent-rgb: 255, 176, 0;
+    --hud-accent-dim: #cc8c00;
+    --hud-accent-glow: rgba(255, 176, 0, 0.45);
+    --hud-secondary: #ff7700;
+    --hud-secondary-rgb: 255, 119, 0;
+    --hud-border: rgba(255, 176, 0, 0.3);
+    --hud-border-dim: rgba(255, 176, 0, 0.15);
+    --hud-text-primary: #fef3c7;
+    --hud-text-accent: #ffb000;
+    --hud-text-muted: #fbbf24;
+    --hud-text-dim: rgba(251, 191, 36, 0.5);
+    --hud-scanlines-opacity: 0.45;
+    --hud-btn-bg: rgba(35, 26, 12, 0.7);
+    --hud-btn-hover: rgba(255, 176, 0, 0.2);
+    --hud-scrollbar-thumb: rgba(255, 176, 0, 0.35);
+    --hud-scrollbar-thumb-hover: rgba(255, 176, 0, 0.7);
+  }
+
+  [data-theme="nord"] {
+    --hud-theme: "nord";
+    --hud-bg-dark: #242933;
+    --hud-bg-main: #242933;
+    --hud-bg-panel: #2e3440;
+    --hud-card-bg: rgba(46, 52, 64, 0.85);
+    --hud-card-solid: #3b4252;
+    --hud-accent: #88c0d0;
+    --hud-accent-rgb: 136, 192, 208;
+    --hud-accent-dim: #81a1c1;
+    --hud-accent-glow: rgba(136, 192, 208, 0.3);
+    --hud-secondary: #ebcb8b;
+    --hud-secondary-rgb: 235, 203, 139;
+    --hud-border: rgba(136, 192, 208, 0.25);
+    --hud-border-dim: rgba(136, 192, 208, 0.14);
+    --hud-text-primary: #eceff4;
+    --hud-text-accent: #88c0d0;
+    --hud-text-muted: #d8dee9;
+    --hud-text-dim: #4c566a;
+    --hud-scanlines-opacity: 0.15;
+    --hud-btn-bg: rgba(59, 66, 82, 0.75);
+    --hud-btn-hover: rgba(136, 192, 208, 0.2);
+    --hud-scrollbar-thumb: rgba(136, 192, 208, 0.3);
+    --hud-scrollbar-thumb-hover: rgba(136, 192, 208, 0.6);
+  }
+
+  [data-theme="matrix"] {
+    --hud-theme: "matrix";
+    --hud-bg-dark: #020803;
+    --hud-bg-main: #020803;
+    --hud-bg-panel: #061208;
+    --hud-card-bg: rgba(6, 18, 8, 0.82);
+    --hud-card-solid: #091a0c;
+    --hud-accent: #00ff66;
+    --hud-accent-rgb: 0, 255, 102;
+    --hud-accent-dim: #00cc52;
+    --hud-accent-glow: rgba(0, 255, 102, 0.45);
+    --hud-secondary: #a3e635;
+    --hud-secondary-rgb: 163, 230, 53;
+    --hud-border: rgba(0, 255, 102, 0.28);
+    --hud-border-dim: rgba(0, 255, 102, 0.14);
+    --hud-text-primary: #dcfce7;
+    --hud-text-accent: #00ff66;
+    --hud-text-muted: #4ade80;
+    --hud-text-dim: rgba(74, 222, 128, 0.4);
+    --hud-scanlines-opacity: 0.5;
+    --hud-btn-bg: rgba(8, 26, 11, 0.7);
+    --hud-btn-hover: rgba(0, 255, 102, 0.2);
+    --hud-scrollbar-thumb: rgba(0, 255, 102, 0.35);
+    --hud-scrollbar-thumb-hover: rgba(0, 255, 102, 0.7);
   }
 
   html, body, #root {
     margin: 0;
     padding: 0;
     background-color: transparent;
-    color: #c5e1ec;
+    color: var(--hud-text-primary);
     font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     user-select: none;
@@ -50,19 +222,20 @@
   );
   background-size: 100% 3px, 6px 100%;
   pointer-events: none;
+  opacity: var(--hud-scanlines-opacity, 0.4);
 }
 
-/* Cyber Glow Utilities */
+/* Theme Glow Utilities */
 .hud-glow-cyan {
-  text-shadow: 0 0 8px rgba(0, 229, 255, 0.7), 0 0 20px rgba(0, 229, 255, 0.35);
+  text-shadow: 0 0 8px var(--hud-accent-glow), 0 0 20px var(--hud-accent-glow);
 }
 
 .hud-box-glow {
-  box-shadow: 0 0 15px rgba(0, 229, 255, 0.18), inset 0 0 15px rgba(0, 229, 255, 0.06);
+  box-shadow: 0 0 15px var(--hud-border-dim), inset 0 0 15px var(--hud-border-dim);
 }
 
 .hud-box-glow-intense {
-  box-shadow: 0 0 25px rgba(0, 229, 255, 0.35), inset 0 0 20px rgba(0, 229, 255, 0.15);
+  box-shadow: 0 0 25px var(--hud-accent-glow), inset 0 0 20px var(--hud-border-dim);
 }
 
 .hud-timer-glow {
@@ -75,42 +248,42 @@
   height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0, 25, 40, 0.5);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 229, 255, 0.3);
+  background: var(--hud-scrollbar-thumb);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 229, 255, 0.6);
+  background: var(--hud-scrollbar-thumb-hover);
 }
 
 /* HUD Button with Sci-fi Chamfer */
 .hud-btn {
   position: relative;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  background: rgba(10, 25, 40, 0.65);
-  border: 1px solid rgba(0, 229, 255, 0.25);
+  background: var(--hud-btn-bg);
+  border: 1px solid var(--hud-border);
   backdrop-filter: blur(8px);
 }
 .hud-btn:hover {
-  background: rgba(0, 229, 255, 0.15);
-  border-color: rgba(0, 229, 255, 0.7);
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+  background: var(--hud-btn-hover);
+  border-color: var(--hud-accent);
+  box-shadow: 0 0 12px var(--hud-accent-glow);
   transform: translateX(2px);
 }
 .hud-btn-active {
-  background: rgba(0, 229, 255, 0.22);
-  border-color: #00e5ff;
-  box-shadow: 0 0 16px rgba(0, 229, 255, 0.4), inset 0 0 10px rgba(0, 229, 255, 0.2);
+  background: var(--hud-btn-hover);
+  border-color: var(--hud-accent);
+  box-shadow: 0 0 16px var(--hud-accent-glow), inset 0 0 10px var(--hud-accent-glow);
 }
 
 /* HUD Panel Outer Frame */
 .hud-panel {
-  background: radial-gradient(circle at 50% 0%, rgba(9, 32, 53, 0.55) 0%, rgba(5, 14, 24, 0.88) 100%);
-  border: 1px solid rgba(0, 229, 255, 0.22);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 229, 255, 0.08);
+  background: var(--hud-card-bg);
+  border: 1px solid var(--hud-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--hud-border-dim);
   backdrop-filter: blur(12px);
 }
 
