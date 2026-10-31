@@ -136,11 +136,18 @@ describe("SettingsModal component", () => {
     expect(screen.getByText(/HUD THEME & PALETTE/i)).toBeInTheDocument();
     expect(screen.queryByText(/NAVIGATION VIEWS & ORDERING/i)).not.toBeInTheDocument();
 
+    // Click EDITOR & SPELLCHECK tab
+    const editorTabBtn = screen.getByRole("button", { name: "EDITOR & SPELLCHECK" });
+    fireEvent.click(editorTabBtn);
+    expect(screen.getByText(/SPELLCHECK & DICTIONARY/i)).toBeInTheDocument();
+    expect(screen.queryByText(/NAVIGATION VIEWS & ORDERING/i)).not.toBeInTheDocument();
+
     // Click ALL tab
     const allTabBtn = screen.getByRole("button", { name: "ALL" });
     fireEvent.click(allTabBtn);
     expect(screen.getByText(/NAVIGATION VIEWS & ORDERING/i)).toBeInTheDocument();
     expect(screen.getByText(/HUD THEME & PALETTE/i)).toBeInTheDocument();
+    expect(screen.getByText(/SPELLCHECK & DICTIONARY/i)).toBeInTheDocument();
   });
 
   it("closes modal on Done or close button click", () => {

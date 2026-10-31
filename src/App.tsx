@@ -6,6 +6,7 @@ import { ResizeHandle } from "./components/layout/ResizeHandle";
 import { TopNavHUD } from "./components/layout/TopNavHUD";
 import { SettingsModal } from "./components/features/settings/SettingsModal";
 import { useTheme } from "./stores/themeStore";
+import { useSpellcheck } from "./stores/spellcheckStore";
 import {
   updateDockSizes,
   restoreWorkArea,
@@ -39,8 +40,9 @@ const MIN_LEFT_WIDTH = 68;
 const MIN_MIDDLE_WIDTH = 340;
 
 export default function App() {
-  // Initialize and synchronize HUD multi-theme engine
+  // Initialize and synchronize HUD multi-theme engine and spellcheck dictionary
   useTheme();
+  useSpellcheck();
 
   const [leftWidth, setLeftWidth] = useState<number>(() => {
     const saved = localStorage.getItem("hud_left_width");
