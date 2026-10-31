@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { Lock, Unlock, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useTheme } from "../../../stores/themeStore";
 
 export interface TreeNode3D {
   id: string;
@@ -29,9 +30,11 @@ interface SpatialNode {
 export const Tree3DView: React.FC<Tree3DViewProps> = ({
   data,
   height = "100%",
-  accentColor = "#00e5ff",
+  accentColor: customAccent,
   onSelectNode,
 }) => {
+  const { themeConfig } = useTheme();
+  const accentColor = customAccent || themeConfig.accentColor || "#00e5ff";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 

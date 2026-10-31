@@ -5,6 +5,7 @@ import { CenterWorkspace } from "./components/layout/CenterWorkspace";
 import { ResizeHandle } from "./components/layout/ResizeHandle";
 import { TopNavHUD } from "./components/layout/TopNavHUD";
 import { SettingsModal } from "./components/features/settings/SettingsModal";
+import { useTheme } from "./stores/themeStore";
 import {
   updateDockSizes,
   restoreWorkArea,
@@ -38,6 +39,9 @@ const MIN_LEFT_WIDTH = 68;
 const MIN_MIDDLE_WIDTH = 340;
 
 export default function App() {
+  // Initialize and synchronize HUD multi-theme engine
+  useTheme();
+
   const [leftWidth, setLeftWidth] = useState<number>(() => {
     const saved = localStorage.getItem("hud_left_width");
     return saved ? Math.round(Number(saved)) : 280;
@@ -497,7 +501,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#03070d] text-cyan-200 select-none relative font-hud">
       {/* Subtle futuristic scanline overlay across whole UI */}
-      <div className="absolute inset-0 scanlines pointer-events-none z-50 opacity-40" />
+      <div className="absolute inset-0 scanlines pointer-events-none z-50" />
 
       {/* Top HUD control toolbar */}
       <TopNavHUD

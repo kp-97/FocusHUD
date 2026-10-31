@@ -284,7 +284,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({ show3D = true }) => {
           </div>
 
           <div className="flex-1 w-full min-h-0 relative">
-            <Tree3DView data={goals} accentColor="#00e5ff" />
+            <Tree3DView data={goals} />
           </div>
         </div>
       )}
