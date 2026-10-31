@@ -55,3 +55,4 @@ describe("DayView Component", () => {
     expect(onEventClick).toHaveBeenCalledWith(dummyItems[0]);
   });
 });
+

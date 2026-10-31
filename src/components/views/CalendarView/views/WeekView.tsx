@@ -222,3 +222,4 @@ export const WeekView: React.FC<WeekViewProps> = ({
     </div>
   );
 };
+

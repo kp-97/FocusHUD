@@ -221,3 +221,4 @@ export const FourDaysView: React.FC<FourDaysViewProps> = ({
     </div>
   );
 };
+

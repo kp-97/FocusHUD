@@ -89,3 +89,4 @@ describe("CalendarHeader Component", () => {
     expect(setShowTasks).toHaveBeenCalled();
   });
 });
+

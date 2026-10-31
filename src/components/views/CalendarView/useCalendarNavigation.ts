@@ -102,3 +102,4 @@ export function useCalendarNavigation(options: UseCalendarNavigationOptions = {}
     jumpToDay,
   };
 }
+

@@ -12,3 +12,4 @@ export interface CalendarItemDisplay {
   completed?: boolean;
   originalEvent?: CalendarEvent;
 }
+

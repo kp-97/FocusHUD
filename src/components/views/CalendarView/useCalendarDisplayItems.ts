@@ -62,3 +62,4 @@ export function useCalendarDisplayItems(
     return list;
   }, [showEvents, showTasks, events, tasks]);
 }
+

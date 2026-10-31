@@ -90,3 +90,4 @@ describe("useCalendarNavigation", () => {
     expect(result.current.mode).toBe("week");
   });
 });
+

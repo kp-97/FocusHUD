@@ -52,3 +52,4 @@ describe("FourDaysView Component", () => {
     expect(onEventClick).toHaveBeenCalledWith(dummyItems[0]);
   });
 });
+
