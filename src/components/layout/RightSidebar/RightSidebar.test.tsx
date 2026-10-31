@@ -113,6 +113,34 @@ describe("RightSidebar component", () => {
     expect(screen.queryByTitle(/Expand Right Panel/i)).not.toBeInTheDocument();
   });
 
+  it("ignores premature blur events on compact rail hamburger menu during focus shifts and closes on legitimate outside-click", () => {
+    vi.useFakeTimers();
+    try {
+      render(<RightSidebar width={68} activeNav="home" />);
+      const menuBtn = screen.getByLabelText(/System Menu/i);
+      act(() => {
+        fireEvent.click(menuBtn);
+      });
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+
+      // Premature blur (< 250ms) ignored (Issue #42)
+      act(() => {
+        window.dispatchEvent(new Event("blur"));
+      });
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+
+      // Outside click after immunity closes menu
+      act(() => {
+        vi.advanceTimersByTime(150);
+        fireEvent.mouseDown(document.body);
+      });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("right", false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("stacks the pause and cancel buttons vertically when running in compact rail", () => {
     render(<RightSidebar width={68} activeNav="home" />);
     const playBtn = screen.getByTitle(/Start Focus Timer/i);

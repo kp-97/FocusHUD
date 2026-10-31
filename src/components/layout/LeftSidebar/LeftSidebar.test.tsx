@@ -104,38 +104,60 @@ describe("LeftSidebar component", () => {
   });
 
   it("closes hamburger menu when clicking outside or when window blurs", () => {
-    render(
-      <LeftSidebar
-        width={280}
-        activeNav="home"
-        onSelectNav={vi.fn()}
-      />
-    );
+    vi.useFakeTimers();
+    try {
+      render(
+        <LeftSidebar
+          width={280}
+          activeNav="home"
+          onSelectNav={vi.fn()}
+        />
+      );
 
-    const menuBtn = screen.getByLabelText("System Menu");
-    act(() => {
-      fireEvent.click(menuBtn);
-    });
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", true);
+      const menuBtn = screen.getByLabelText("System Menu");
+      act(() => {
+        fireEvent.click(menuBtn);
+      });
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+      expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", true);
 
-    // Click outside
-    act(() => {
-      fireEvent.mouseDown(document.body);
-    });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+      // Premature blur during focus shift / geometry transition (< 250ms) is ignored (Issue #42)
+      act(() => {
+        window.dispatchEvent(new Event("blur"));
+      });
+      expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    // Reopen and test window blur
-    act(() => {
-      fireEvent.click(menuBtn);
-    });
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-    act(() => {
-      window.dispatchEvent(new Event("blur"));
-    });
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+      // Click outside after opening immunity window closes menu
+      act(() => {
+        vi.advanceTimersByTime(150);
+        fireEvent.mouseDown(document.body);
+      });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+
+      // Reopen and test window blur after opening transition
+      act(() => {
+        fireEvent.click(menuBtn);
+      });
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+
+      // Blur during initial 250ms is ignored
+      act(() => {
+        vi.advanceTimersByTime(100);
+        window.dispatchEvent(new Event("blur"));
+      });
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+
+      // Blur after 250ms closes menu
+      act(() => {
+        vi.advanceTimersByTime(200);
+        window.dispatchEvent(new Event("blur"));
+      });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders compact mode with dual toggle button and bottom settings button when width < 120", () => {
