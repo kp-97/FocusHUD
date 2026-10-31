@@ -49,4 +49,4 @@ jobs:
           releaseName: "FocusHUD ${{ github.ref_name }}"
           releaseBody: "Automated release of FocusHUD ${{ github.ref_name }}"
           releaseDraft: false
-          prerelease: true
+          prerelease: false
