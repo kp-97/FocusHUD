@@ -353,4 +353,19 @@ describe("NotesView Component", () => {
     expect(textarea.selectionStart).toBe(10);
     expect(document.activeElement).toBe(textarea);
   });
+
+  it("inserts table template when clicking table button in editor toolbar", async () => {
+    render(<NotesView />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("First Scratchpad")).toBeInTheDocument();
+    });
+
+    const tableButton = screen.getByTitle(/Table \(\| col \| col \|\)/i);
+    fireEvent.click(tableButton);
+
+    const textarea = screen.getByPlaceholderText(/Type notes here/i) as HTMLTextAreaElement;
+    expect(textarea.value).toContain("| Column 1 | Column 2 | Column 3 |");
+    expect(textarea.value).toContain("| :--- | :---: | ---: |");
+  });
 });
