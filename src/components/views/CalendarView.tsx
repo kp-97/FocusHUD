@@ -345,7 +345,7 @@ export const CalendarView: React.FC = () => {
   return (
     <div className="h-full w-full flex flex-col bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none">
       {/* ================= HEADER BAR ================= */}
-      <div className="h-14 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-[#050b14] z-20">
+      <div className="h-14 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-[#050b14] relative z-40">
         {/* Left Navigation Controls */}
         <div className="flex items-center gap-3">
           <button
@@ -384,9 +384,9 @@ export const CalendarView: React.FC = () => {
         </div>
 
         {/* Right Controls: Mode Dropdown + Independent Events/Tasks Toggles */}
-        <div className="flex items-center gap-2 relative">
+        <div className="flex items-center gap-2 relative z-50">
           {/* View Mode Switcher Dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative z-50" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen((prev) => !prev)}
               data-testid="mode-dropdown-button"
@@ -456,7 +456,7 @@ export const CalendarView: React.FC = () => {
       </div>
 
       {/* ================= VIEW BODY ================= */}
-      <div className="flex-1 min-h-0 overflow-hidden relative">
+      <div className="flex-1 min-h-0 overflow-hidden relative z-10">
         {mode === "day" && (
           <DayView
             date={currentDate}

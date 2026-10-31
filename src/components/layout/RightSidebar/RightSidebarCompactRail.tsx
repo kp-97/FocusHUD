@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
+import { Play, Pause, RotateCcw, Check, Menu, Square } from "lucide-react";
 import { usePomodoro } from "../../../stores/pomodoroStore";
-import { exitApp, setDockPopoutMode } from "../../../services/tauriBridge";
+import { setDockPopoutMode } from "../../../services/tauriBridge";
+import { useTheme } from "../../../stores/themeStore";
+import { SystemMenuDropdown } from "../LeftSidebar/SystemMenuDropdown";
 
 interface RightSidebarCompactRailProps {
   onExpand?: () => void;
   onMaximizePanes?: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = ({
   onOpenSettings,
 }) => {
+  const { themeConfig } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isMenuOpenRef = useRef(isMenuOpen);
   isMenuOpenRef.current = isMenuOpen;
@@ -82,6 +85,10 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   // Mini gauge calculations
+  const accent = themeConfig?.accentColor || "#ff9100";
+  const isLightOrPink = themeConfig?.category === "light";
+  const timerTextColor = isLightOrPink ? "var(--hud-text-primary)" : "#ffffff";
+
   const radius = 17;
   const strokeWidth = 3;
   const circumference = 2 * Math.PI * radius;
@@ -97,8 +104,12 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
           <div className="w-full flex items-center justify-between h-7 px-1 text-amber-500/60">
             <div className="flex items-center gap-1">
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isRunning ? "bg-amber-400 animate-ping shadow-[0_0_6px_#ffb300]" : "bg-neutral-600"
+                className={`w-1.5 h-1.5 rounded-full ${isRunning ? "animate-ping shadow-sm" : "bg-neutral-600"
                   }`}
+                style={{
+                  backgroundColor: isRunning ? accent : undefined,
+                  boxShadow: isRunning ? `0 0 6px ${accent}` : undefined,
+                }}
                 title={isRunning ? "Timer Active" : "Timer Standby"}
               />
             </div>
@@ -109,7 +120,8 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               title="System Menu"
               aria-label="System Menu"
               aria-expanded={isMenuOpen}
-              className="text-amber-400/80 hover:text-amber-200 hover:scale-110 transition p-1 cursor-pointer"
+              className="hover:scale-110 transition p-1 cursor-pointer"
+              style={{ color: isLightOrPink ? "var(--hud-text-primary)" : accent }}
             >
               <Menu className="w-3.5 h-3.5" />
             </button>
@@ -117,84 +129,13 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
         </div>
 
         {/* Floating Hamburger Dropdown Menu in Compact Rail (Spills left into the center pane) */}
-        {isMenuOpen && (
-          <div
-            ref={menuRef}
-            className="absolute top-1 right-[calc(100%+20px)] w-52 bg-[#040d1a]/95 backdrop-blur-md border border-amber-500/40 rounded-lg shadow-[0_0_20px_rgba(255,179,0,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150"
-            role="menu"
-            aria-label="System Menu"
-          >
-            {/* Pointing notch back to sidebar */}
-            <div className="absolute -right-1.5 top-3 w-2.5 h-2.5 bg-[#040d1a] rotate-45 border-r border-t border-amber-500/50" />
-            <div className="px-2.5 py-1 text-[9px] font-tech text-amber-400/60 uppercase tracking-widest border-b border-amber-500/20">
-              SYSTEM MENU
-            </div>
-
-            {/* 1. Settings */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-                if (onOpenSettings) onOpenSettings();
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <Settings className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">SETTINGS</span>
-                <span className="text-[9px] font-tech text-amber-400/70">Preferences & Panes</span>
-              </div>
-            </button>
-
-            {/* 2. Themes */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">THEMES</span>
-                <span className="text-[9px] font-tech text-amber-400/70">Cyberpunk Themes</span>
-              </div>
-            </button>
-
-            {/* 3. Extensions */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <Puzzle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">EXTENSIONS</span>
-                <span className="text-[9px] font-tech text-amber-400/70">Plugins & Integrations</span>
-              </div>
-            </button>
-
-            <div className="my-0.5 border-t border-amber-500/20" />
-
-            {/* 4. Log out */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-                exitApp();
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-red-400/80 hover:text-red-300 hover:bg-red-500/15 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">LOG OUT</span>
-                <span className="text-[9px] font-tech text-red-400/60">Lock HUD & Exit</span>
-              </div>
-            </button>
-          </div>
-        )}
+        <SystemMenuDropdown
+          isOpen={isMenuOpen}
+          menuRef={menuRef}
+          onClose={() => setIsMenuOpen(false)}
+          onOpenSettings={onOpenSettings}
+          side="right"
+        />
       </div>
 
       {/* 2. Mini Ring Gauge & Countdown */}
@@ -206,7 +147,8 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               cx="22"
               cy="22"
               r={radius}
-              stroke="rgba(255, 145, 0, 0.15)"
+              stroke={accent}
+              strokeOpacity={0.18}
               strokeWidth={strokeWidth}
               fill="transparent"
             />
@@ -215,27 +157,33 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               cx="22"
               cy="22"
               r={radius}
-              stroke="#ff9100"
+              stroke={accent}
               strokeWidth={strokeWidth + 0.5}
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
               fill="transparent"
               className="transition-all duration-300"
-              style={{ filter: "drop-shadow(0 0 4px #ff9100)" }}
+              style={{ filter: `drop-shadow(0 0 4px ${accent})` }}
             />
           </svg>
 
           {/* Centered Monospace Time (Short Form) */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-tech text-[10px] font-bold text-amber-200 tracking-tighter">
+            <span
+              className="font-tech text-[10px] font-bold tracking-tighter"
+              style={{ color: timerTextColor }}
+            >
               {minutes}m
             </span>
           </div>
         </div>
 
         {/* Precise MM:SS text */}
-        <div className="text-[11px] font-tech font-bold tracking-tight text-amber-200/90 mt-1">
+        <div
+          className="text-[11px] font-tech font-bold tracking-tight mt-1"
+          style={{ color: timerTextColor }}
+        >
           {timeFormatted}
         </div>
       </div>

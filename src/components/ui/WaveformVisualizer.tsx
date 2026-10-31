@@ -1,5 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Edit2, Check } from "lucide-react";
+import { useTheme } from "../../stores/themeStore";
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  let r = 0,
+    g = 229,
+    b = 255;
+  if (clean.length === 3) {
+    r = parseInt(clean[0] + clean[0], 16);
+    g = parseInt(clean[1] + clean[1], 16);
+    b = parseInt(clean[2] + clean[2], 16);
+  } else if (clean.length === 6) {
+    r = parseInt(clean.substring(0, 2), 16);
+    g = parseInt(clean.substring(2, 4), 16);
+    b = parseInt(clean.substring(4, 6), 16);
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 interface WaveformVisualizerProps {
   isCompact?: boolean;
@@ -17,6 +35,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   voiceAmplitude = 1.0,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const { themeConfig } = useTheme();
+  const accentColor = themeConfig.accentColor || "#00e5ff";
 
   // Assistant name state (persisted in localStorage)
   const [name, setName] = useState<string>(() => {
@@ -62,6 +83,10 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     let animationFrameId: number;
     let phase = 0;
 
+    const gridColor = hexToRgba(accentColor, 0.08);
+    const baselineColor = hexToRgba(accentColor, 0.22);
+    const harmonicColor = hexToRgba(accentColor, 0.38);
+
     const render = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -70,7 +95,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       const centerY = height / 2;
 
       // Draw subtle background grid
-      ctx.strokeStyle = "rgba(0, 229, 255, 0.08)";
+      ctx.strokeStyle = gridColor;
       ctx.lineWidth = 1;
       for (let x = 0; x < width; x += 16) {
         ctx.beginPath();
@@ -86,7 +111,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       }
 
       // Center baseline
-      ctx.strokeStyle = "rgba(0, 229, 255, 0.22)";
+      ctx.strokeStyle = baselineColor;
       ctx.beginPath();
       ctx.moveTo(0, centerY);
       ctx.lineTo(width, centerY);
@@ -94,9 +119,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
       if (!isVoiceActive) {
         // Flat waveform line across the center (voice agent will animate when speaking)
-        ctx.strokeStyle = "#00e5ff";
+        ctx.strokeStyle = accentColor;
         ctx.lineWidth = 1.6;
-        ctx.shadowColor = "#00e5ff";
+        ctx.shadowColor = accentColor;
         ctx.shadowBlur = 8;
         ctx.beginPath();
         ctx.moveTo(0, centerY);
@@ -109,9 +134,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       const ampMultiplier = voiceAmplitude;
 
       // Main active waveform
-      ctx.strokeStyle = "#00e5ff";
+      ctx.strokeStyle = accentColor;
       ctx.lineWidth = 1.8;
-      ctx.shadowColor = "#00e5ff";
+      ctx.shadowColor = accentColor;
       ctx.shadowBlur = 10;
       ctx.beginPath();
 
@@ -132,7 +157,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       ctx.stroke();
 
       // Second harmonic wave
-      ctx.strokeStyle = "rgba(0, 229, 255, 0.38)";
+      ctx.strokeStyle = harmonicColor;
       ctx.lineWidth = 1;
       ctx.shadowBlur = 2;
       ctx.beginPath();
@@ -154,7 +179,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isVoiceActive, voiceAmplitude]);
+  }, [isVoiceActive, voiceAmplitude, accentColor]);
 
   return (
     <div className="relative w-full rounded bg-cyan-950/20 border border-cyan-500/20 p-2 overflow-hidden">

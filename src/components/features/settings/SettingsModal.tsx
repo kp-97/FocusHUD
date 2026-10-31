@@ -24,6 +24,7 @@ interface SettingsModalProps {
   onClose: () => void;
   onResetWidths?: () => void;
   isStandalone?: boolean;
+  initialTab?: string;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -31,7 +32,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onResetWidths,
   isStandalone = false,
+  initialTab = "all",
 }) => {
+  const [activeTab, setActiveTab] = useState<string>(() => initialTab || "all");
   const [resetSuccess, setResetSuccess] = useState<boolean>(false);
   const [navResetSuccess, setNavResetSuccess] = useState<boolean>(false);
   const [limitsApplied, setLimitsApplied] = useState<boolean>(false);
@@ -42,6 +45,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setActiveTab(initialTab || "all");
       setResetSuccess(false);
       setNavResetSuccess(false);
       setLimitsApplied(false);
@@ -49,7 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setMaxLeft(getMaxLeftWidth());
       setMaxRight(getMaxRightWidth());
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,36 +155,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
+        {/* Category Filter Tabs */}
+        <div className="flex items-center gap-1.5 pb-2.5 mb-2 border-b border-cyan-500/20 overflow-x-auto shrink-0 select-none">
+          {[
+            { id: "all", label: "ALL" },
+            { id: "appearance", label: "THEMES & PALETTE" },
+            { id: "views", label: "VIEWS" },
+            { id: "limits", label: "LIMITS" },
+            { id: "updates", label: "UPDATES" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`hud-btn px-2.5 py-1 rounded text-[10.5px] font-tech uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === tab.id
+                  ? "hud-btn-active text-cyan-100 border-cyan-400"
+                  : "text-cyan-400/70 hover:text-cyan-200 border-cyan-500/30"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Scrollable Body Content with Tabs */}
         <div className="space-y-4 text-xs font-tech overflow-y-auto flex-1 pr-1">
           {/* View Customization */}
-          <ViewCustomizationTab
-            navConfig={navConfig}
-            onToggleVisibility={handleToggleVisibility}
-            onMoveUp={handleMoveUp}
-            onMoveDown={handleMoveDown}
-            onResetNav={handleResetNav}
-            navResetSuccess={navResetSuccess}
-          />
+          {(activeTab === "all" || activeTab === "views") && (
+            <ViewCustomizationTab
+              navConfig={navConfig}
+              onToggleVisibility={handleToggleVisibility}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onResetNav={handleResetNav}
+              navResetSuccess={navResetSuccess}
+            />
+          )}
 
           {/* Pane Limits */}
-          <PaneLimitsTab
-            maxLeft={maxLeft}
-            maxRight={maxRight}
-            onChangeMaxLeft={setMaxLeft}
-            onChangeMaxRight={setMaxRight}
-            onApplyLimits={handleApplyLimits}
-            limitsApplied={limitsApplied}
-          />
+          {(activeTab === "all" || activeTab === "limits") && (
+            <PaneLimitsTab
+              maxLeft={maxLeft}
+              maxRight={maxRight}
+              onChangeMaxLeft={setMaxLeft}
+              onChangeMaxRight={setMaxRight}
+              onApplyLimits={handleApplyLimits}
+              limitsApplied={limitsApplied}
+            />
+          )}
 
           {/* Sizing Memory & Appearance */}
-          <AppearanceTab
-            onResetDefaults={handleResetDefaults}
-            resetSuccess={resetSuccess}
-          />
+          {(activeTab === "all" || activeTab === "appearance") && (
+            <AppearanceTab
+              onResetDefaults={handleResetDefaults}
+              resetSuccess={resetSuccess}
+            />
+          )}
 
           {/* Software Updates & Build */}
-          <UpdatesTab />
+          {(activeTab === "all" || activeTab === "updates") && <UpdatesTab />}
         </div>
 
         {/* Footer */}

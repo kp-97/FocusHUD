@@ -129,6 +129,20 @@ describe("SettingsModal component", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders specific tab when initialTab is provided and switches tabs on click", () => {
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} initialTab="appearance" />);
+
+    // In appearance tab, themes section is visible but navigation views is filtered out
+    expect(screen.getByText(/HUD THEME & PALETTE/i)).toBeInTheDocument();
+    expect(screen.queryByText(/NAVIGATION VIEWS & ORDERING/i)).not.toBeInTheDocument();
+
+    // Click ALL tab
+    const allTabBtn = screen.getByRole("button", { name: "ALL" });
+    fireEvent.click(allTabBtn);
+    expect(screen.getByText(/NAVIGATION VIEWS & ORDERING/i)).toBeInTheDocument();
+    expect(screen.getByText(/HUD THEME & PALETTE/i)).toBeInTheDocument();
+  });
+
   it("closes modal on Done or close button click", () => {
     const handleClose = vi.fn();
     render(<SettingsModal isOpen={true} onClose={handleClose} />);
