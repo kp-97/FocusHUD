@@ -1,5 +1,56 @@
 import React from "react";
 
+export function splitTableRow(row: string): string[] {
+  let trimmed = row.trim();
+  if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, -1);
+
+  const cells: string[] = [];
+  let current = "";
+  let escaped = false;
+  let inBacktick = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    if (char === "\\" && !escaped) {
+      escaped = true;
+      current += char;
+      continue;
+    }
+    if (char === "`" && !escaped) {
+      inBacktick = !inBacktick;
+      current += char;
+      continue;
+    }
+    if (char === "|" && !escaped && !inBacktick) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+    escaped = false;
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+export function isDelimiterRow(row: string): boolean {
+  const trimmed = row.trim();
+  if (!trimmed.includes("-") || !trimmed.includes("|")) return false;
+  const cells = splitTableRow(trimmed);
+  if (cells.length === 0) return false;
+  return cells.every((c) => /^\s*:?-+:?\s*$/.test(c));
+}
+
+export function parseAlignment(delimiterCell: string): "left" | "center" | "right" {
+  const trimmed = delimiterCell.trim();
+  const leftColon = trimmed.startsWith(":");
+  const rightColon = trimmed.endsWith(":");
+  if (leftColon && rightColon) return "center";
+  if (rightColon) return "right";
+  return "left";
+}
+
 interface MarkdownPreviewProps {
   content: string;
   onToggleChecklist?: (lineIndex: number) => void;
@@ -117,6 +168,83 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
     if (inCodeBlock) {
       codeBlockLines.push(line);
       continue;
+    }
+
+    // GFM Table: Check if current line and next line form a valid table header and delimiter row
+    if (
+      line.includes("|") &&
+      idx + 1 < lines.length &&
+      lines[idx + 1].includes("|") &&
+      isDelimiterRow(lines[idx + 1])
+    ) {
+      const headerCells = splitTableRow(line);
+      const delimCells = splitTableRow(lines[idx + 1]);
+
+      if (headerCells.length > 0 && delimCells.length === headerCells.length) {
+        const alignments = delimCells.map(parseAlignment);
+        const dataRows: string[][] = [];
+        let tableEndIdx = idx + 1;
+
+        for (let r = idx + 2; r < lines.length; r++) {
+          const rowLine = lines[r];
+          const trimmedRow = rowLine.trim();
+
+          if (!trimmedRow) break;
+          if (trimmedRow.startsWith("```")) break;
+          if (/^(\s*[-*_]\s*){3,}$/.test(trimmedRow)) break;
+          if (trimmedRow.startsWith("#")) break;
+          if (!trimmedRow.includes("|")) break;
+
+          dataRows.push(splitTableRow(rowLine));
+          tableEndIdx = r;
+        }
+
+        elements.push(
+          <div
+            key={`table_wrap_${idx}`}
+            className="my-3 w-full overflow-x-auto rounded border border-cyan-500/30 bg-black/50 shadow-inner"
+          >
+            <table className="w-full min-w-full border-collapse text-left text-xs text-cyan-200">
+              <thead className="border-b border-cyan-500/30 bg-cyan-950/60 font-orbitron font-semibold tracking-wider text-cyan-100 uppercase">
+                <tr>
+                  {headerCells.map((headerText, cIdx) => (
+                    <th
+                      key={`th_${cIdx}`}
+                      style={{ textAlign: alignments[cIdx] }}
+                      className="px-3 py-2 text-[11px] font-bold border-r last:border-r-0 border-cyan-500/20 whitespace-nowrap"
+                    >
+                      {renderInline(headerText.replace(/\\\|/g, "|"))}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cyan-500/10 font-mono text-[11px]">
+                {dataRows.map((rowCells, rIdx) => (
+                  <tr
+                    key={`tr_${rIdx}`}
+                    className={`transition-colors hover:bg-cyan-500/10 ${
+                      rIdx % 2 === 1 ? "bg-cyan-950/20" : "bg-transparent"
+                    }`}
+                  >
+                    {headerCells.map((_, cIdx) => (
+                      <td
+                        key={`td_${rIdx}_${cIdx}`}
+                        style={{ textAlign: alignments[cIdx] }}
+                        className="px-3 py-1.5 border-r last:border-r-0 border-cyan-500/10 text-cyan-200/90 leading-relaxed"
+                      >
+                        {renderInline((rowCells[cIdx] ?? "").replace(/\\\|/g, "|"))}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+        idx = tableEndIdx;
+        continue;
+      }
     }
 
     // Headings

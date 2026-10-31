@@ -20,6 +20,7 @@ import {
   Code,
   Quote,
   Minus,
+  Table,
 } from "lucide-react";
 import { NoteItem, GoalNode, TaskItem, ActionPlanNode } from "../../../types/hud";
 import { MarkdownPreview } from "./MarkdownPreview";
@@ -218,6 +219,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       | "codeblock"
       | "quote"
       | "divider"
+      | "table"
   ) => {
     if (viewMode === "preview") {
       setViewMode("edit");
@@ -240,6 +242,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         case "codeblock": insertion = "```\ncode block\n```\n"; break;
         case "quote": insertion = "> Quote\n"; break;
         case "divider": insertion = "\n---\n"; break;
+        case "table": insertion = "\n| Column 1 | Column 2 | Column 3 |\n| :--- | :---: | ---: |\n| Item 1 | Item 2 | Item 3 |\n| Item 4 | Item 5 | Item 6 |\n"; break;
       }
       onChangeContent(content ? `${content}\n${insertion}` : insertion);
       return;
@@ -335,6 +338,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         replacement = `\n---\n`;
         cursorOffsetStart = start + replacement.length;
         cursorOffsetEnd = cursorOffsetStart;
+        break;
+      case "table":
+        replacement = `\n| Column 1 | Column 2 | Column 3 |\n| :--- | :---: | ---: |\n| Item 1 | Item 2 | Item 3 |\n| Item 4 | Item 5 | Item 6 |\n`;
+        cursorOffsetStart = start + 3;
+        cursorOffsetEnd = cursorOffsetStart + 8;
         break;
     }
 
@@ -783,6 +791,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
         >
           <Quote className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormatting("table")}
+          title="Table (| col | col |)"
+          className="p-1 rounded text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        >
+          <Table className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
