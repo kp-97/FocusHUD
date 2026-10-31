@@ -27,6 +27,7 @@ import { MarkdownPreview } from "./MarkdownPreview";
 import { loadGoals, loadTasks, loadActionPlans } from "../../../stores/layoutStore";
 import { fetchGoals, fetchTasks, fetchActionPlans, isTauriEnvironment } from "../../../services/dbService";
 import { dbGoalsToTree, dbTasksToTree, dbActionPlansToTree } from "../../../services/dbAdapters";
+import { useSpellcheck } from "../../../stores/spellcheckStore";
 
 interface NoteEditorProps {
   note: NoteItem;
@@ -55,6 +56,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [copiedToast, setCopiedToast] = useState(false);
   const [isLinkDropdownOpen, setIsLinkDropdownOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { locale: spellcheckLocale, enabled: spellcheckEnabled } = useSpellcheck();
 
   // Available context options to link note to
   const [goals, setGoals] = useState<GoalNode[]>(() => loadGoals());
@@ -545,6 +547,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           value={note.title}
           onChange={(e) => onChangeTitle(e.target.value)}
           placeholder="NOTE TITLE..."
+          spellCheck={spellcheckEnabled}
+          lang={spellcheckEnabled ? spellcheckLocale : undefined}
           className="w-full bg-transparent font-orbitron font-bold text-sm text-cyan-100 tracking-wider placeholder:text-cyan-700/50 focus:outline-none"
         />
 
@@ -821,6 +825,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             onKeyUp={(e) => recordSelection(e.currentTarget)}
             onClick={(e) => recordSelection(e.currentTarget)}
             onPointerUp={(e) => recordSelection(e.currentTarget)}
+            spellCheck={spellcheckEnabled}
+            lang={spellcheckEnabled ? spellcheckLocale : undefined}
             placeholder="Type notes here... Supports Markdown headers (#), bullets (-), checklists (- [ ]), and bold (**text**)..."
             className="flex-1 w-full p-3 bg-transparent text-cyan-200 font-mono text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
           />
@@ -845,6 +851,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               onKeyUp={(e) => recordSelection(e.currentTarget)}
               onClick={(e) => recordSelection(e.currentTarget)}
               onPointerUp={(e) => recordSelection(e.currentTarget)}
+              spellCheck={spellcheckEnabled}
+              lang={spellcheckEnabled ? spellcheckLocale : undefined}
               placeholder="Type markdown here..."
               className="flex-1 h-full p-3 bg-transparent text-cyan-200 font-mono text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
             />
