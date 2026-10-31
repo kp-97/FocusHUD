@@ -17,6 +17,7 @@ import { NavItemConfig } from "../../../types/hud";
 import { ViewCustomizationTab } from "./ViewCustomizationTab";
 import { PaneLimitsTab } from "./PaneLimitsTab";
 import { AppearanceTab } from "./AppearanceTab";
+import { EditorTab } from "./EditorTab";
 import { UpdatesTab } from "./UpdatesTab";
 
 interface SettingsModalProps {
@@ -160,6 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {[
             { id: "all", label: "ALL" },
             { id: "appearance", label: "THEMES & PALETTE" },
+            { id: "editor", label: "EDITOR & SPELLCHECK" },
             { id: "views", label: "VIEWS" },
             { id: "limits", label: "LIMITS" },
             { id: "updates", label: "UPDATES" },
@@ -181,6 +183,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Scrollable Body Content with Tabs */}
         <div className="space-y-4 text-xs font-tech overflow-y-auto flex-1 pr-1">
+          {/* Editor & Spellcheck Settings */}
+          {(activeTab === "all" || activeTab === "editor") && <EditorTab />}
+
           {/* View Customization */}
           {(activeTab === "all" || activeTab === "views") && (
             <ViewCustomizationTab
