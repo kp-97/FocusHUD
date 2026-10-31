@@ -13,15 +13,25 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   onOpenSettings,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isMenuOpenRef = useRef(isMenuOpen);
+  isMenuOpenRef.current = isMenuOpen;
+  const menuOpenedAtRef = useRef<number>(0);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    isMenuOpenRef.current = isMenuOpen;
     setDockPopoutMode("right", isMenuOpen);
 
     if (!isMenuOpen) return;
 
+    menuOpenedAtRef.current = Date.now();
+
     const handleClickOutside = (e: MouseEvent) => {
+      // Prevent outside-click dismissal during opening click phase
+      if (Date.now() - menuOpenedAtRef.current < 100) {
+        return;
+      }
       if (
         menuRef.current &&
         !menuRef.current.contains(e.target as Node) &&
@@ -36,6 +46,10 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
       }
     };
     const handleBlur = () => {
+      // Ignore blur events that occur during opening focus shifts / dock popout geometry updates
+      if (Date.now() - menuOpenedAtRef.current < 250) {
+        return;
+      }
       setIsMenuOpen(false);
     };
 

@@ -60,6 +60,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   });
   const [dockMode, setDockMode] = useState<"monitoring" | "notes">("monitoring");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isMenuOpenRef = useRef(isMenuOpen);
+  isMenuOpenRef.current = isMenuOpen;
+  const menuOpenedAtRef = useRef<number>(0);
   const activeTooltipRef = useRef<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -74,22 +77,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     setDockPopoutMode("left", true);
   }, []);
 
-  const handleTooltipClose = useCallback(
-    (id: string) => {
-      if (activeTooltipRef.current === id) {
-        activeTooltipRef.current = null;
+  const handleTooltipClose = useCallback((id: string) => {
+    if (activeTooltipRef.current === id) {
+      activeTooltipRef.current = null;
+    }
+    if (popoutCloseTimer.current) {
+      clearTimeout(popoutCloseTimer.current);
+    }
+    popoutCloseTimer.current = setTimeout(() => {
+      if (!isMenuOpenRef.current && !activeTooltipRef.current) {
+        setDockPopoutMode("left", false);
       }
-      if (popoutCloseTimer.current) {
-        clearTimeout(popoutCloseTimer.current);
-      }
-      popoutCloseTimer.current = setTimeout(() => {
-        if (!isMenuOpen && !activeTooltipRef.current) {
-          setDockPopoutMode("left", false);
-        }
-      }, 150);
-    },
-    [isMenuOpen]
-  );
+    }, 150);
+  }, []);
 
   const handleSidebarMouseLeave = useCallback(() => {
     if (popoutCloseTimer.current) {
@@ -97,14 +97,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       popoutCloseTimer.current = null;
     }
     activeTooltipRef.current = null;
-    if (!isMenuOpen) {
+    if (!isMenuOpenRef.current) {
       setDockPopoutMode("left", false);
     }
-  }, [isMenuOpen]);
+  }, []);
 
   // Sync dock popout mode with native window for hamburger menu
   useEffect(() => {
+    isMenuOpenRef.current = isMenuOpen;
+
     if (isMenuOpen) {
+      menuOpenedAtRef.current = Date.now();
+      if (popoutCloseTimer.current) {
+        clearTimeout(popoutCloseTimer.current);
+        popoutCloseTimer.current = null;
+      }
       setDockPopoutMode("left", true);
     } else if (!activeTooltipRef.current) {
       setDockPopoutMode("left", false);
@@ -113,6 +120,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     if (!isMenuOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      // Prevent outside-click dismissal during the opening click phase
+      if (Date.now() - menuOpenedAtRef.current < 100) {
+        return;
+      }
       if (
         menuRef.current &&
         !menuRef.current.contains(e.target as Node) &&
@@ -127,6 +138,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       }
     };
     const handleBlur = () => {
+      // Ignore blur events that occur during opening focus shifts / dock popout geometry updates
+      if (Date.now() - menuOpenedAtRef.current < 250) {
+        return;
+      }
       setIsMenuOpen(false);
     };
 
@@ -239,7 +254,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   </h1>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <Tooltip content="System Menu" side="right" theme="cyan">
+                    <Tooltip content="System Menu" side="right" theme="cyan" disabled={isMenuOpen}>
                       <button
                         ref={menuBtnRef}
                         onClick={() => setIsMenuOpen((prev) => !prev)}
