@@ -40,6 +40,10 @@ describe("themeStore", () => {
   it("applies theme attribute and classes to document element", () => {
     applyThemeToDom("pink");
     expect(document.documentElement.getAttribute("data-theme")).toBe("pink");
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+
+    applyThemeToDom("cyber");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("cyber");
     expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
 
     applyThemeToDom("light");

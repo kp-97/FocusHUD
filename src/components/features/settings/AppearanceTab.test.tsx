@@ -16,7 +16,7 @@ describe("AppearanceTab", () => {
     expect(screen.getByText("Cyber HUD")).toBeInTheDocument();
     expect(screen.getByText("Stealth Dark")).toBeInTheDocument();
     expect(screen.getByText("Lab Light")).toBeInTheDocument();
-    expect(screen.getByText("Neon Sakura")).toBeInTheDocument();
+    expect(screen.getByText("Pastel Sakura")).toBeInTheDocument();
     expect(screen.getByText("Retro Terminal")).toBeInTheDocument();
     expect(screen.getByText("Arctic Slate")).toBeInTheDocument();
     expect(screen.getByText("Phosphor Matrix")).toBeInTheDocument();
@@ -25,7 +25,7 @@ describe("AppearanceTab", () => {
   it("switches theme when a swatch card is clicked", () => {
     render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
 
-    const pinkCard = screen.getByRole("button", { name: /Neon Sakura/i });
+    const pinkCard = screen.getByRole("button", { name: /Pastel Sakura/i });
     fireEvent.click(pinkCard);
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("pink");
@@ -53,3 +53,4 @@ describe("AppearanceTab", () => {
     expect(handleReset).toHaveBeenCalledTimes(1);
   });
 });
+

@@ -58,13 +58,13 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
   },
   pink: {
     id: "pink",
-    name: "Neon Sakura",
-    category: "dark",
-    description: "Synthwave midnight violet with hot neon magenta glow.",
-    accentColor: "#ff2a85",
-    secondaryColor: "#c084fc",
-    bgColor: "#0d0814",
-    borderColor: "rgba(255, 42, 133, 0.3)",
+    name: "Pastel Sakura",
+    category: "light",
+    description: "Cute pastel pink aesthetic with rounded typography and soft white cards.",
+    accentColor: "#f43f5e",
+    secondaryColor: "#fb7185",
+    bgColor: "#fce7f3",
+    borderColor: "rgba(244, 63, 94, 0.3)",
   },
   amber: {
     id: "amber",
@@ -145,7 +145,8 @@ export const applyThemeToDom = (theme: ThemeId) => {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.setAttribute("data-theme", theme);
-  if (theme === "light") {
+  const config = THEMES[theme] || THEMES.cyber;
+  if (config.category === "light") {
     root.classList.add("theme-light");
     root.classList.remove("theme-dark");
   } else {
@@ -263,3 +264,4 @@ export function useTheme() {
     themeConfig: THEMES[effectiveTheme],
   };
 }
+

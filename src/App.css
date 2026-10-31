@@ -26,6 +26,11 @@
     --hud-btn-hover: rgba(0, 229, 255, 0.15);
     --hud-scrollbar-thumb: rgba(0, 229, 255, 0.3);
     --hud-scrollbar-thumb-hover: rgba(0, 229, 255, 0.6);
+
+    --hud-font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --hud-font-orbitron: 'Orbitron', monospace, sans-serif;
+    --hud-font-tech: 'Share Tech Mono', monospace;
+    --hud-font-hud: 'Chakra Petch', 'Rajdhani', sans-serif;
   }
 
   [data-theme="dark"] {
@@ -52,6 +57,11 @@
     --hud-btn-hover: rgba(148, 163, 184, 0.18);
     --hud-scrollbar-thumb: rgba(148, 163, 184, 0.25);
     --hud-scrollbar-thumb-hover: rgba(148, 163, 184, 0.5);
+
+    --hud-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --hud-font-orbitron: 'Inter', 'Orbitron', sans-serif;
+    --hud-font-tech: 'Share Tech Mono', monospace;
+    --hud-font-hud: 'Inter', system-ui, sans-serif;
   }
 
   [data-theme="light"] {
@@ -78,32 +88,42 @@
     --hud-btn-hover: rgba(2, 132, 199, 0.12);
     --hud-scrollbar-thumb: rgba(2, 132, 199, 0.3);
     --hud-scrollbar-thumb-hover: rgba(2, 132, 199, 0.6);
+
+    --hud-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --hud-font-orbitron: 'Inter', system-ui, sans-serif;
+    --hud-font-tech: 'Inter', system-ui, monospace;
+    --hud-font-hud: 'Inter', system-ui, sans-serif;
   }
 
   [data-theme="pink"] {
     --hud-theme: "pink";
-    --hud-bg-dark: #0d0814;
-    --hud-bg-main: #0d0814;
-    --hud-bg-panel: #160c22;
-    --hud-card-bg: rgba(22, 12, 34, 0.82);
-    --hud-card-solid: #1c0f2d;
-    --hud-accent: #ff2a85;
-    --hud-accent-rgb: 255, 42, 133;
-    --hud-accent-dim: #d11266;
-    --hud-accent-glow: rgba(255, 42, 133, 0.45);
-    --hud-secondary: #c084fc;
-    --hud-secondary-rgb: 192, 132, 252;
-    --hud-border: rgba(255, 42, 133, 0.3);
-    --hud-border-dim: rgba(255, 42, 133, 0.15);
-    --hud-text-primary: #fce7f3;
-    --hud-text-accent: #ff2a85;
-    --hud-text-muted: #f472b6;
-    --hud-text-dim: rgba(244, 114, 182, 0.5);
-    --hud-scanlines-opacity: 0.35;
-    --hud-btn-bg: rgba(30, 15, 45, 0.7);
-    --hud-btn-hover: rgba(255, 42, 133, 0.2);
-    --hud-scrollbar-thumb: rgba(255, 42, 133, 0.35);
-    --hud-scrollbar-thumb-hover: rgba(255, 42, 133, 0.7);
+    --hud-bg-dark: #fce7f3;
+    --hud-bg-main: #fce7f3;
+    --hud-bg-panel: #fdf2f8;
+    --hud-card-bg: rgba(255, 255, 255, 0.85);
+    --hud-card-solid: #ffffff;
+    --hud-accent: #f43f5e;
+    --hud-accent-rgb: 244, 63, 94;
+    --hud-accent-dim: #e11d48;
+    --hud-accent-glow: rgba(244, 63, 94, 0.25);
+    --hud-secondary: #fb7185;
+    --hud-secondary-rgb: 251, 113, 133;
+    --hud-border: rgba(244, 63, 94, 0.25);
+    --hud-border-dim: rgba(244, 63, 94, 0.12);
+    --hud-text-primary: #831843;
+    --hud-text-accent: #e11d48;
+    --hud-text-muted: #9d174d;
+    --hud-text-dim: #be185d;
+    --hud-scanlines-opacity: 0;
+    --hud-btn-bg: rgba(255, 255, 255, 0.9);
+    --hud-btn-hover: rgba(251, 113, 133, 0.22);
+    --hud-scrollbar-thumb: rgba(244, 63, 94, 0.3);
+    --hud-scrollbar-thumb-hover: rgba(244, 63, 94, 0.6);
+
+    --hud-font-family: 'Quicksand', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --hud-font-orbitron: 'Quicksand', 'Nunito', sans-serif;
+    --hud-font-tech: 'Nunito', sans-serif;
+    --hud-font-hud: 'Quicksand', 'Nunito', sans-serif;
   }
 
   [data-theme="amber"] {
@@ -130,6 +150,11 @@
     --hud-btn-hover: rgba(255, 176, 0, 0.2);
     --hud-scrollbar-thumb: rgba(255, 176, 0, 0.35);
     --hud-scrollbar-thumb-hover: rgba(255, 176, 0, 0.7);
+
+    --hud-font-family: 'Share Tech Mono', 'VT323', monospace;
+    --hud-font-orbitron: 'Share Tech Mono', monospace;
+    --hud-font-tech: 'Share Tech Mono', monospace;
+    --hud-font-hud: 'Share Tech Mono', monospace;
   }
 
   [data-theme="nord"] {
@@ -156,6 +181,11 @@
     --hud-btn-hover: rgba(136, 192, 208, 0.2);
     --hud-scrollbar-thumb: rgba(136, 192, 208, 0.3);
     --hud-scrollbar-thumb-hover: rgba(136, 192, 208, 0.6);
+
+    --hud-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --hud-font-orbitron: 'Inter', system-ui, sans-serif;
+    --hud-font-tech: 'Share Tech Mono', monospace;
+    --hud-font-hud: 'Inter', system-ui, sans-serif;
   }
 
   [data-theme="matrix"] {
@@ -182,6 +212,11 @@
     --hud-btn-hover: rgba(0, 255, 102, 0.2);
     --hud-scrollbar-thumb: rgba(0, 255, 102, 0.35);
     --hud-scrollbar-thumb-hover: rgba(0, 255, 102, 0.7);
+
+    --hud-font-family: 'Share Tech Mono', 'VT323', monospace;
+    --hud-font-orbitron: 'Share Tech Mono', monospace;
+    --hud-font-tech: 'Share Tech Mono', monospace;
+    --hud-font-hud: 'Share Tech Mono', monospace;
   }
 
   html, body, #root {
@@ -189,24 +224,161 @@
     padding: 0;
     background-color: transparent;
     color: var(--hud-text-primary);
-    font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--hud-font-family);
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
   }
 }
 
-/* Sci-fi HUD Typography */
+/* Dynamic Theme Typography */
 .font-orbitron {
-  font-family: 'Orbitron', monospace, sans-serif;
+  font-family: var(--hud-font-orbitron, 'Orbitron', monospace, sans-serif) !important;
 }
 
 .font-tech {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--hud-font-tech, 'Share Tech Mono', monospace) !important;
 }
 
 .font-hud {
-  font-family: 'Chakra Petch', 'Rajdhani', sans-serif;
+  font-family: var(--hud-font-hud, 'Chakra Petch', 'Rajdhani', sans-serif) !important;
+}
+
+/* Theme Adaptation Across All Views & Panels */
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#03070d\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#020509\] {
+  background-color: var(--hud-bg-dark) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#050b14\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#060c16\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#070e18\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#040810\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#090b10\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#020813\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#030a14\] {
+  background-color: var(--hud-card-bg) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#071322\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#040d1a\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#07172b\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#040f1f\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#091528\],
+[data-theme]:not([data-theme="cyber"]) .bg-\[\#030812\] {
+  background-color: var(--hud-bg-panel) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) .text-cyan-100,
+[data-theme]:not([data-theme="cyber"]) .text-cyan-200 {
+  color: var(--hud-text-primary) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) .text-cyan-300 {
+  color: var(--hud-text-muted) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) .text-cyan-400,
+[data-theme]:not([data-theme="cyber"]) .text-cyan-500 {
+  color: var(--hud-text-accent) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) [class*="text-cyan-400/"],
+[data-theme]:not([data-theme="cyber"]) [class*="text-cyan-300/"],
+[data-theme]:not([data-theme="cyber"]) [class*="text-cyan-500/"],
+[data-theme]:not([data-theme="cyber"]) [class*="text-cyan-200/"],
+[data-theme]:not([data-theme="cyber"]) .text-cyan-600,
+[data-theme]:not([data-theme="cyber"]) .text-cyan-700 {
+  color: var(--hud-text-dim) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) [class*="border-cyan-"] {
+  border-color: var(--hud-border) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) [class*="bg-cyan-950"],
+[data-theme]:not([data-theme="cyber"]) [class*="bg-cyan-900"] {
+  background-color: var(--hud-btn-bg) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) [class*="hover:bg-cyan-950"]:hover,
+[data-theme]:not([data-theme="cyber"]) [class*="hover:bg-cyan-900"]:hover,
+[data-theme]:not([data-theme="cyber"]) [class*="hover:bg-cyan-500"]:hover {
+  background-color: var(--hud-btn-hover) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) [class*="hover:text-cyan-"]:hover {
+  color: var(--hud-text-accent) !important;
+}
+
+[data-theme]:not([data-theme="cyber"]) .hud-glow-cyan {
+  text-shadow: 0 0 8px var(--hud-accent-glow), 0 0 16px var(--hud-accent-glow) !important;
+}
+
+/* Pastel Sakura (Pink Theme) Inspiration Overrides */
+[data-theme="pink"] .rounded,
+[data-theme="pink"] .rounded-lg,
+[data-theme="pink"] .hud-panel {
+  border-radius: 14px;
+}
+
+[data-theme="pink"] .hud-btn {
+  border-radius: 10px;
+  font-weight: 600;
+  border-color: rgba(244, 63, 94, 0.25);
+}
+
+[data-theme="pink"] input,
+[data-theme="pink"] textarea,
+[data-theme="pink"] select {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #831843 !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+  border-radius: 10px !important;
+}
+
+[data-theme="pink"] input::placeholder,
+[data-theme="pink"] textarea::placeholder {
+  color: #be185d !important;
+  opacity: 0.65;
+}
+
+[data-theme="pink"] .hud-btn-active,
+[data-theme="pink"] [class*="bg-cyan-600"],
+[data-theme="pink"] [class*="bg-cyan-500"]:not([class*="/"]) {
+  background-color: #f43f5e !important;
+  color: #ffffff !important;
+}
+
+[data-theme="pink"] [class*="bg-cyan-600"] *,
+[data-theme="pink"] [class*="bg-cyan-500"]:not([class*="/"]) * {
+  color: #ffffff !important;
+}
+
+/* Lab Light Mode Input Overrides */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.4) !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .hud-btn-active,
+[data-theme="light"] [class*="bg-cyan-600"],
+[data-theme="light"] [class*="bg-cyan-500"]:not([class*="/"]) {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] [class*="bg-cyan-600"] *,
+[data-theme="light"] [class*="bg-cyan-500"]:not([class*="/"]) * {
+  color: #ffffff !important;
 }
 
 /* Futuristic Scanline Effect */
