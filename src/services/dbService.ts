@@ -4,6 +4,10 @@
  * Supports real-time dual-window cache updates via Tauri events.
  */
 
+import { isTauriEnvironment, invokeTauri, invokeTauriBool } from "./ipc";
+
+export { isTauriEnvironment };
+
 export interface DbGoal {
   id: string;
   parentId?: string | null;
@@ -115,50 +119,25 @@ export interface LegacyStorageData {
   actionPlans?: LegacyActionPlanNode[];
 }
 
-export function isTauriEnvironment(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
 // ========================================================
 // Goals
 // ========================================================
 
 export async function fetchGoals(): Promise<DbGoal[]> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbGoal[]>("get_goals");
-  } catch {
-    return [];
-  }
+  const res = await invokeTauri<DbGoal[]>("get_goals");
+  return res ?? [];
 }
 
 export async function persistGoal(goal: DbGoal): Promise<DbGoal | null> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbGoal>("save_goal", { goal });
-  } catch {
-    return null;
-  }
+  return invokeTauri<DbGoal>("save_goal", { goal });
 }
 
 export async function removeGoal(id: string): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("delete_goal", { id });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("delete_goal", { id });
 }
 
 export async function syncGoals(goals: DbGoal[]): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("sync_goals", { goals });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("sync_goals", { goals });
 }
 
 // ========================================================
@@ -166,41 +145,20 @@ export async function syncGoals(goals: DbGoal[]): Promise<boolean> {
 // ========================================================
 
 export async function fetchTasks(): Promise<DbTask[]> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbTask[]>("get_tasks");
-  } catch {
-    return [];
-  }
+  const res = await invokeTauri<DbTask[]>("get_tasks");
+  return res ?? [];
 }
 
 export async function persistTask(task: DbTask): Promise<DbTask | null> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbTask>("save_task", { task });
-  } catch {
-    return null;
-  }
+  return invokeTauri<DbTask>("save_task", { task });
 }
 
 export async function removeTask(id: string): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("delete_task", { id });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("delete_task", { id });
 }
 
 export async function syncTasks(tasks: DbTask[]): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("sync_tasks", { tasks });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("sync_tasks", { tasks });
 }
 
 // ========================================================
@@ -208,41 +166,20 @@ export async function syncTasks(tasks: DbTask[]): Promise<boolean> {
 // ========================================================
 
 export async function fetchActionPlans(): Promise<DbActionPlan[]> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbActionPlan[]>("get_action_plans");
-  } catch {
-    return [];
-  }
+  const res = await invokeTauri<DbActionPlan[]>("get_action_plans");
+  return res ?? [];
 }
 
 export async function persistActionPlan(plan: DbActionPlan): Promise<DbActionPlan | null> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbActionPlan>("save_action_plan", { plan });
-  } catch {
-    return null;
-  }
+  return invokeTauri<DbActionPlan>("save_action_plan", { plan });
 }
 
 export async function removeActionPlan(id: string): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("delete_action_plan", { id });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("delete_action_plan", { id });
 }
 
 export async function syncActionPlans(plans: DbActionPlan[]): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("sync_action_plans", { plans });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("sync_action_plans", { plans });
 }
 
 // ========================================================
@@ -250,41 +187,20 @@ export async function syncActionPlans(plans: DbActionPlan[]): Promise<boolean> {
 // ========================================================
 
 export async function fetchNotes(): Promise<DbNote[]> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbNote[]>("get_notes");
-  } catch {
-    return [];
-  }
+  const res = await invokeTauri<DbNote[]>("get_notes");
+  return res ?? [];
 }
 
 export async function persistNote(note: DbNote): Promise<DbNote | null> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbNote>("save_note", { note });
-  } catch {
-    return null;
-  }
+  return invokeTauri<DbNote>("save_note", { note });
 }
 
 export async function removeNote(id: string): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("delete_note", { id });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("delete_note", { id });
 }
 
 export async function syncNotes(notes: DbNote[]): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("sync_notes", { notes });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("sync_notes", { notes });
 }
 
 // ========================================================
@@ -292,42 +208,20 @@ export async function syncNotes(notes: DbNote[]): Promise<boolean> {
 // ========================================================
 
 export async function fetchCalendarEvents(): Promise<DbCalendarEvent[]> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<DbCalendarEvent[]>("get_calendar_events");
-  } catch {
-    return [];
-  }
+  const res = await invokeTauri<DbCalendarEvent[]>("get_calendar_events");
+  return res ?? [];
 }
 
 export async function saveCalendarEvent(event: DbCalendarEvent): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("save_calendar_event", { event });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("save_calendar_event", { event });
 }
 
 export async function deleteCalendarEvent(id: string): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("delete_calendar_event", { id });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("delete_calendar_event", { id });
 }
 
 export async function syncCalendarEvents(events: DbCalendarEvent[]): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("sync_calendar_events", { events });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("sync_calendar_events", { events });
 }
 
 // ========================================================
@@ -335,22 +229,12 @@ export async function syncCalendarEvents(events: DbCalendarEvent[]): Promise<boo
 // ========================================================
 
 export async function checkDbIsEmpty(): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<boolean>("check_db_is_empty");
-  } catch {
-    return false;
-  }
+  const res = await invokeTauri<boolean>("check_db_is_empty");
+  return res ?? false;
 }
 
 export async function migrateLegacyStorage(data: LegacyStorageData): Promise<boolean> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("migrate_legacy_data", { data });
-    return true;
-  } catch {
-    return false;
-  }
+  return invokeTauriBool("migrate_legacy_data", { data });
 }
 
 // ========================================================
@@ -360,12 +244,12 @@ export async function migrateLegacyStorage(data: LegacyStorageData): Promise<boo
 export async function onDbChange(
   callback: (payload: DbChangePayload) => void
 ): Promise<(() => void) | null> {
+  if (!isTauriEnvironment()) return null;
   try {
     const { listen } = await import("@tauri-apps/api/event");
-    const unlisten = await listen<DbChangePayload>("db-change", (event) => {
+    return await listen<DbChangePayload>("db-change", (event) => {
       callback(event.payload);
     });
-    return unlisten;
   } catch {
     return null;
   }

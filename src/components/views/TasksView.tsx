@@ -1,18 +1,17 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { CheckSquare, Search, Plus, Check, Trash2, Tag, Sparkles } from "lucide-react";
 import { TaskItem, GoalNode } from "../../types/hud";
-import { loadTasks, saveTasks, loadGoals, getTodayString } from "../../stores/layoutStore";
+import { getTodayString } from "../../stores/layoutStore";
 import { Tree3DView, TreeNode3D } from "../features/tree3d/Tree3DView";
-import { fetchTasks, fetchGoals, onDbChange, isTauriEnvironment } from "../../services/dbService";
-import { dbTasksToTree, dbGoalsToTree } from "../../services/dbAdapters";
+import { useSyncTasks, useSyncGoals } from "../../hooks/useSyncEntity";
 
 interface TasksViewProps {
   show3D?: boolean;
 }
 
 export const TasksView: React.FC<TasksViewProps> = ({ show3D = true }) => {
-  const [tasks, setTasks] = useState<TaskItem[]>(loadTasks);
-  const [goals, setGoals] = useState<GoalNode[]>(loadGoals);
+  const [tasks, saveAndSetTasks] = useSyncTasks();
+  const [goals] = useSyncGoals();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"all" | "ungrouped" | "grouped">("all");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(tasks[0]?.id || null);
@@ -21,41 +20,6 @@ export const TasksView: React.FC<TasksViewProps> = ({ show3D = true }) => {
   const [selectedGoalId, setSelectedGoalId] = useState<string>("none");
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [addingSubToId, setAddingSubToId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    if (isTauriEnvironment()) {
-      fetchTasks().then((dbTasks) => {
-        if (active && dbTasks.length > 0) setTasks(dbTasksToTree(dbTasks));
-      });
-      fetchGoals().then((dbGoals) => {
-        if (active && dbGoals.length > 0) setGoals(dbGoalsToTree(dbGoals));
-      });
-    }
-
-    const unlistenPromise = onDbChange((payload) => {
-      if (payload.entity === "tasks" || payload.entity === "all") {
-        fetchTasks().then((dbTasks) => {
-          if (active) setTasks(dbTasksToTree(dbTasks));
-        });
-      }
-      if (payload.entity === "goals" || payload.entity === "all") {
-        fetchGoals().then((dbGoals) => {
-          if (active) setGoals(dbGoalsToTree(dbGoals));
-        });
-      }
-    });
-
-    return () => {
-      active = false;
-      unlistenPromise.then((unlisten) => unlisten && unlisten());
-    };
-  }, []);
-
-  const saveAndSetTasks = (newTasks: TaskItem[]) => {
-    setTasks(newTasks);
-    saveTasks(newTasks);
-  };
 
   // Add Task
   const handleAddTask = (e?: React.FormEvent) => {

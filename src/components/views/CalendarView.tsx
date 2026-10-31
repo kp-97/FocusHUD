@@ -7,10 +7,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import {
-  loadEvents,
   saveEvents,
-  loadTasks,
-  loadNotes,
   saveNotes,
   getTodayString,
   broadcastNavChange,
@@ -31,21 +28,15 @@ import {
 } from "../../utils/calendarFormatters";
 import { EventEditModal } from "./CalendarView/EventEditModal";
 import {
-  fetchCalendarEvents,
   saveCalendarEvent as persistCalendarEvent,
   deleteCalendarEvent as removeCalendarEvent,
-  fetchNotes,
-  fetchTasks,
   persistNote,
-  onDbChange,
   isTauriEnvironment,
 } from "../../services/dbService";
+import { useSyncCalendarEvents, useSyncTasks, useSyncNotes } from "../../hooks/useSyncEntity";
 import {
-  dbEventsToApp,
   appEventsToDb,
-  dbNotesToApp,
   appNotesToDb,
-  dbTasksToTree,
 } from "../../services/dbAdapters";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -80,9 +71,9 @@ const flattenTasks = (taskList: TaskItem[]): TaskItem[] => {
 };
 
 export const CalendarView: React.FC = () => {
-  const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
-  const [tasks, setTasks] = useState<TaskItem[]>(loadTasks);
-  const [notes, setNotes] = useState<NoteItem[]>(loadNotes);
+  const [events, , setEvents] = useSyncCalendarEvents();
+  const [tasks] = useSyncTasks();
+  const [notes, , setNotes] = useSyncNotes();
 
   const [mode, setMode] = useState<CalendarMode>(() => {
     const saved = localStorage.getItem("focushud_calendar_mode");
@@ -107,63 +98,6 @@ export const CalendarView: React.FC = () => {
 
   // Modal State for Create / Edit
   const [activeModalEvent, setActiveModalEvent] = useState<Partial<CalendarEvent> | null>(null);
-
-  // Sync with Tauri SQLite backend if available
-  useEffect(() => {
-    let active = true;
-    if (isTauriEnvironment()) {
-      fetchCalendarEvents().then((dbEvents) => {
-        if (active && dbEvents && dbEvents.length > 0) {
-          setEvents(dbEventsToApp(dbEvents));
-        }
-      });
-      fetchNotes().then((dbNotes) => {
-        if (active && dbNotes && dbNotes.length > 0) {
-          setNotes(dbNotesToApp(dbNotes));
-        }
-      });
-      fetchTasks().then((dbTasks) => {
-        if (active && dbTasks && dbTasks.length > 0) {
-          setTasks(dbTasksToTree(dbTasks));
-        }
-      });
-    }
-
-    const unlistenPromise = onDbChange((payload) => {
-      if (payload.entity === "calendar_events" || payload.entity === "all") {
-        fetchCalendarEvents().then((dbEvents) => {
-          if (active && dbEvents) setEvents(dbEventsToApp(dbEvents));
-        });
-      }
-      if (payload.entity === "notes" || payload.entity === "all") {
-        if (isTauriEnvironment()) {
-          fetchNotes().then((dbNotes) => {
-            if (active && dbNotes) {
-              setNotes(dbNotesToApp(dbNotes));
-            }
-          });
-        } else {
-          setNotes(loadNotes());
-        }
-      }
-      if (payload.entity === "tasks" || payload.entity === "all") {
-        if (isTauriEnvironment()) {
-          fetchTasks().then((dbTasks) => {
-            if (active && dbTasks) {
-              setTasks(dbTasksToTree(dbTasks));
-            }
-          });
-        } else {
-          setTasks(loadTasks());
-        }
-      }
-    });
-
-    return () => {
-      active = false;
-      unlistenPromise.then((unlisten) => unlisten && unlisten());
-    };
-  }, []);
 
   // Persist mode & independent display toggles
   useEffect(() => {
