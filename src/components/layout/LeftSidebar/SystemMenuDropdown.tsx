@@ -1,12 +1,13 @@
 import React from "react";
 import { Settings, Palette, Puzzle, LogOut } from "lucide-react";
 import { exitApp } from "../../../services/tauriBridge";
+import { useTheme } from "../../../stores/themeStore";
 
 interface SystemMenuDropdownProps {
   isOpen: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export const SystemMenuDropdown: React.FC<SystemMenuDropdownProps> = ({
@@ -15,6 +16,8 @@ export const SystemMenuDropdown: React.FC<SystemMenuDropdownProps> = ({
   onClose,
   onOpenSettings,
 }) => {
+  const { themeConfig } = useTheme();
+
   if (!isOpen) return null;
 
   return (
@@ -34,7 +37,7 @@ export const SystemMenuDropdown: React.FC<SystemMenuDropdownProps> = ({
       <button
         onClick={() => {
           onClose();
-          if (onOpenSettings) onOpenSettings();
+          if (onOpenSettings) onOpenSettings("all");
         }}
         className="flex items-center gap-2.5 px-2.5 py-2 rounded text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all text-left cursor-pointer"
         role="menuitem"
@@ -48,14 +51,17 @@ export const SystemMenuDropdown: React.FC<SystemMenuDropdownProps> = ({
 
       {/* 2. Themes */}
       <button
-        onClick={onClose}
+        onClick={() => {
+          onClose();
+          if (onOpenSettings) onOpenSettings("appearance");
+        }}
         className="flex items-center gap-2.5 px-2.5 py-2 rounded text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all text-left cursor-pointer"
         role="menuitem"
       >
         <Palette className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
         <div className="flex flex-col">
           <span className="font-semibold tracking-wider">THEMES</span>
-          <span className="text-[9px] font-tech text-cyan-400/70">Cyan Cyberpunk (Active)</span>
+          <span className="text-[9px] font-tech text-cyan-400/70">{themeConfig?.name || "Cyber HUD"} (Active)</span>
         </div>
       </button>
 

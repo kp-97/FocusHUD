@@ -86,10 +86,21 @@ describe("LeftSidebar component", () => {
     act(() => {
       fireEvent.click(settingsItem);
     });
-    expect(handleSettings).toHaveBeenCalledTimes(1);
+    expect(handleSettings).toHaveBeenCalledWith("all");
     // Menu should close
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+
+    // Reopen menu and test Themes button
+    act(() => {
+      fireEvent.click(menuBtn);
+    });
+    const themesItem = screen.getByText("THEMES");
+    act(() => {
+      fireEvent.click(themesItem);
+    });
+    expect(handleSettings).toHaveBeenCalledWith("appearance");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     // Reopen menu and test Log out
     act(() => {

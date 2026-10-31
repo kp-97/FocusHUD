@@ -43,7 +43,7 @@ interface LeftSidebarProps {
   isCompact?: boolean;
   isDockMode?: boolean;
   onToggleCollapse?: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -388,7 +388,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               theme="cyan"
             >
               <button
-                onClick={onOpenSettings}
+                onClick={() => onOpenSettings?.("all")}
                 aria-label="Settings"
                 className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-500/20 ${
                   isIconOnly

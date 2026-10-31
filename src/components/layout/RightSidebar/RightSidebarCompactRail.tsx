@@ -2,16 +2,18 @@ import React, { useState, useEffect, useRef } from "react";
 import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
 import { usePomodoro } from "../../../stores/pomodoroStore";
 import { exitApp, setDockPopoutMode } from "../../../services/tauriBridge";
+import { useTheme } from "../../../stores/themeStore";
 
 interface RightSidebarCompactRailProps {
   onExpand?: () => void;
   onMaximizePanes?: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = ({
   onOpenSettings,
 }) => {
+  const { themeConfig } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isMenuOpenRef = useRef(isMenuOpen);
   isMenuOpenRef.current = isMenuOpen;
@@ -150,6 +152,7 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
             <button
               onClick={() => {
                 setIsMenuOpen(false);
+                if (onOpenSettings) onOpenSettings("appearance");
               }}
               className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
               role="menuitem"
@@ -157,7 +160,9 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <div className="flex flex-col">
                 <span className="font-semibold tracking-wider">THEMES</span>
-                <span className="text-[9px] font-tech text-amber-400/70">Cyberpunk Themes</span>
+                <span className="text-[9px] font-tech text-amber-400/70">
+                  {themeConfig?.name || "Cyber HUD"} (Active)
+                </span>
               </div>
             </button>
 

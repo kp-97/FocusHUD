@@ -25,7 +25,7 @@ interface RightSidebarProps {
   onExpand?: () => void;
   onCollapse?: () => void;
   onMaximizePanes?: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({

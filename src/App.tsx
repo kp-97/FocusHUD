@@ -57,6 +57,7 @@ export default function App() {
   const [snapMode, setSnapMode] = useState<"fluid" | "grid-snap" | "ratio-16-9">("fluid");
   const [activeNav, setActiveNav] = useState<string>("home");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<string>("all");
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
 
   // Check for updates on startup
@@ -168,7 +169,13 @@ export default function App() {
     return () => unsubscribe();
   }, [dockWindowType, desktopDockActive]);
 
-  const handleOpenSettings = async () => {
+  const handleOpenSettings = async (tab: string = "all") => {
+    setSettingsTab(tab);
+    try {
+      localStorage.setItem("hud_settings_tab", tab);
+    } catch {
+      // ignore
+    }
     if (dockWindowType !== "full") {
       const opened = await openSettingsWindow();
       if (!opened) {
@@ -402,10 +409,13 @@ export default function App() {
 
   // Dedicated Centered Settings window
   if (dockWindowType === "settings") {
+    const initialTab =
+      (typeof localStorage !== "undefined" && localStorage.getItem("hud_settings_tab")) || "all";
     return (
       <SettingsModal
         isOpen={true}
         isStandalone={true}
+        initialTab={initialTab}
         onClose={() => {
           closeSettingsWindow();
         }}
@@ -448,6 +458,7 @@ export default function App() {
 
         <SettingsModal
           isOpen={isSettingsOpen}
+          initialTab={settingsTab}
           onClose={() => setIsSettingsOpen(false)}
           onResetWidths={handleResetWidths}
         />
@@ -490,6 +501,7 @@ export default function App() {
 
         <SettingsModal
           isOpen={isSettingsOpen}
+          initialTab={settingsTab}
           onClose={() => setIsSettingsOpen(false)}
           onResetWidths={handleResetWidths}
         />
@@ -585,6 +597,7 @@ export default function App() {
       {/* Settings Modal Dialog */}
       <SettingsModal
         isOpen={isSettingsOpen}
+        initialTab={settingsTab}
         onClose={() => setIsSettingsOpen(false)}
         onResetWidths={handleResetWidths}
       />
