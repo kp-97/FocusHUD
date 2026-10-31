@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, RotateCcw, Check, Menu, Settings, Palette, Puzzle, LogOut, Square } from "lucide-react";
+import { Play, Pause, RotateCcw, Check, Menu, Square } from "lucide-react";
 import { usePomodoro } from "../../../stores/pomodoroStore";
-import { exitApp, setDockPopoutMode } from "../../../services/tauriBridge";
+import { setDockPopoutMode } from "../../../services/tauriBridge";
 import { useTheme } from "../../../stores/themeStore";
+import { SystemMenuDropdown } from "../LeftSidebar/SystemMenuDropdown";
 
 interface RightSidebarCompactRailProps {
   onExpand?: () => void;
@@ -119,7 +120,8 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               title="System Menu"
               aria-label="System Menu"
               aria-expanded={isMenuOpen}
-              className="text-amber-400/80 hover:text-amber-200 hover:scale-110 transition p-1 cursor-pointer"
+              className="hover:scale-110 transition p-1 cursor-pointer"
+              style={{ color: isLightOrPink ? "var(--hud-text-primary)" : accent }}
             >
               <Menu className="w-3.5 h-3.5" />
             </button>
@@ -127,87 +129,13 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
         </div>
 
         {/* Floating Hamburger Dropdown Menu in Compact Rail (Spills left into the center pane) */}
-        {isMenuOpen && (
-          <div
-            ref={menuRef}
-            className="absolute top-1 right-[calc(100%+20px)] w-52 bg-[#040d1a]/95 backdrop-blur-md border border-amber-500/40 rounded-lg shadow-[0_0_20px_rgba(255,179,0,0.25)] z-50 p-1.5 flex flex-col gap-1 font-hud text-xs animate-in fade-in zoom-in-95 duration-150"
-            role="menu"
-            aria-label="System Menu"
-          >
-            {/* Pointing notch back to sidebar */}
-            <div className="absolute -right-1.5 top-3 w-2.5 h-2.5 bg-[#040d1a] rotate-45 border-r border-t border-amber-500/50" />
-            <div className="px-2.5 py-1 text-[9px] font-tech text-amber-400/60 uppercase tracking-widest border-b border-amber-500/20">
-              SYSTEM MENU
-            </div>
-
-            {/* 1. Settings */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-                if (onOpenSettings) onOpenSettings("all");
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <Settings className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">SETTINGS</span>
-                <span className="text-[9px] font-tech text-amber-400/70">Preferences & Panes</span>
-              </div>
-            </button>
-
-            {/* 2. Themes */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-                if (onOpenSettings) onOpenSettings("appearance");
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">THEMES</span>
-                <span className="text-[9px] font-tech text-amber-400/70">
-                  {themeConfig?.name || "Cyber HUD"} (Active)
-                </span>
-              </div>
-            </button>
-
-            {/* 3. Extensions */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <Puzzle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">EXTENSIONS</span>
-                <span className="text-[9px] font-tech text-amber-400/70">Plugins & Integrations</span>
-              </div>
-            </button>
-
-            <div className="my-0.5 border-t border-amber-500/20" />
-
-            {/* 4. Log out */}
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-                exitApp();
-              }}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded text-red-400/80 hover:text-red-300 hover:bg-red-500/15 transition-all text-left cursor-pointer"
-              role="menuitem"
-            >
-              <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-semibold tracking-wider">LOG OUT</span>
-                <span className="text-[9px] font-tech text-red-400/60">Lock HUD & Exit</span>
-              </div>
-            </button>
-          </div>
-        )}
+        <SystemMenuDropdown
+          isOpen={isMenuOpen}
+          menuRef={menuRef}
+          onClose={() => setIsMenuOpen(false)}
+          onOpenSettings={onOpenSettings}
+          side="right"
+        />
       </div>
 
       {/* 2. Mini Ring Gauge & Countdown */}

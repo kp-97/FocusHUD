@@ -403,6 +403,13 @@
   color: var(--hud-text-primary);
 }
 
+/* System Menu Dropdown Reset */
+[role="menu"] button {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
 /* Eliminate dark/black utility overlays on light and pink backgrounds (except fixed modal backdrops) */
 [data-theme="light"] [class*="bg-black/"]:not([class*="fixed"]),
 [data-theme="light"] [class*="bg-black\\/"]:not([class*="fixed"]),

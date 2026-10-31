@@ -23,6 +23,7 @@ import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
 import { DiagnosticsCard } from "./DiagnosticsCard";
 import { NotesView } from "../../views/NotesView";
+import { useTheme } from "../../../stores/themeStore";
 
 const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -54,6 +55,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onToggleCollapse,
   onOpenSettings,
 }) => {
+  const { themeConfig } = useTheme();
   const [diag, setDiag] = useState<SystemDiagnostics | null>(null);
   const [diagnosticsCollapsed, setDiagnosticsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("hud_diag_collapsed") === "true";
@@ -260,7 +262,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                         onClick={() => setIsMenuOpen((prev) => !prev)}
                         aria-label="System Menu"
                         aria-expanded={isMenuOpen}
-                        className="text-cyan-400/80 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+                        className="hover:scale-110 transition p-1 cursor-pointer"
+                        style={{
+                          color: themeConfig?.category === "light"
+                            ? "var(--hud-text-primary)"
+                            : (themeConfig?.accentColor || "#00e5ff"),
+                        }}
                       >
                         <Menu className="w-3.5 h-3.5" />
                       </button>
