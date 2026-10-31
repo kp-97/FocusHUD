@@ -84,6 +84,10 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   // Mini gauge calculations
+  const accent = themeConfig?.accentColor || "#ff9100";
+  const isLightOrPink = themeConfig?.category === "light";
+  const timerTextColor = isLightOrPink ? "var(--hud-text-primary)" : "#ffffff";
+
   const radius = 17;
   const strokeWidth = 3;
   const circumference = 2 * Math.PI * radius;
@@ -99,8 +103,12 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
           <div className="w-full flex items-center justify-between h-7 px-1 text-amber-500/60">
             <div className="flex items-center gap-1">
               <span
-                className={`w-1.5 h-1.5 rounded-full ${isRunning ? "bg-amber-400 animate-ping shadow-[0_0_6px_#ffb300]" : "bg-neutral-600"
+                className={`w-1.5 h-1.5 rounded-full ${isRunning ? "animate-ping shadow-sm" : "bg-neutral-600"
                   }`}
+                style={{
+                  backgroundColor: isRunning ? accent : undefined,
+                  boxShadow: isRunning ? `0 0 6px ${accent}` : undefined,
+                }}
                 title={isRunning ? "Timer Active" : "Timer Standby"}
               />
             </div>
@@ -136,7 +144,7 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                if (onOpenSettings) onOpenSettings();
+                if (onOpenSettings) onOpenSettings("all");
               }}
               className="flex items-center gap-2.5 px-2.5 py-2 rounded text-amber-300 hover:text-amber-100 hover:bg-amber-500/20 transition-all text-left cursor-pointer"
               role="menuitem"
@@ -211,7 +219,8 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               cx="22"
               cy="22"
               r={radius}
-              stroke="rgba(255, 145, 0, 0.15)"
+              stroke={accent}
+              strokeOpacity={0.18}
               strokeWidth={strokeWidth}
               fill="transparent"
             />
@@ -220,27 +229,33 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               cx="22"
               cy="22"
               r={radius}
-              stroke="#ff9100"
+              stroke={accent}
               strokeWidth={strokeWidth + 0.5}
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
               fill="transparent"
               className="transition-all duration-300"
-              style={{ filter: "drop-shadow(0 0 4px #ff9100)" }}
+              style={{ filter: `drop-shadow(0 0 4px ${accent})` }}
             />
           </svg>
 
           {/* Centered Monospace Time (Short Form) */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-tech text-[10px] font-bold text-amber-200 tracking-tighter">
+            <span
+              className="font-tech text-[10px] font-bold tracking-tighter"
+              style={{ color: timerTextColor }}
+            >
               {minutes}m
             </span>
           </div>
         </div>
 
         {/* Precise MM:SS text */}
-        <div className="text-[11px] font-tech font-bold tracking-tight text-amber-200/90 mt-1">
+        <div
+          className="text-[11px] font-tech font-bold tracking-tight mt-1"
+          style={{ color: timerTextColor }}
+        >
           {timeFormatted}
         </div>
       </div>

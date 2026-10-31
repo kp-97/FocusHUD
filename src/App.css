@@ -381,6 +381,81 @@
   color: #ffffff !important;
 }
 
+/* Universal Legibility and High-Contrast Rules for Light Themes */
+[data-theme="light"],
+[data-theme="pink"] {
+  color: var(--hud-text-primary);
+}
+
+[data-theme="light"] .text-white:not([class*="bg-"]):not([class*="hud-btn-active"]),
+[data-theme="pink"] .text-white:not([class*="bg-"]):not([class*="hud-btn-active"]) {
+  color: var(--hud-text-primary) !important;
+}
+
+[data-theme="light"] [class*="text-neutral-"],
+[data-theme="pink"] [class*="text-neutral-"],
+[data-theme="light"] [class*="text-gray-"],
+[data-theme="pink"] [class*="text-gray-"],
+[data-theme="light"] [class*="text-slate-"],
+[data-theme="pink"] [class*="text-slate-"] {
+  color: var(--hud-text-muted) !important;
+}
+
+[data-theme="light"] [class*="text-orange-"],
+[data-theme="light"] [class*="text-amber-"] {
+  color: #0369a1 !important;
+}
+
+[data-theme="pink"] [class*="text-orange-"],
+[data-theme="pink"] [class*="text-amber-"] {
+  color: #be185d !important;
+}
+
+[data-theme="light"] code,
+[data-theme="light"] pre {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="pink"] code,
+[data-theme="pink"] pre {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #831843 !important;
+}
+
+/* High-Contrast Readability Rules for Dark Themes */
+[data-theme="amber"] {
+  color: #fef3c7;
+}
+
+[data-theme="amber"] [class*="text-cyan-"] {
+  color: #ffb000 !important;
+}
+
+[data-theme="matrix"] {
+  color: #dcfce7;
+}
+
+[data-theme="matrix"] [class*="text-cyan-"] {
+  color: #00ff66 !important;
+}
+
+[data-theme="nord"] {
+  color: #eceff4;
+}
+
+[data-theme="nord"] [class*="text-cyan-"] {
+  color: #88c0d0 !important;
+}
+
+[data-theme="dark"] {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] [class*="text-cyan-"] {
+  color: #f1f5f9 !important;
+}
+
 /* Futuristic Scanline Effect */
 .scanlines {
   background: linear-gradient(
