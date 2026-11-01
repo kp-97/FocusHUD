@@ -1,6 +1,6 @@
 [package]
 name = "FocusHUD"
-version = "0.2.9"
+version = "0.2.10"
 description = "Desktop productivity app with dual sidebars, focus mode and monitoring dashboard"
 authors = ["kp-97"]
 edition = "2024"
