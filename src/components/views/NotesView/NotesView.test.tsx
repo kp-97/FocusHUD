@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { NotesView } from "./NotesView";
 import * as dbService from "../../../services/dbService";
 import { NoteItem } from "../../../types/hud";
@@ -53,6 +53,7 @@ describe("NotesView Component", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
   });
 
@@ -247,9 +248,13 @@ describe("NotesView Component", () => {
     );
   });
 
-  it("renders back button when rendered inside left dock", () => {
+  it("renders back button when rendered inside left dock", async () => {
     const handleBack = vi.fn();
     render(<NotesView isLeftDock={true} onBackToMonitoring={handleBack} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Pinned Goal Note")).toBeInTheDocument();
+    });
 
     const backBtn = screen.getByRole("button", { name: /RETURN TO MONITORING/i });
     expect(backBtn).toBeInTheDocument();

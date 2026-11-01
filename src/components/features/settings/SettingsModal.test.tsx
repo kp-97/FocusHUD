@@ -1,11 +1,19 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import * as store from "../../../stores/layoutStore";
+
+vi.mock("./UpdatesTab", () => ({
+  UpdatesTab: () => <div data-testid="updates-tab">Mock Updates Tab</div>,
+}));
 
 describe("SettingsModal component", () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("does not render when isOpen is false", () => {

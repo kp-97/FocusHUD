@@ -131,353 +131,159 @@ pub fn close_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 // ========================================================
-// SQLite Database Commands
+// SQLite Database Commands & Helpers
 // ========================================================
+
+fn with_conn<T, F>(state: &tauri::State<'_, crate::db::DbState>, f: F) -> Result<T, String>
+where
+    F: FnOnce(&rusqlite::Connection) -> Result<T, rusqlite::Error>,
+{
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    f(&conn).map_err(|e| e.to_string())
+}
+
+fn with_conn_mut<T, F>(state: &tauri::State<'_, crate::db::DbState>, f: F) -> Result<T, String>
+where
+    F: FnOnce(&mut rusqlite::Connection) -> Result<T, rusqlite::Error>,
+{
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    f(&mut conn).map_err(|e| e.to_string())
+}
+
+fn emit_db_change(
+    app: &tauri::AppHandle,
+    entity: &'static str,
+    action: &'static str,
+    id: Option<String>,
+) {
+    use tauri::Emitter;
+    let _ = app.emit(
+        "db-change",
+        crate::db::models::DbChangePayload {
+            entity: entity.into(),
+            action: action.into(),
+            id,
+        },
+    );
+}
+
+macro_rules! crud_commands {
+    // Standard entity where save returns the model
+    (
+        entity: $entity:literal,
+        model: $model:ty,
+        get: $get_fn:ident => $get_query:path,
+        save: $save_fn:ident ( $save_arg:ident ) => $save_query:path,
+        delete: $delete_fn:ident => $delete_query:path,
+        sync: $sync_fn:ident ( $sync_arg:ident ) => $sync_query:path $(,)?
+    ) => {
+        crud_commands! {
+            entity: $entity,
+            model: $model,
+            get: $get_fn => $get_query,
+            save: $save_fn($save_arg) -> $model => $save_query => $save_arg,
+            delete: $delete_fn => $delete_query,
+            sync: $sync_fn($sync_arg) => $sync_query,
+        }
+    };
+
+    // Generic entity with explicit save return type and expression
+    (
+        entity: $entity:literal,
+        model: $model:ty,
+        get: $get_fn:ident => $get_query:path,
+        save: $save_fn:ident ( $save_arg:ident ) -> $save_ret:ty => $save_query:path => $save_expr:expr,
+        delete: $delete_fn:ident => $delete_query:path,
+        sync: $sync_fn:ident ( $sync_arg:ident ) => $sync_query:path $(,)?
+    ) => {
+        #[tauri::command]
+        pub fn $get_fn(state: tauri::State<'_, crate::db::DbState>) -> Result<Vec<$model>, String> {
+            with_conn(&state, $get_query)
+        }
+
+        #[tauri::command]
+        pub fn $save_fn(
+            app: tauri::AppHandle,
+            state: tauri::State<'_, crate::db::DbState>,
+            $save_arg: $model,
+        ) -> Result<$save_ret, String> {
+            with_conn(&state, |conn| $save_query(conn, &$save_arg))?;
+            emit_db_change(&app, $entity, "save", Some($save_arg.id.clone()));
+            Ok($save_expr)
+        }
+
+        #[tauri::command]
+        pub fn $delete_fn(
+            app: tauri::AppHandle,
+            state: tauri::State<'_, crate::db::DbState>,
+            id: String,
+        ) -> Result<(), String> {
+            with_conn(&state, |conn| $delete_query(conn, &id))?;
+            emit_db_change(&app, $entity, "delete", Some(id));
+            Ok(())
+        }
+
+        #[tauri::command]
+        pub fn $sync_fn(
+            app: tauri::AppHandle,
+            state: tauri::State<'_, crate::db::DbState>,
+            $sync_arg: Vec<$model>,
+        ) -> Result<(), String> {
+            with_conn_mut(&state, |conn| $sync_query(conn, &$sync_arg))?;
+            emit_db_change(&app, $entity, "save", None);
+            Ok(())
+        }
+    };
+}
 
 #[tauri::command]
 pub fn check_db_is_empty(state: tauri::State<'_, crate::db::DbState>) -> Result<bool, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::is_database_empty(&conn).map_err(|e| e.to_string())
+    with_conn(&state, crate::db::queries::is_database_empty)
 }
 
-#[tauri::command]
-pub fn get_goals(
-    state: tauri::State<'_, crate::db::DbState>,
-) -> Result<Vec<crate::db::models::Goal>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::get_all_goals(&conn).map_err(|e| e.to_string())
+crud_commands! {
+    entity: "goals",
+    model: crate::db::models::Goal,
+    get: get_goals => crate::db::queries::get_all_goals,
+    save: save_goal(goal) => crate::db::queries::upsert_goal,
+    delete: delete_goal => crate::db::queries::delete_goal,
+    sync: sync_goals(goals) => crate::db::queries::sync_goals,
 }
 
-#[tauri::command]
-pub fn save_goal(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    goal: crate::db::models::Goal,
-) -> Result<crate::db::models::Goal, String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::upsert_goal(&conn, &goal).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "goals".into(),
-            action: "save".into(),
-            id: Some(goal.id.clone()),
-        },
-    );
-    Ok(goal)
+crud_commands! {
+    entity: "tasks",
+    model: crate::db::models::Task,
+    get: get_tasks => crate::db::queries::get_all_tasks,
+    save: save_task(task) => crate::db::queries::upsert_task,
+    delete: delete_task => crate::db::queries::delete_task,
+    sync: sync_tasks(tasks) => crate::db::queries::sync_tasks,
 }
 
-#[tauri::command]
-pub fn delete_goal(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    id: String,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::delete_goal(&conn, &id).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "goals".into(),
-            action: "delete".into(),
-            id: Some(id),
-        },
-    );
-    Ok(())
+crud_commands! {
+    entity: "action_plans",
+    model: crate::db::models::ActionPlan,
+    get: get_action_plans => crate::db::queries::get_all_action_plans,
+    save: save_action_plan(plan) => crate::db::queries::upsert_action_plan,
+    delete: delete_action_plan => crate::db::queries::delete_action_plan,
+    sync: sync_action_plans(plans) => crate::db::queries::sync_action_plans,
 }
 
-#[tauri::command]
-pub fn sync_goals(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    goals: Vec<crate::db::models::Goal>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::sync_goals(&mut conn, &goals).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "goals".into(),
-            action: "save".into(),
-            id: None,
-        },
-    );
-    Ok(())
+crud_commands! {
+    entity: "notes",
+    model: crate::db::models::Note,
+    get: get_notes => crate::db::queries::get_all_notes,
+    save: save_note(note) => crate::db::queries::upsert_note,
+    delete: delete_note => crate::db::queries::delete_note,
+    sync: sync_notes(notes) => crate::db::queries::sync_notes,
 }
 
-#[tauri::command]
-pub fn get_tasks(
-    state: tauri::State<'_, crate::db::DbState>,
-) -> Result<Vec<crate::db::models::Task>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::get_all_tasks(&conn).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn save_task(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    task: crate::db::models::Task,
-) -> Result<crate::db::models::Task, String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::upsert_task(&conn, &task).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "tasks".into(),
-            action: "save".into(),
-            id: Some(task.id.clone()),
-        },
-    );
-    Ok(task)
-}
-
-#[tauri::command]
-pub fn delete_task(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    id: String,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::delete_task(&conn, &id).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "tasks".into(),
-            action: "delete".into(),
-            id: Some(id),
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn sync_tasks(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    tasks: Vec<crate::db::models::Task>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::sync_tasks(&mut conn, &tasks).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "tasks".into(),
-            action: "save".into(),
-            id: None,
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_action_plans(
-    state: tauri::State<'_, crate::db::DbState>,
-) -> Result<Vec<crate::db::models::ActionPlan>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::get_all_action_plans(&conn).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn save_action_plan(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    plan: crate::db::models::ActionPlan,
-) -> Result<crate::db::models::ActionPlan, String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::upsert_action_plan(&conn, &plan).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "action_plans".into(),
-            action: "save".into(),
-            id: Some(plan.id.clone()),
-        },
-    );
-    Ok(plan)
-}
-
-#[tauri::command]
-pub fn delete_action_plan(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    id: String,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::delete_action_plan(&conn, &id).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "action_plans".into(),
-            action: "delete".into(),
-            id: Some(id),
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn sync_action_plans(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    plans: Vec<crate::db::models::ActionPlan>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::sync_action_plans(&mut conn, &plans).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "action_plans".into(),
-            action: "save".into(),
-            id: None,
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_notes(
-    state: tauri::State<'_, crate::db::DbState>,
-) -> Result<Vec<crate::db::models::Note>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::get_all_notes(&conn).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn save_note(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    note: crate::db::models::Note,
-) -> Result<crate::db::models::Note, String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::upsert_note(&conn, &note).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "notes".into(),
-            action: "save".into(),
-            id: Some(note.id.clone()),
-        },
-    );
-    Ok(note)
-}
-
-#[tauri::command]
-pub fn delete_note(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    id: String,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::delete_note(&conn, &id).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "notes".into(),
-            action: "delete".into(),
-            id: Some(id),
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn sync_notes(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    notes: Vec<crate::db::models::Note>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::sync_notes(&mut conn, &notes).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "notes".into(),
-            action: "save".into(),
-            id: None,
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_calendar_events(
-    state: tauri::State<'_, crate::db::DbState>,
-) -> Result<Vec<crate::db::models::CalendarEvent>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::get_all_calendar_events(&conn).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn save_calendar_event(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    event: crate::db::models::CalendarEvent,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::upsert_calendar_event(&conn, &event).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "calendar_events".into(),
-            action: "save".into(),
-            id: Some(event.id),
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn delete_calendar_event(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    id: String,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::delete_calendar_event(&conn, &id).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "calendar_events".into(),
-            action: "delete".into(),
-            id: Some(id),
-        },
-    );
-    Ok(())
-}
-
-#[tauri::command]
-pub fn sync_calendar_events(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, crate::db::DbState>,
-    events: Vec<crate::db::models::CalendarEvent>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::sync_calendar_events(&mut conn, &events).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "calendar_events".into(),
-            action: "save".into(),
-            id: None,
-        },
-    );
-    Ok(())
+crud_commands! {
+    entity: "calendar_events",
+    model: crate::db::models::CalendarEvent,
+    get: get_calendar_events => crate::db::queries::get_all_calendar_events,
+    save: save_calendar_event(event) -> () => crate::db::queries::upsert_calendar_event => (),
+    delete: delete_calendar_event => crate::db::queries::delete_calendar_event,
+    sync: sync_calendar_events(events) => crate::db::queries::sync_calendar_events,
 }
 
 #[tauri::command]
@@ -486,16 +292,9 @@ pub fn migrate_legacy_data(
     state: tauri::State<'_, crate::db::DbState>,
     data: crate::db::models::LegacyStorageData,
 ) -> Result<(), String> {
-    use tauri::Emitter;
-    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::migrate_legacy_data(&mut conn, &data).map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "db-change",
-        crate::db::models::DbChangePayload {
-            entity: "all".into(),
-            action: "migrate".into(),
-            id: None,
-        },
-    );
+    with_conn_mut(&state, |conn| {
+        crate::db::queries::migrate_legacy_data(conn, &data)
+    })?;
+    emit_db_change(&app, "all", "migrate", None);
     Ok(())
 }

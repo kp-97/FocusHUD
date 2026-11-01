@@ -1,23 +1,69 @@
 import "@testing-library/jest-dom/vitest";
+import { vi } from "vitest";
 
-// Mock BroadcastChannel if unavailable in test environment
-if (typeof window !== "undefined" && !window.BroadcastChannel) {
-  class MockBroadcastChannel {
-    name: string;
-    onmessage: ((ev: MessageEvent) => void) | null = null;
-    constructor(name: string) {
-      this.name = name;
+// Mock HTMLCanvasElement.getContext if unavailable or unimplemented in jsdom
+if (typeof HTMLCanvasElement !== "undefined") {
+  HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((contextId: string) => {
+    if (contextId === "2d") {
+      return {
+        fillRect: vi.fn(),
+        clearRect: vi.fn(),
+        getImageData: vi.fn(() => ({ data: new Array(4) })),
+        putImageData: vi.fn(),
+        createImageData: vi.fn(() => []),
+        setTransform: vi.fn(),
+        drawImage: vi.fn(),
+        save: vi.fn(),
+        fillText: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        closePath: vi.fn(),
+        stroke: vi.fn(),
+        translate: vi.fn(),
+        scale: vi.fn(),
+        rotate: vi.fn(),
+        arc: vi.fn(),
+        fill: vi.fn(),
+        measureText: vi.fn(() => ({ width: 0 })),
+        transform: vi.fn(),
+        rect: vi.fn(),
+        clip: vi.fn(),
+      } as unknown as CanvasRenderingContext2D;
     }
-    postMessage(_data: unknown) {}
-    close() {}
-    addEventListener(_type: string, _listener: EventListenerOrEventListenerObject) {}
-    removeEventListener(_type: string, _listener: EventListenerOrEventListenerObject) {}
-    dispatchEvent(_event: Event) {
-      return true;
-    }
-  }
-  // @ts-expect-error mock assignment for testing
-  window.BroadcastChannel = MockBroadcastChannel;
-  // @ts-expect-error mock assignment for testing
-  globalThis.BroadcastChannel = MockBroadcastChannel;
+    return null;
+  }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 }
+
+// Mock BroadcastChannel in test environment
+class MockBroadcastChannel {
+  name: string;
+  onmessage: ((ev: MessageEvent) => void) | null = null;
+  private listeners: Map<string, Set<EventListenerOrEventListenerObject>> = new Map();
+
+  constructor(name: string) {
+    this.name = name;
+  }
+  postMessage(_data: unknown) {}
+  close() {
+    this.listeners.clear();
+  }
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, new Set());
+    }
+    this.listeners.get(type)!.add(listener);
+  }
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+    this.listeners.get(type)?.delete(listener);
+  }
+  dispatchEvent(_event: Event) {
+    return true;
+  }
+}
+
+// @ts-expect-error mock assignment for testing
+window.BroadcastChannel = MockBroadcastChannel;
+// @ts-expect-error mock assignment for testing
+globalThis.BroadcastChannel = MockBroadcastChannel;
