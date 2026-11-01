@@ -6,10 +6,11 @@ import React, {
   useId,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTheme } from "../../stores/themeStore";
 
 export type TooltipSide = "right" | "left" | "top" | "bottom";
 export type TooltipAlign = "center" | "start" | "end";
-export type TooltipTheme = "cyan" | "amber" | "neutral";
+export type TooltipTheme = "cyan" | "amber" | "neutral" | "light" | "pink" | "auto";
 
 export interface TooltipProps {
   content: React.ReactNode;
@@ -103,6 +104,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   onOpenChange,
 }) => {
   const context = React.useContext(TooltipContext);
+  const { effectiveTheme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; transform: string } | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -307,23 +309,45 @@ export const Tooltip: React.FC<TooltipProps> = ({
     "aria-describedby": isVisible ? tooltipId : childProps["aria-describedby"],
   });
 
-  const themeStyles = {
-    cyan: {
+  const isLight = effectiveTheme === "light" || theme === "light";
+  const isPink = effectiveTheme === "pink" || theme === "pink";
+
+  const themeStyles = (() => {
+    if (isLight) {
+      return {
+        box: "bg-[#ffffff] border-[#cbd5e1] text-[#0f172a] shadow-[0_4px_16px_rgba(15,23,42,0.12),0_1px_3px_rgba(15,23,42,0.08)]",
+        notch: "bg-[#ffffff] border-[#cbd5e1]",
+        shortcut: "bg-[#f1f5f9] text-[#0369a1] border-[#cbd5e1]",
+      };
+    }
+    if (isPink) {
+      return {
+        box: "bg-[#ffffff] border-rose-300/80 text-[#831843] shadow-[0_4px_16px_rgba(244,63,94,0.18),0_1px_3px_rgba(244,63,94,0.08)]",
+        notch: "bg-[#ffffff] border-rose-300/80",
+        shortcut: "bg-[#fff1f2] text-[#e11d48] border-rose-200",
+      };
+    }
+    if (theme === "amber") {
+      return {
+        box: "bg-[#0c0802]/95 border-amber-500/50 text-amber-100 shadow-[0_0_12px_rgba(255,179,0,0.3)]",
+        notch: "bg-[#0c0802] border-amber-500/50",
+        shortcut: "bg-amber-950/70 text-amber-300 border-amber-500/40",
+      };
+    }
+    if (theme === "neutral") {
+      return {
+        box: "bg-neutral-900/95 border-neutral-700 text-neutral-100 shadow-lg",
+        notch: "bg-neutral-900 border-neutral-700",
+        shortcut: "bg-neutral-800 text-neutral-300 border-neutral-700",
+      };
+    }
+    // Default cyber / cyan theme
+    return {
       box: "bg-[#030812]/95 border-cyan-500/50 text-cyan-100 shadow-[0_0_12px_rgba(0,229,255,0.3)]",
       notch: "bg-[#030812] border-cyan-500/50",
       shortcut: "bg-cyan-950/70 text-cyan-300 border-cyan-500/40",
-    },
-    amber: {
-      box: "bg-[#0c0802]/95 border-amber-500/50 text-amber-100 shadow-[0_0_12px_rgba(255,179,0,0.3)]",
-      notch: "bg-[#0c0802] border-amber-500/50",
-      shortcut: "bg-amber-950/70 text-amber-300 border-amber-500/40",
-    },
-    neutral: {
-      box: "bg-neutral-900/95 border-neutral-700 text-neutral-100 shadow-lg",
-      notch: "bg-neutral-900 border-neutral-700",
-      shortcut: "bg-neutral-800 text-neutral-300 border-neutral-700",
-    },
-  }[theme];
+    };
+  })();
 
   const notchStyles = {
     right: "absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 border-l border-b",
@@ -344,12 +368,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
               left: `${coords.left}px`,
               transform: coords.transform,
             }}
-            className={`pointer-events-none select-none z-[99999] flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-tech tracking-wider uppercase backdrop-blur-md border animate-in fade-in zoom-in-95 duration-75 ${themeStyles.box} ${className}`}
+            className={`hud-tooltip pointer-events-none select-none z-[99999] flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-tech tracking-wider uppercase backdrop-blur-md border animate-in fade-in zoom-in-95 duration-75 ${themeStyles.box} ${className}`}
           >
-            <div className={`${notchStyles} ${themeStyles.notch}`} />
-            <span className="font-semibold">{content}</span>
+            <div className={`hud-tooltip-notch ${notchStyles} ${themeStyles.notch}`} />
+            <span className="hud-tooltip-content font-semibold">{content}</span>
             {shortcut && (
-              <kbd className={`text-[10px] px-1 py-0.5 rounded border ml-1 font-mono ${themeStyles.shortcut}`}>
+              <kbd className={`hud-tooltip-shortcut text-[10px] px-1 py-0.5 rounded border ml-1 font-mono ${themeStyles.shortcut}`}>
                 {shortcut}
               </kbd>
             )}

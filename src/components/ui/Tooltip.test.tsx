@@ -131,4 +131,49 @@ describe("Tooltip Component", () => {
 
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
+
+  it("renders high-contrast legible colours for Lab Light theme", () => {
+    localStorage.setItem("focushud_theme", "light");
+
+    render(
+      <Tooltip content="Settings Tab" shortcut="Ctrl+,">
+        <button>Settings</button>
+      </Tooltip>
+    );
+
+    const button = screen.getByRole("button", { name: "Settings Tab" });
+    fireEvent.mouseEnter(button);
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip.className).toContain("bg-[#ffffff]");
+    expect(tooltip.className).toContain("text-[#0f172a]");
+    expect(tooltip.className).toContain("border-[#cbd5e1]");
+
+    const shortcut = tooltip.querySelector("kbd");
+    expect(shortcut).toBeInTheDocument();
+    expect(shortcut?.className).toContain("text-[#0369a1]");
+  });
+
+  it("renders high-contrast legible colours for Pastel Sakura theme", () => {
+    localStorage.setItem("focushud_theme", "pink");
+
+    render(
+      <Tooltip content="Focus Mode" shortcut="Alt+F">
+        <button>Focus</button>
+      </Tooltip>
+    );
+
+    const button = screen.getByRole("button", { name: "Focus Mode" });
+    fireEvent.mouseEnter(button);
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip.className).toContain("bg-[#ffffff]");
+    expect(tooltip.className).toContain("text-[#831843]");
+
+    const shortcut = tooltip.querySelector("kbd");
+    expect(shortcut).toBeInTheDocument();
+    expect(shortcut?.className).toContain("text-[#e11d48]");
+  });
 });

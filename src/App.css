@@ -439,6 +439,65 @@
   border-color: rgba(244, 63, 94, 0.22) !important;
 }
 
+/* Tooltip High-Contrast Legibility Overrides for Lab Light & Pastel Sakura */
+[data-theme="light"] .hud-tooltip,
+[data-theme="light"] [role="tooltip"] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme="light"] .hud-tooltip .hud-tooltip-notch,
+[data-theme="light"] [role="tooltip"] > div {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .hud-tooltip span,
+[data-theme="light"] .hud-tooltip .hud-tooltip-content,
+[data-theme="light"] [role="tooltip"] span,
+[data-theme="light"] [role="tooltip"] .font-semibold {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .hud-tooltip kbd,
+[data-theme="light"] .hud-tooltip-shortcut,
+[data-theme="light"] [role="tooltip"] kbd {
+  background-color: #f1f5f9 !important;
+  color: #0369a1 !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="pink"] .hud-tooltip,
+[data-theme="pink"] [role="tooltip"] {
+  background-color: #ffffff !important;
+  color: #831843 !important;
+  border-color: rgba(244, 63, 94, 0.4) !important;
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.18), 0 1px 3px rgba(244, 63, 94, 0.08) !important;
+}
+
+[data-theme="pink"] .hud-tooltip .hud-tooltip-notch,
+[data-theme="pink"] [role="tooltip"] > div {
+  background-color: #ffffff !important;
+  border-color: rgba(244, 63, 94, 0.4) !important;
+}
+
+[data-theme="pink"] .hud-tooltip span,
+[data-theme="pink"] .hud-tooltip .hud-tooltip-content,
+[data-theme="pink"] [role="tooltip"] span,
+[data-theme="pink"] [role="tooltip"] .font-semibold {
+  color: #831843 !important;
+}
+
+[data-theme="pink"] .hud-tooltip kbd,
+[data-theme="pink"] .hud-tooltip-shortcut,
+[data-theme="pink"] [role="tooltip"] kbd {
+  background-color: #fff1f2 !important;
+  color: #e11d48 !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
 /* Slot Headers and Sub-bars */
 [data-theme="light"] .border-b[class*="bg-black"],
 [data-theme="light"] .border-t[class*="bg-black"] {
