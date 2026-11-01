@@ -3,6 +3,9 @@ import {
   getPomodoroState,
   pomodoroActions,
   subscribePomodoro,
+  _getIsLocalTicker,
+  _handleIncomingSyncForTesting,
+  PomodoroState,
 } from "./pomodoroStore";
 
 describe("pomodoroStore", () => {
@@ -185,6 +188,114 @@ describe("pomodoroStore", () => {
       vi.advanceTimersByTime(60000);
       expect(getPomodoroState().dailyStats.totalFocusMinutes).toBe(0);
       expect(getPomodoroState().dailyStats.focusSecondsElapsed).toBe(0);
+    });
+  });
+
+  describe("Cross-window Pomodoro synchronization", () => {
+    it("broadcasts sync payload to localStorage on start, pause, and adjust", () => {
+      pomodoroActions.start();
+      const rawStart = localStorage.getItem("focushud_last_pomodoro_sync");
+      expect(rawStart).toBeTruthy();
+      const parsedStart = JSON.parse(rawStart!);
+      expect(parsedStart.type).toBe("START");
+      expect(parsedStart.state.isRunning).toBe(true);
+
+      pomodoroActions.adjustMinutes(2);
+      const rawAdjust = localStorage.getItem("focushud_last_pomodoro_sync");
+      const parsedAdjust = JSON.parse(rawAdjust!);
+      expect(parsedAdjust.type).toBe("ADJUST");
+
+      pomodoroActions.pause();
+      const rawPause = localStorage.getItem("focushud_last_pomodoro_sync");
+      const parsedPause = JSON.parse(rawPause!);
+      expect(parsedPause.type).toBe("PAUSE");
+      expect(parsedPause.state.isRunning).toBe(false);
+    });
+
+    it("synchronizes timer state from remote window without starting duplicate local ticker", () => {
+      const listener = vi.fn();
+      const unsub = subscribePomodoro(listener);
+
+      const remoteState: PomodoroState = {
+        ...getPomodoroState(),
+        isRunning: true,
+        timeLeft: 1350,
+      };
+
+      _handleIncomingSyncForTesting({
+        type: "START",
+        state: remoteState,
+        senderId: "remote_window_abc",
+        timestamp: Date.now(),
+      });
+
+      expect(getPomodoroState().isRunning).toBe(true);
+      expect(getPomodoroState().timeLeft).toBe(1350);
+      expect(_getIsLocalTicker()).toBe(false); // Does not tick locally to prevent double tick
+      expect(listener).toHaveBeenCalled();
+
+      unsub();
+    });
+
+    it("smoothly adopts remote ticks", () => {
+      const remoteState: PomodoroState = {
+        ...getPomodoroState(),
+        isRunning: true,
+        timeLeft: 1100,
+        dailyStats: {
+          date: new Date().toISOString().split("T")[0],
+          completedPomodoros: 2,
+          totalFocusMinutes: 50,
+          focusSecondsElapsed: 25,
+        },
+      };
+
+      _handleIncomingSyncForTesting({
+        type: "TICK",
+        state: remoteState,
+        senderId: "remote_window_abc",
+        timestamp: Date.now(),
+      });
+
+      expect(getPomodoroState().timeLeft).toBe(1100);
+      expect(getPomodoroState().dailyStats.completedPomodoros).toBe(2);
+      expect(getPomodoroState().dailyStats.totalFocusMinutes).toBe(50);
+    });
+
+    it("synchronizes pause, stop, and mode changes from remote window", () => {
+      // First start remotely
+      _handleIncomingSyncForTesting({
+        type: "START",
+        state: { ...getPomodoroState(), isRunning: true, timeLeft: 1200 },
+        senderId: "remote_window_abc",
+        timestamp: Date.now(),
+      });
+      expect(getPomodoroState().isRunning).toBe(true);
+
+      // Remote pause
+      _handleIncomingSyncForTesting({
+        type: "PAUSE",
+        state: { ...getPomodoroState(), isRunning: false, timeLeft: 1200 },
+        senderId: "remote_window_abc",
+        timestamp: Date.now(),
+      });
+      expect(getPomodoroState().isRunning).toBe(false);
+
+      // Remote mode change
+      _handleIncomingSyncForTesting({
+        type: "SWITCH_MODE",
+        state: {
+          ...getPomodoroState(),
+          mode: "short_break",
+          timeLeft: 300,
+          totalSeconds: 300,
+          isRunning: false,
+        },
+        senderId: "remote_window_abc",
+        timestamp: Date.now(),
+      });
+      expect(getPomodoroState().mode).toBe("short_break");
+      expect(getPomodoroState().timeLeft).toBe(300);
     });
   });
 });

@@ -75,6 +75,137 @@ type Listener = (state: PomodoroState) => void;
 const listeners = new Set<Listener>();
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let isLocalTicker = false;
+
+// Cross-window Pomodoro synchronization via BroadcastChannel
+const POMODORO_CHANNEL_NAME = "focushud_pomodoro_channel";
+const pomodoroChannel =
+  typeof BroadcastChannel !== "undefined"
+    ? new BroadcastChannel(POMODORO_CHANNEL_NAME)
+    : null;
+
+const WINDOW_ID =
+  typeof window !== "undefined"
+    ? `win_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`
+    : "win_node";
+
+export type PomodoroSyncActionType =
+  | "START"
+  | "PAUSE"
+  | "STOP"
+  | "TICK"
+  | "COMPLETE"
+  | "SWITCH_MODE"
+  | "RESET"
+  | "SKIP_PHASE"
+  | "ADJUST"
+  | "SETTINGS_CHANGE"
+  | "STATS_UPDATE"
+  | "REQUEST_SYNC";
+
+export interface PomodoroSyncPayload {
+  type: PomodoroSyncActionType;
+  state: PomodoroState;
+  senderId: string;
+  timestamp: number;
+}
+
+export const broadcastPomodoroSync = (type: PomodoroSyncActionType) => {
+  const payload: PomodoroSyncPayload = {
+    type,
+    state: { ...state, dailyStats: { ...state.dailyStats } },
+    senderId: WINDOW_ID,
+    timestamp: Date.now(),
+  };
+
+  if (pomodoroChannel) {
+    pomodoroChannel.postMessage(payload);
+  }
+
+  try {
+    localStorage.setItem("focushud_last_pomodoro_sync", JSON.stringify(payload));
+  } catch {
+    // Ignore storage quota or disabled storage
+  }
+};
+
+const handleIncomingSync = (payload: PomodoroSyncPayload) => {
+  if (!payload || payload.senderId === WINDOW_ID) return;
+
+  const { type, state: remoteState } = payload;
+
+  switch (type) {
+    case "START": {
+      isLocalTicker = false;
+      state = { ...remoteState, dailyStats: { ...remoteState.dailyStats } };
+      updateTimerLoop();
+      notify();
+      break;
+    }
+    case "TICK": {
+      state = { ...remoteState, dailyStats: { ...remoteState.dailyStats } };
+      notify();
+      break;
+    }
+    case "PAUSE":
+    case "STOP":
+    case "RESET":
+    case "SWITCH_MODE":
+    case "SKIP_PHASE":
+    case "COMPLETE": {
+      isLocalTicker = false;
+      state = { ...remoteState, dailyStats: { ...remoteState.dailyStats } };
+      updateTimerLoop();
+      notify();
+      break;
+    }
+    case "ADJUST":
+    case "SETTINGS_CHANGE":
+    case "STATS_UPDATE": {
+      state = { ...remoteState, dailyStats: { ...remoteState.dailyStats } };
+      notify();
+      break;
+    }
+    case "REQUEST_SYNC": {
+      if (isLocalTicker || state.isRunning) {
+        broadcastPomodoroSync("TICK");
+      }
+      break;
+    }
+  }
+};
+
+if (pomodoroChannel) {
+  pomodoroChannel.addEventListener("message", (e: MessageEvent) => {
+    if (e.data && e.data.type) {
+      handleIncomingSync(e.data as PomodoroSyncPayload);
+    }
+  });
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e: StorageEvent) => {
+    if (e.key === "focushud_last_pomodoro_sync" && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed && parsed.type) {
+          handleIncomingSync(parsed as PomodoroSyncPayload);
+        }
+      } catch {}
+    }
+  });
+
+  try {
+    if (pomodoroChannel) {
+      pomodoroChannel.postMessage({
+        type: "REQUEST_SYNC",
+        state: { ...state },
+        senderId: WINDOW_ID,
+        timestamp: Date.now(),
+      });
+    }
+  } catch {}
+}
 
 const notify = () => {
   listeners.forEach((l) => l({ ...state }));
@@ -122,16 +253,17 @@ const tick = () => {
       dailyStats: updatedDaily,
     };
     notify();
+    broadcastPomodoroSync("TICK");
   }
 };
 
 const updateTimerLoop = () => {
-  if (state.isRunning && !intervalId) {
+  if (state.isRunning && isLocalTicker && !intervalId) {
     intervalId = setInterval(tick, 1000);
     if (intervalId && typeof (intervalId as unknown as { unref?: () => void }).unref === "function") {
       (intervalId as unknown as { unref: () => void }).unref();
     }
-  } else if (!state.isRunning && intervalId) {
+  } else if ((!state.isRunning || !isLocalTicker) && intervalId) {
     clearInterval(intervalId);
     intervalId = null;
   }
@@ -185,8 +317,10 @@ const handleCompleted = (currentDaily?: DailyStats) => {
     };
   }
 
+  isLocalTicker = false;
   updateTimerLoop();
   notify();
+  broadcastPomodoroSync("COMPLETE");
 };
 
 export const getPomodoroState = (): PomodoroState => ({ ...state });
@@ -198,31 +332,45 @@ export const subscribePomodoro = (listener: Listener): (() => void) => {
   };
 };
 
+export const _getIsLocalTicker = () => isLocalTicker;
+export const _setIsLocalTicker = (val: boolean) => {
+  isLocalTicker = val;
+};
+export const _handleIncomingSyncForTesting = handleIncomingSync;
+
 export const pomodoroActions = {
   toggleRun: () => {
-    state = { ...state, isRunning: !state.isRunning };
+    const nextRunning = !state.isRunning;
+    isLocalTicker = nextRunning;
+    state = { ...state, isRunning: nextRunning };
     updateTimerLoop();
     notify();
+    broadcastPomodoroSync(nextRunning ? "START" : "PAUSE");
   },
 
   start: () => {
     if (!state.isRunning) {
+      isLocalTicker = true;
       state = { ...state, isRunning: true };
       updateTimerLoop();
       notify();
+      broadcastPomodoroSync("START");
     }
   },
 
   pause: () => {
     if (state.isRunning) {
+      isLocalTicker = false;
       state = { ...state, isRunning: false };
       localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
       updateTimerLoop();
       notify();
+      broadcastPomodoroSync("PAUSE");
     }
   },
 
   stop: () => {
+    isLocalTicker = false;
     // Cancels the active timer: stops running and resets countdown back to initial duration for current mode
     let mins = state.focusMinutes;
     if (state.mode === "short_break") mins = state.shortBreakMinutes;
@@ -238,6 +386,7 @@ export const pomodoroActions = {
     localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
     updateTimerLoop();
     notify();
+    broadcastPomodoroSync("STOP");
   },
 
   cancel: () => {
@@ -245,6 +394,7 @@ export const pomodoroActions = {
   },
 
   skipPhase: () => {
+    isLocalTicker = false;
     const isFocus = state.mode === "focus";
     let nextMode: PomodoroMode = "focus";
     let nextCycle = state.cycle;
@@ -277,9 +427,11 @@ export const pomodoroActions = {
     localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
     updateTimerLoop();
     notify();
+    broadcastPomodoroSync("SKIP_PHASE");
   },
 
   reset: () => {
+    isLocalTicker = false;
     let mins = state.focusMinutes;
     if (state.mode === "short_break") mins = state.shortBreakMinutes;
     if (state.mode === "long_break") mins = state.longBreakMinutes;
@@ -291,6 +443,7 @@ export const pomodoroActions = {
     };
     updateTimerLoop();
     notify();
+    broadcastPomodoroSync("RESET");
   },
 
   setCycle: (cycle: number) => {
@@ -299,6 +452,7 @@ export const pomodoroActions = {
       cycle: Math.max(1, Math.min(state.totalCycles, cycle)),
     };
     notify();
+    broadcastPomodoroSync("SETTINGS_CHANGE");
   },
 
   resetDailyStats: () => {
@@ -313,20 +467,24 @@ export const pomodoroActions = {
     localStorage.removeItem("focusdock_pomodoro_daily");
     state = { ...state, dailyStats: fresh };
     notify();
+    broadcastPomodoroSync("STATS_UPDATE");
   },
 
   setDailyStats: (stats: Partial<DailyStats>) => {
     state = { ...state, dailyStats: { ...state.dailyStats, ...stats } };
     localStorage.setItem("focushud_pomodoro_daily", JSON.stringify(state.dailyStats));
     notify();
+    broadcastPomodoroSync("STATS_UPDATE");
   },
 
   reloadDailyStats: () => {
     state = { ...state, dailyStats: loadInitialDailyStats() };
     notify();
+    broadcastPomodoroSync("STATS_UPDATE");
   },
 
   switchMode: (newMode: PomodoroMode) => {
+    isLocalTicker = false;
     let mins = state.focusMinutes;
     if (newMode === "short_break") mins = state.shortBreakMinutes;
     if (newMode === "long_break") mins = state.longBreakMinutes;
@@ -339,6 +497,7 @@ export const pomodoroActions = {
     };
     updateTimerLoop();
     notify();
+    broadcastPomodoroSync("SWITCH_MODE");
   },
 
   adjustMinutes: (delta: number) => {
@@ -378,6 +537,7 @@ export const pomodoroActions = {
       longBreakMinutes: newLongBreak,
     };
     notify();
+    broadcastPomodoroSync("ADJUST");
   },
 
   setFocusMinutes: (mins: number) => {
@@ -390,6 +550,7 @@ export const pomodoroActions = {
         : {}),
     };
     notify();
+    broadcastPomodoroSync("SETTINGS_CHANGE");
   },
 
   setShortBreakMinutes: (mins: number) => {
@@ -402,6 +563,7 @@ export const pomodoroActions = {
         : {}),
     };
     notify();
+    broadcastPomodoroSync("SETTINGS_CHANGE");
   },
 
   setLongBreakMinutes: (mins: number) => {
@@ -414,6 +576,7 @@ export const pomodoroActions = {
         : {}),
     };
     notify();
+    broadcastPomodoroSync("SETTINGS_CHANGE");
   },
 
   setTotalCycles: (cycles: number) => {
@@ -424,6 +587,7 @@ export const pomodoroActions = {
       cycle: state.cycle > cycles ? 1 : state.cycle,
     };
     notify();
+    broadcastPomodoroSync("SETTINGS_CHANGE");
   },
 };
 

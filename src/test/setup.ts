@@ -36,28 +36,59 @@ if (typeof HTMLCanvasElement !== "undefined") {
   }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 }
 
-// Mock BroadcastChannel in test environment
+// Mock BroadcastChannel in test environment with multi-instance peer dispatch
 class MockBroadcastChannel {
   name: string;
   onmessage: ((ev: MessageEvent) => void) | null = null;
   private listeners: Map<string, Set<EventListenerOrEventListenerObject>> = new Map();
+  private static channelsByName: Map<string, Set<MockBroadcastChannel>> = new Map();
 
   constructor(name: string) {
     this.name = name;
+    if (!MockBroadcastChannel.channelsByName.has(name)) {
+      MockBroadcastChannel.channelsByName.set(name, new Set());
+    }
+    MockBroadcastChannel.channelsByName.get(name)!.add(this);
   }
-  postMessage(_data: unknown) {}
+
+  postMessage(data: unknown) {
+    const peers = MockBroadcastChannel.channelsByName.get(this.name);
+    if (peers) {
+      peers.forEach((peer) => {
+        if (peer !== this) {
+          const event = new MessageEvent("message", { data });
+          if (peer.onmessage) peer.onmessage(event);
+          const listeners = peer.listeners.get("message");
+          if (listeners) {
+            listeners.forEach((listener) => {
+              if (typeof listener === "function") {
+                listener(event);
+              } else if (listener && typeof listener.handleEvent === "function") {
+                listener.handleEvent(event);
+              }
+            });
+          }
+        }
+      });
+    }
+  }
+
   close() {
     this.listeners.clear();
+    MockBroadcastChannel.channelsByName.get(this.name)?.delete(this);
   }
+
   addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
     this.listeners.get(type)!.add(listener);
   }
+
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject) {
     this.listeners.get(type)?.delete(listener);
   }
+
   dispatchEvent(_event: Event) {
     return true;
   }
