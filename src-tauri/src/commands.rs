@@ -197,9 +197,7 @@ macro_rules! crud_commands {
         sync: $sync_fn:ident ( $sync_arg:ident ) => $sync_query:path $(,)?
     ) => {
         #[tauri::command]
-        pub fn $get_fn(
-            state: tauri::State<'_, crate::db::DbState>,
-        ) -> Result<Vec<$model>, String> {
+        pub fn $get_fn(state: tauri::State<'_, crate::db::DbState>) -> Result<Vec<$model>, String> {
             with_conn(&state, $get_query)
         }
 
