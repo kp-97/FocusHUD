@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Download,
   RefreshCw,
@@ -25,26 +25,38 @@ export const UpdatesTab: React.FC = () => {
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isReadyToRestart, setIsReadyToRestart] = useState(false);
   const [isSnoozed, setIsSnoozed] = useState(false);
+  const isMountedRef = useRef(true);
 
   // Check on tab mount
   useEffect(() => {
-    getAppCurrentVersion().then(setCurrentVersion);
+    isMountedRef.current = true;
+    getAppCurrentVersion().then((ver) => {
+      if (isMountedRef.current) setCurrentVersion(ver);
+    });
     handleCheck(false);
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const handleCheck = async (force = true) => {
+    if (!isMountedRef.current) return;
     setIsChecking(true);
     setStatusMessage(null);
     try {
       const info = await checkForUpdates(force);
+      if (!isMountedRef.current) return;
       setUpdateInfo(info);
       if (!info.available) {
         setStatusMessage("FocusHUD is currently up to date.");
       }
     } catch {
+      if (!isMountedRef.current) return;
       setStatusMessage("Failed to check for updates. Please check your network connection.");
     } finally {
-      setIsChecking(false);
+      if (isMountedRef.current) {
+        setIsChecking(false);
+      }
     }
   };
 

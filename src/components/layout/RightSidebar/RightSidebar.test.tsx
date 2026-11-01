@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { RightSidebar } from "./RightSidebar";
 import { pomodoroActions } from "../../../stores/pomodoroStore";
 import * as tauriBridge from "../../../services/tauriBridge";
@@ -21,6 +21,7 @@ describe("RightSidebar component", () => {
   });
 
   afterEach(() => {
+    cleanup();
     pomodoroActions.pause();
     pomodoroActions.reset();
     vi.useRealTimers();
