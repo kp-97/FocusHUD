@@ -39,7 +39,7 @@ export const NotesList: React.FC<NotesListProps> = ({
   onChangeFilter,
   searchQuery,
   onChangeSearchQuery,
-  isCompact: _isCompact = false,
+  isCompact = false,
 }) => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -134,12 +134,14 @@ export const NotesList: React.FC<NotesListProps> = ({
   return (
     <div className="flex flex-col h-full w-full bg-[#03070d] text-cyan-200 select-none overflow-hidden">
       {/* Header with New Note Action */}
-      <div className="flex items-center justify-between p-2 border-b border-cyan-500/20 bg-black/40 shrink-0 gap-1.5">
+      <div className={`flex items-center justify-between ${isCompact ? "p-1.5" : "p-2"} border-b border-cyan-500/20 bg-black/40 shrink-0 gap-1.5`}>
         <div className="flex items-center gap-1.5 min-w-0">
           <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span className="font-orbitron font-bold text-xs tracking-wider text-cyan-200 truncate">
-            NOTES
-          </span>
+          {!isCompact && (
+            <span className="font-orbitron font-bold text-xs tracking-wider text-cyan-200 truncate">
+              NOTES
+            </span>
+          )}
           <span className="text-[10px] font-mono text-cyan-400/60 bg-cyan-950/80 px-1 rounded border border-cyan-500/20">
             {notes.length}
           </span>

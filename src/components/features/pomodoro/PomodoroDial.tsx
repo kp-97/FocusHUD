@@ -3,8 +3,9 @@ import { Play, Pause, RotateCcw, Timer, Plus, Minus, Check, X, Sliders, Square }
 import { usePomodoro } from "../../../stores/pomodoroStore";
 import { useTheme } from "../../../stores/themeStore";
 
-interface PomodoroDialProps {
+export interface PomodoroDialProps {
   isCompact?: boolean;
+  showTitle?: boolean;
 }
 
 type AdjustTarget = "focus" | "short_break" | "long_break" | "cycles" | null;
@@ -205,7 +206,10 @@ const THEME_POMODORO: Record<string, PomodoroThemeStyle> = {
   },
 };
 
-export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false }) => {
+export const PomodoroDial: React.FC<PomodoroDialProps> = ({
+  isCompact = false,
+  showTitle = !isCompact,
+}) => {
   const { effectiveTheme } = useTheme();
   const themeStyle = THEME_POMODORO[effectiveTheme] || THEME_POMODORO.cyber;
 
@@ -333,18 +337,24 @@ export const PomodoroDial: React.FC<PomodoroDialProps> = ({ isCompact = false })
 
   return (
     <div className="relative w-full flex flex-col items-center justify-center p-3 select-none">
-      {/* 1. HUD Telemetry Top Header (STANDBY -> POMODORO TIMER) */}
-      <div className="w-full flex justify-between items-center text-[10px] text-orange-400/80 font-tech uppercase tracking-wider mb-2">
-        <span className="flex items-center gap-1.5">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isRunning ? "bg-amber-400 animate-ping shadow-[0_0_8px_#ffb300]" : "bg-neutral-600"
-            }`}
-          />
-          <span className="font-semibold text-orange-200">
-            {isRunning ? "TIMER RUNNING" : "POMODORO TIMER"}
+      {/* 1. HUD Telemetry Top Header */}
+      <div
+        className={`w-full flex ${
+          showTitle ? "justify-between" : "justify-end"
+        } items-center text-[10px] text-orange-400/80 font-tech uppercase tracking-wider mb-2`}
+      >
+        {showTitle && (
+          <span className="flex items-center gap-1.5" data-testid="pomodoro-header-title">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isRunning ? "bg-amber-400 animate-ping shadow-[0_0_8px_#ffb300]" : "bg-neutral-600"
+              }`}
+            />
+            <span className="font-semibold text-orange-200">
+              {isRunning ? "TIMER RUNNING" : "POMODORO TIMER"}
+            </span>
           </span>
-        </span>
+        )}
         <button
           onClick={() => !isRunning && openAdjust("cycles")}
           disabled={isRunning}

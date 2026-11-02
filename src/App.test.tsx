@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, act } from "@testing-library/react";
 import App from "./App";
 
 vi.mock("./services/tauriBridge", () => ({
@@ -12,6 +12,7 @@ vi.mock("./services/tauriBridge", () => ({
   setDockPopoutMode: vi.fn(),
   exitApp: vi.fn(),
   minimizeToTray: vi.fn(),
+  setFullscreenMode: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("./components/features/settings/UpdatesTab", () => ({
@@ -70,5 +71,54 @@ describe("App root window dispatcher", () => {
     setLocationSearch("?view=settings");
     render(<App />);
     expect(screen.getByTestId("settings-modal-app")).toBeInTheDocument();
+  });
+
+  it("switches to full screen mode when clicking maximise and returns to docked mode when clicking restore", async () => {
+    setLocationSearch("");
+    render(<App />);
+
+    // Initially in docked mode: Center workspace is present, full screen view container is not
+    expect(screen.getByText("Fluid Fit")).toBeInTheDocument();
+    expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
+
+    const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
+    expect(maxBtn).toBeInTheDocument();
+
+    // Click Maximise button
+    await act(async () => {
+      maxBtn.click();
+    });
+
+    // In full screen mode:
+    // 1. Center workspace is replaced by full-screen view container (merging left & right panes)
+    expect(screen.getByTestId("full-screen-view-container")).toBeInTheDocument();
+    expect(screen.queryByText("Fluid Fit")).not.toBeInTheDocument();
+
+    // 2. Left and right rails are still on the left and right
+    expect(screen.getByLabelText("System Menu")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-toggle-left")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-toggle-right")).toBeInTheDocument();
+
+    // Clicking a view on the left rail displays its full view version in the center space
+    const calendarBtn = screen.getByTestId("left-rail-nav-calendar");
+    await act(async () => {
+      calendarBtn.click();
+    });
+    expect(screen.getByText("CALENDAR")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Today/i })).toBeInTheDocument();
+
+    // 3. Maximise button switches to Restore button
+    const restoreBtn = screen.getByLabelText(/Restore FocusHUD/i);
+    expect(restoreBtn).toBeInTheDocument();
+
+    // Click Restore button
+    await act(async () => {
+      restoreBtn.click();
+    });
+
+    // Returns to docked mode
+    expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
+    expect(screen.getByText("Fluid Fit")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Maximize FocusHUD/i)).toBeInTheDocument();
   });
 });

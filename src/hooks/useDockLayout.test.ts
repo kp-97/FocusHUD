@@ -9,6 +9,7 @@ vi.mock("../services/tauriBridge", () => ({
   restoreWorkArea: vi.fn(),
   openSettingsWindow: vi.fn().mockResolvedValue(true),
   closeSettingsWindow: vi.fn(),
+  setFullscreenMode: vi.fn().mockResolvedValue(true),
 }));
 
 describe("useDockLayout hook", () => {
@@ -107,6 +108,24 @@ describe("useDockLayout hook", () => {
     expect(result.current.rightWidth).toBe(340);
   });
 
+  it("maximizes app freeing screen zones and restores back to docked state", async () => {
+    const { result } = renderHook(() => useDockLayout("full"));
+
+    expect(result.current.isAppMaximized).toBe(false);
+
+    await act(async () => {
+      await result.current.handleToggleMaximizeApp();
+    });
+
+    expect(result.current.isAppMaximized).toBe(true);
+
+    await act(async () => {
+      await result.current.handleToggleMaximizeApp();
+    });
+
+    expect(result.current.isAppMaximized).toBe(false);
+  });
+
   it("applies presets and resets widths", () => {
     const { result } = renderHook(() => useDockLayout("full"));
 
@@ -169,5 +188,54 @@ describe("useDockLayout hook", () => {
   it("calls updateDockSizes on startup when in right dock mode", () => {
     renderHook(() => useDockLayout("right"));
     expect(tauriBridge.updateDockSizes).toHaveBeenCalledWith(null, 280, true);
+  });
+
+  it("toggles maximize and calls setFullscreenMode to transition between dock and full screen", async () => {
+    const { result } = renderHook(() => useDockLayout("right"));
+    expect(result.current.isAppMaximized).toBe(false);
+
+    // Maximize to full screen
+    await act(async () => {
+      await result.current.handleToggleMaximizeApp();
+    });
+    expect(result.current.isAppMaximized).toBe(true);
+    expect(tauriBridge.setFullscreenMode).toHaveBeenCalledWith(true);
+    expect(localStorage.getItem("focushud_is_app_maximized")).toBe("true");
+
+    // Restore back to dock mode
+    await act(async () => {
+      await result.current.handleToggleMaximizeApp();
+    });
+    expect(result.current.isAppMaximized).toBe(false);
+    expect(tauriBridge.setFullscreenMode).toHaveBeenCalledWith(false);
+    expect(localStorage.getItem("focushud_is_app_maximized")).toBe("false");
+  });
+
+  it("synchronizes active navigation item across windows and local storage", () => {
+    const { result } = renderHook(() => useDockLayout("left"));
+    expect(result.current.activeNav).toBe("home");
+
+    act(() => {
+      result.current.setActiveNav("calendar");
+    });
+    expect(result.current.activeNav).toBe("calendar");
+    expect(localStorage.getItem("focushud_active_nav")).toBe("calendar");
+
+    // Receives SET_ACTIVE_NAV broadcast
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "focushud_last_layout_action",
+          newValue: JSON.stringify({
+            action: {
+              type: "SET_ACTIVE_NAV",
+              nav: "kanban",
+              sender: "remote_window",
+            },
+          }),
+        })
+      );
+    });
+    expect(result.current.activeNav).toBe("kanban");
   });
 });

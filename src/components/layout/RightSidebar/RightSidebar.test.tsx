@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, act, cleanup, within } from "@testing-library/react";
 import { RightSidebar } from "./RightSidebar";
 import { pomodoroActions } from "../../../stores/pomodoroStore";
 import * as tauriBridge from "../../../services/tauriBridge";
@@ -7,6 +7,7 @@ import * as tauriBridge from "../../../services/tauriBridge";
 vi.mock("../../../services/tauriBridge", () => ({
   exitApp: vi.fn(),
   minimizeToTray: vi.fn(),
+  restoreWorkArea: vi.fn(),
   getSystemDiagnostics: vi.fn().mockResolvedValue(null),
   setDockPopoutMode: vi.fn(),
 }));
@@ -35,12 +36,14 @@ describe("RightSidebar component", () => {
 
   it("renders window controls in expanded header and triggers actions", () => {
     const handleMaximize = vi.fn();
+    const handleToggleMaximizeApp = vi.fn();
 
     render(
       <RightSidebar
         width={280}
         activeNav="home"
         onMaximizePanes={handleMaximize}
+        onToggleMaximizeApp={handleToggleMaximizeApp}
       />
     );
 
@@ -49,10 +52,10 @@ describe("RightSidebar component", () => {
     fireEvent.click(minBtn);
     expect(tauriBridge.minimizeToTray).toHaveBeenCalledTimes(1);
 
-    // 2. Maximize panes button
-    const maxBtn = screen.getByLabelText(/Maximize Left & Right Panes/i);
+    // 2. Maximize app button
+    const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
     fireEvent.click(maxBtn);
-    expect(handleMaximize).toHaveBeenCalledTimes(1);
+    expect(handleToggleMaximizeApp).toHaveBeenCalledTimes(1);
 
     // 3. Exit button
     const exitBtn = screen.getByLabelText(/Close FocusHUD/i);
@@ -68,30 +71,51 @@ describe("RightSidebar component", () => {
     expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
   });
 
-  it("renders compact controls in compact mini HUD rail", () => {
-    const handleSettings = vi.fn();
+  it("renders compact controls in compact mini HUD rail with window controls and stats", () => {
+    render(<RightSidebar width={68} activeNav="home" />);
 
-    render(
-      <RightSidebar
-        width={68}
-        activeNav="home"
-        onOpenSettings={handleSettings}
-      />
-    );
+    // Minimize, Restore/Maximize, and Exit buttons ARE rendered vertically in compact rail
+    const exitBtn = screen.getByLabelText(/Close FocusHUD/i);
+    const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
+    const minBtn = screen.getByLabelText(/Minimize FocusHUD to Tray/i);
+    const rightToggle = screen.getByTestId("sidebar-toggle-right");
+    expect(exitBtn).toBeInTheDocument();
+    expect(maxBtn).toBeInTheDocument();
+    expect(minBtn).toBeInTheDocument();
+    expect(rightToggle).toBeInTheDocument();
 
-    // Hamburger menu button in compact rail
-    const menuBtn = screen.getByLabelText(/System Menu/i);
-    expect(menuBtn).toBeInTheDocument();
-    act(() => {
-      fireEvent.click(menuBtn);
-    });
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-    expect(screen.getByText("SYSTEM MENU")).toBeInTheDocument();
-    expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("right", true);
+    // Verify vertical order in DOM: Exit is before Maximize, Maximize before Minimize, and Minimize before Right Toggle
+    expect(exitBtn.compareDocumentPosition(maxBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(maxBtn.compareDocumentPosition(minBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(minBtn.compareDocumentPosition(rightToggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
-    // Minimize and Exit buttons should NOT exist in compact rail
-    expect(screen.queryByLabelText(/Minimize to Tray/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Close FocusHUD/i)).not.toBeInTheDocument();
+    // System stats section is rendered
+    expect(screen.getByText("STATS")).toBeInTheDocument();
+    expect(screen.getByTestId("configure-system-stats-button")).toBeInTheDocument();
+  });
+
+  it("allows configuring system stats metrics on the right rail", () => {
+    render(<RightSidebar width={68} activeNav="home" />);
+
+    // Open stats configuration dialog
+    const configBtn = screen.getByTestId("configure-system-stats-button");
+    fireEvent.click(configBtn);
+
+    const dialog = screen.getByTestId("stats-config-dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByText("CONFIG STATS")).toBeInTheDocument();
+
+    // Toggle CPU stat checkbox
+    const cpuCheckbox = screen.getByLabelText("Toggle CPU Stat");
+    expect(cpuCheckbox).toBeChecked();
+    fireEvent.click(cpuCheckbox);
+    expect(cpuCheckbox).not.toBeChecked();
+
+    // Toggle Temp stat checkbox
+    const tempCheckbox = screen.getByLabelText("Toggle Temp Stat");
+    expect(tempCheckbox).not.toBeChecked();
+    fireEvent.click(tempCheckbox);
+    expect(tempCheckbox).toBeChecked();
   });
 
   it("toggles timer directly from compact rail", () => {
@@ -112,34 +136,6 @@ describe("RightSidebar component", () => {
   it("does not render the expand right panel button in compact rail", () => {
     render(<RightSidebar width={68} activeNav="home" />);
     expect(screen.queryByTitle(/Expand Right Panel/i)).not.toBeInTheDocument();
-  });
-
-  it("ignores premature blur events on compact rail hamburger menu during focus shifts and closes on legitimate outside-click", () => {
-    vi.useFakeTimers();
-    try {
-      render(<RightSidebar width={68} activeNav="home" />);
-      const menuBtn = screen.getByLabelText(/System Menu/i);
-      act(() => {
-        fireEvent.click(menuBtn);
-      });
-      expect(screen.getByRole("menu")).toBeInTheDocument();
-
-      // Premature blur (< 250ms) ignored (Issue #42)
-      act(() => {
-        window.dispatchEvent(new Event("blur"));
-      });
-      expect(screen.getByRole("menu")).toBeInTheDocument();
-
-      // Outside click after immunity closes menu
-      act(() => {
-        vi.advanceTimersByTime(150);
-        fireEvent.mouseDown(document.body);
-      });
-      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-      expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("right", false);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it("stacks the pause and cancel buttons vertically when running in compact rail", () => {
@@ -166,5 +162,274 @@ describe("RightSidebar component", () => {
     });
     expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
     expect(screen.queryByTitle(/Cancel Timer/i)).not.toBeInTheDocument();
+  });
+
+  it("allows selecting a view from the right pane dropdown independently of the left pane", () => {
+    render(<RightSidebar width={280} activeNav="home" />);
+
+    // Initially displays Home view (VIEW: HOME)
+    const dropdownBtn = screen.getByTestId("right-pane-view-dropdown-button");
+    expect(dropdownBtn).toBeInTheDocument();
+    expect(dropdownBtn).toHaveTextContent(/VIEW: HOME/i);
+
+    // Open dropdown
+    fireEvent.click(dropdownBtn);
+    const menu = screen.getByRole("menu", { name: /Right Pane Views/i });
+    expect(menu).toBeInTheDocument();
+
+    // Select AI CHAT from dropdown
+    const chatOption = within(menu).getByRole("menuitem", { name: /AI CHAT/i });
+    fireEvent.click(chatOption);
+
+    // Dropdown closes and right pane updates to AI AGENT CHAT
+    expect(screen.queryByRole("menu", { name: /Right Pane Views/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("right-pane-view-dropdown-button")).toHaveTextContent(/VIEW: CHAT/i);
+    expect(screen.getByText(/AI AGENT CHAT/i)).toBeInTheDocument();
+  });
+
+  it("always displays window controls vertically (Exit -> Maximise/Restore -> Minimize) in both expanded and compact states", () => {
+    // 1. Expanded mode (width = 280)
+    const { unmount } = render(
+      <RightSidebar
+        width={280}
+        activeNav="home"
+      />
+    );
+
+    const exitBtnExpanded = screen.getByLabelText(/Close FocusHUD/i);
+    const maxBtnExpanded = screen.getByLabelText(/Maximize FocusHUD/i);
+    const minBtnExpanded = screen.getByLabelText(/Minimize FocusHUD to Tray/i);
+
+    // Verify vertical order in expanded mode
+    expect(exitBtnExpanded.compareDocumentPosition(maxBtnExpanded)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(maxBtnExpanded.compareDocumentPosition(minBtnExpanded)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    unmount();
+
+    // 2. Compact mode (width = 68)
+    render(
+      <RightSidebar
+        width={68}
+        activeNav="home"
+      />
+    );
+
+    const exitBtnCompact = screen.getByLabelText(/Close FocusHUD/i);
+    const maxBtnCompact = screen.getByLabelText(/Maximize FocusHUD/i);
+    const minBtnCompact = screen.getByLabelText(/Minimize FocusHUD to Tray/i);
+
+    // Verify vertical order in compact mode
+    expect(exitBtnCompact.compareDocumentPosition(maxBtnCompact)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(maxBtnCompact.compareDocumentPosition(minBtnCompact)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("toggles between maximize and restore state when isAppMaximized is toggled", () => {
+    const handleToggleMaximizeApp = vi.fn();
+    const { rerender } = render(
+      <RightSidebar
+        width={68}
+        activeNav="home"
+        isAppMaximized={false}
+        onToggleMaximizeApp={handleToggleMaximizeApp}
+      />
+    );
+
+    // In normal state, button says Maximize FocusHUD
+    const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
+    expect(maxBtn).toBeInTheDocument();
+    fireEvent.click(maxBtn);
+    expect(handleToggleMaximizeApp).toHaveBeenCalledTimes(1);
+
+    // When maximized, button switches to Restore FocusHUD
+    rerender(
+      <RightSidebar
+        width={68}
+        activeNav="home"
+        isAppMaximized={true}
+        onToggleMaximizeApp={handleToggleMaximizeApp}
+      />
+    );
+
+    const restoreBtn = screen.getByLabelText(/Restore FocusHUD/i);
+    expect(restoreBtn).toBeInTheDocument();
+    fireEvent.click(restoreBtn);
+    expect(handleToggleMaximizeApp).toHaveBeenCalledTimes(2);
+  });
+
+  it("places timer components closer together on right rail and allows adjusting vertical position without swapping", () => {
+    render(<RightSidebar width={68} activeNav="home" />);
+
+    const timerSection = screen.getByTestId("right-rail-timer-wrapper");
+    const statsSection = screen.getByTestId("right-rail-stats-wrapper");
+    const timerLine = screen.getByTestId("timer-drag-handle");
+    const statsLine = screen.getByTestId("stats-drag-handle");
+
+    expect(timerSection).toBeInTheDocument();
+    expect(statsSection).toBeInTheDocument();
+
+    // Fixed order: Timer section is always above the Stats section
+    expect(timerSection.compareDocumentPosition(statsSection)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    // Drag timer dividing line vertically by 30px
+    act(() => {
+      fireEvent.pointerDown(timerLine, { clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(timerLine, { clientY: 130, pointerId: 1 });
+      fireEvent.pointerUp(timerLine, { clientY: 130, pointerId: 1 });
+    });
+
+    expect(timerSection).toHaveStyle({ marginTop: "30px" });
+    expect(localStorage.getItem("focushud_right_rail_timer_offset")).toBe("30");
+
+    // Drag stats dividing line vertically by 45px
+    act(() => {
+      fireEvent.pointerDown(statsLine, { clientY: 200, pointerId: 1 });
+      fireEvent.pointerMove(statsLine, { clientY: 245, pointerId: 1 });
+      fireEvent.pointerUp(statsLine, { clientY: 245, pointerId: 1 });
+    });
+
+    expect(statsSection).toHaveStyle({ marginTop: "45px" });
+    expect(localStorage.getItem("focushud_right_rail_stats_offset")).toBe("45");
+
+    // Timer section remains above Stats section (never swap places)
+    expect(timerSection.compareDocumentPosition(statsSection)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("displays detailed system diagnostics when clicking the stats", async () => {
+    vi.mocked(tauriBridge.getSystemDiagnostics).mockResolvedValue({
+      cpu_usage: 42.5,
+      cpu_name: "AMD Ryzen 9 5900X 12-Core Processor",
+      cpu_cores: 12,
+      ram_used_bytes: 16 * 1024 * 1024 * 1024,
+      ram_total_bytes: 32 * 1024 * 1024 * 1024,
+      ram_usage: 50.0,
+      gpu_name: "NVIDIA GeForce RTX 4080",
+      gpu_usage: 65.0,
+      gpu_temp: 58,
+      vram_used_bytes: 8 * 1024 * 1024 * 1024,
+      vram_total_bytes: 16 * 1024 * 1024 * 1024,
+      vram_usage: 50.0,
+    });
+
+    render(<RightSidebar width={68} activeNav="home" />);
+
+    // Flush pending async state updates from getSystemDiagnostics
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Initially details dialog is not open
+    expect(screen.queryByTestId("system-details-dialog")).not.toBeInTheDocument();
+
+    // Click stats trigger / metrics area
+    const clickableStats = screen.getByTestId("stats-metrics-clickable");
+    act(() => {
+      fireEvent.click(clickableStats);
+    });
+
+    // Detailed dialog is displayed
+    const detailsDialog = screen.getByTestId("system-details-dialog");
+    expect(detailsDialog).toBeInTheDocument();
+    expect(screen.getByText("SYSTEM DIAGNOSTICS")).toBeInTheDocument();
+    expect(screen.getByText("PROCESSOR (CPU)")).toBeInTheDocument();
+    expect(screen.getByText("AMD Ryzen 9 5900X 12-Core Processor")).toBeInTheDocument();
+    expect(screen.getByText("MEMORY (RAM)")).toBeInTheDocument();
+    expect(screen.getByText("GRAPHICS (GPU)")).toBeInTheDocument();
+    expect(screen.getByText("NVIDIA GeForce RTX 4080")).toBeInTheDocument();
+
+    // Close button dismisses dialog
+    const closeBtn = screen.getByLabelText("Close system details");
+    act(() => {
+      fireEvent.click(closeBtn);
+    });
+    expect(screen.queryByTestId("system-details-dialog")).not.toBeInTheDocument();
+  });
+
+  it("renders draggable lines above timer and stats, and has no overflowing icons to the right of system stats", async () => {
+    let container!: HTMLElement;
+    await act(async () => {
+      const res = render(<RightSidebar width={68} activeNav="home" />);
+      container = res.container;
+      await Promise.resolve();
+    });
+
+    // 1. Draggable lines above timer and stats
+    const timerLine = screen.getByTestId("timer-drag-handle");
+    const statsLine = screen.getByTestId("stats-drag-handle");
+    expect(timerLine).toBeInTheDocument();
+    expect(statsLine).toBeInTheDocument();
+    expect(timerLine).toHaveAttribute("draggable", "true");
+    expect(statsLine).toHaveAttribute("draggable", "true");
+
+    // 2. Dragging the line above timer vertically adjusts its offset
+    act(() => {
+      fireEvent.pointerDown(timerLine, { clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(timerLine, { clientY: 135, pointerId: 1 });
+      fireEvent.pointerUp(timerLine, { clientY: 135, pointerId: 1 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(localStorage.getItem("focushud_right_rail_timer_offset")).toBe("35");
+
+    // 3. Header has clean STATS title with no overflowing icons to its right
+    const statsTrigger = screen.getByTestId("stats-details-trigger");
+    expect(statsTrigger).toBeInTheDocument();
+    const statsHeader = statsTrigger.parentElement!;
+    // Only the trigger button exists in this header row
+    expect(statsHeader.querySelectorAll("button").length).toBe(1);
+
+    // 4. Corner dots on the right rail: top-left and bottom-right blue dots are present
+    const dots = container.querySelectorAll(".bg-cyan-400\\/80");
+    expect(dots.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("drags the dividing lines vertically using pointer events to adjust vertical position along the rail", async () => {
+    localStorage.removeItem("focushud_right_rail_timer_offset");
+    localStorage.removeItem("focushud_right_rail_stats_offset");
+    act(() => {
+      render(<RightSidebar width={68} activeNav="home" />);
+    });
+
+    const timerLine = screen.getByTestId("timer-drag-handle");
+    const statsLine = screen.getByTestId("stats-drag-handle");
+    expect(timerLine).toBeInTheDocument();
+    expect(statsLine).toBeInTheDocument();
+
+    // Drag timer line vertically down by 50px
+    act(() => {
+      fireEvent.pointerDown(timerLine, { clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(timerLine, { clientY: 150, pointerId: 1 });
+      fireEvent.pointerUp(timerLine, { clientY: 150, pointerId: 1 });
+    });
+
+    expect(localStorage.getItem("focushud_right_rail_timer_offset")).toBe("50");
+
+    // Drag stats line vertically down by 60px
+    act(() => {
+      fireEvent.pointerDown(statsLine, { clientY: 200, pointerId: 1 });
+      fireEvent.pointerMove(statsLine, { clientY: 260, pointerId: 1 });
+      fireEvent.pointerUp(statsLine, { clientY: 260, pointerId: 1 });
+    });
+
+    expect(localStorage.getItem("focushud_right_rail_stats_offset")).toBe("60");
+
+    // Ensure timer and stats never swap places
+    const timerSection = screen.getByTestId("right-rail-timer-wrapper");
+    const statsSection = screen.getByTestId("right-rail-stats-wrapper");
+    expect(timerSection.compareDocumentPosition(statsSection)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("keeps the right rail fixed to the right edge when expanding from a collapsed state below 120px", () => {
+    // Render at an intermediate width between collapsed (68px) and expanded (120px), e.g. 100px
+    let container: HTMLElement;
+    act(() => {
+      const res = render(<RightSidebar width={100} activeNav="home" />);
+      container = res.container;
+    });
+    const aside = container!.querySelector("aside");
+    expect(aside).toHaveClass("justify-end");
+
+    const rail = container!.querySelector(".hud-panel.w-\\[52px\\]");
+    expect(rail).toHaveClass("ml-auto");
   });
 });

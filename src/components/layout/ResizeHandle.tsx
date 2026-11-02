@@ -19,7 +19,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
   side,
   currentWidth,
   minWidth = 68,
-  maxWidth = 500,
+  maxWidth = typeof window !== "undefined" ? window.innerWidth - minWidth : Infinity,
   snapPoints = [
     { value: 68, label: "SQUARE ICONS" },
     { value: 220, label: "COMPACT" },
@@ -33,7 +33,9 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
   onDoubleClick,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isHoldingClick, setIsHoldingClick] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [cursorY, setCursorY] = useState<number | null>(null);
   const [activeSnapLabel, setActiveSnapLabel] = useState<string | null>(null);
 
   const grabOffsetRef = useRef<number>(0);
@@ -43,11 +45,32 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
   const isDraggingRef = useRef<boolean>(false);
   isDraggingRef.current = isDragging;
 
+  const isResizingActive = isHoldingClick || isDragging;
+
   const getDistanceFromScreenEdge = (clientX: number) => {
     return side === "left" ? clientX : window.innerWidth - clientX;
   };
 
-  const handleMouseEnter = () => setIsHovered(true);
+  const updateCursorY = (clientY: number, currentTarget: HTMLElement) => {
+    try {
+      const rect = currentTarget.getBoundingClientRect();
+      if (rect && rect.height > 0) {
+        const relativeY = clientY - rect.top;
+        const clampedY = Math.max(16, Math.min(rect.height - 16, relativeY));
+        setCursorY(clampedY);
+      }
+    } catch {}
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsHovered(true);
+    updateCursorY(e.clientY, e.currentTarget);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    updateCursorY(e.clientY, e.currentTarget);
+  };
+
   const handleMouseLeave = () => setIsHovered(false);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -57,7 +80,9 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch (_) {}
 
+    setIsHoldingClick(true);
     pointerDownPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+    updateCursorY(e.clientY, e.currentTarget);
 
     const dist = getDistanceFromScreenEdge(e.clientX);
     const rawOffset = dist - currentWidthRef.current;
@@ -65,7 +90,12 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!pointerDownPosRef.current) return;
+    // While hovering (no click held), track cursor vertically.
+    // Once holding click / resizing, lock the vertical position and do not update it.
+    if (!pointerDownPosRef.current) {
+      updateCursorY(e.clientY, e.currentTarget);
+      return;
+    }
 
     if (!isDraggingRef.current) {
       const delta = Math.hypot(
@@ -98,12 +128,15 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       }
     }
 
-    currentWidthRef.current = targetWidth;
-    setActiveSnapLabel(snapLabel);
-    onDragChange(targetWidth, snapLabel);
+    if (currentWidthRef.current !== targetWidth || activeSnapLabel !== snapLabel) {
+      currentWidthRef.current = targetWidth;
+      setActiveSnapLabel(snapLabel);
+      onDragChange(targetWidth, snapLabel);
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsHoldingClick(false);
     pointerDownPosRef.current = null;
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
@@ -125,31 +158,45 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       onPointerCancel={handlePointerUp}
       onDoubleClick={onDoubleClick}
       onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       title="Drag to resize (Double-click to toggle width)"
       className={
         className ??
-        `relative w-3.5 -mx-1.5 z-50 flex items-center justify-center cursor-col-resize select-none touch-none ${
-          isDragging ? "bg-cyan-500/20" : ""
+        `relative w-3.5 -mx-1.5 z-50 flex items-center ${
+          side === "left" ? "justify-start" : "justify-end"
+        } cursor-col-resize select-none touch-none ${
+          isResizingActive ? "bg-cyan-500/20" : ""
         }`
       }
     >
-      {/* Central glow line */}
+      {/* Resizing edge glow line: pushed all the way to respective edge, completely transparent by default, lighting up on hold-click/resizing */}
       <div
-        className={`w-[2px] h-full transition-all duration-150 pointer-events-none ${
-          isDragging
-            ? "bg-cyan-300 shadow-[0_0_12px_#00e5ff] scale-x-125"
-            : isHovered
-            ? "bg-cyan-400 shadow-[0_0_8px_rgba(0,229,255,0.6)]"
-            : "bg-cyan-500/30"
+        data-testid="resize-glow-line"
+        className={`w-[2px] h-full pointer-events-none ${
+          isResizingActive ? "transition-none" : "transition-all duration-150"
+        } ${
+          side === "left" ? "mr-auto" : "ml-auto"
+        } ${
+          isResizingActive
+            ? "bg-cyan-300 shadow-[0_0_12px_#00e5ff] scale-x-125 opacity-100"
+            : "bg-transparent opacity-0"
         }`}
       />
 
-      {/* Futuristic handle grip in the middle: ONLY appears on hover or dragging */}
-      {(isHovered || isDragging || activeSnapLabel) && (
+      {/* Futuristic handle grip: appears where the cursor is on hover or dragging */}
+      {(isHovered || isResizingActive || activeSnapLabel) && (
         <div
-          className={`absolute top-1/2 -translate-y-1/2 flex flex-col items-center justify-center py-2 px-0.5 rounded-sm bg-[#03070d] border transition-all duration-150 pointer-events-none z-50 ${
-            isDragging || activeSnapLabel
+          data-testid="resize-drag-bar"
+          style={{
+            top: cursorY !== null ? `${cursorY}px` : "50%",
+          }}
+          className={`absolute -translate-y-1/2 flex flex-col items-center justify-center py-2 px-0.5 rounded-sm bg-[#03070d] border pointer-events-none z-50 will-change-transform ${
+            isResizingActive ? "transition-none" : "transition-all duration-75"
+          } ${
+            side === "left" ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"
+          } ${
+            isResizingActive || activeSnapLabel
               ? "border-cyan-300 shadow-[0_0_12px_#00e5ff] text-cyan-200"
               : "border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(0,229,255,0.5)]"
           }`}
@@ -159,7 +206,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       )}
 
       {/* Floating HUD Tooltip during dragging or hover */}
-      {(isDragging || isHovered) && (
+      {(isResizingActive || isHovered) && (
         <div
           className={`absolute top-12 ${
             side === "left" ? "right-4" : "left-4"
@@ -178,7 +225,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       )}
 
       {/* Visual Alignment Crosshair ticks at top and bottom */}
-      {(isHovered || isDragging) && (
+      {(isHovered || isResizingActive) && (
         <>
           <div className="absolute top-4 w-2 h-[1px] bg-cyan-400/60 pointer-events-none" />
           <div className="absolute bottom-4 w-2 h-[1px] bg-cyan-400/60 pointer-events-none" />

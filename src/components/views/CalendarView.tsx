@@ -35,7 +35,11 @@ import {
 
 export type { CalendarItemDisplay };
 
-export const CalendarView: React.FC = () => {
+export interface CalendarViewProps {
+  isCompact?: boolean;
+}
+
+export const CalendarView: React.FC<CalendarViewProps> = ({ isCompact = false }) => {
   const [events, , setEvents] = useSyncCalendarEvents();
   const [tasks] = useSyncTasks();
   const [notes, , setNotes] = useSyncNotes();
@@ -177,8 +181,9 @@ export const CalendarView: React.FC = () => {
 
   // Current time marker calculation
   const now = new Date();
+  const effectiveHourHeight = isCompact ? 32 : HOUR_HEIGHT;
   const currentMinutesFromMidnight = now.getHours() * 60 + now.getMinutes();
-  const timeIndicatorTop = (currentMinutesFromMidnight / 60) * HOUR_HEIGHT;
+  const timeIndicatorTop = (currentMinutesFromMidnight / 60) * effectiveHourHeight;
 
   return (
     <div className="h-full w-full flex flex-col bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none">
@@ -186,6 +191,7 @@ export const CalendarView: React.FC = () => {
         mode={mode}
         setMode={setMode}
         headerTitle={headerTitle}
+        isCompact={isCompact}
         onToday={handleToday}
         onPrev={handlePrev}
         onNext={handleNext}
@@ -201,7 +207,7 @@ export const CalendarView: React.FC = () => {
           <DayView
             date={currentDate}
             items={displayItems}
-            hourHeight={HOUR_HEIGHT}
+            hourHeight={effectiveHourHeight}
             scrollRef={timetableScrollRef}
             timeIndicatorTop={timeIndicatorTop}
             todayISO={todayISO}
@@ -214,7 +220,7 @@ export const CalendarView: React.FC = () => {
           <WeekView
             date={currentDate}
             items={displayItems}
-            hourHeight={HOUR_HEIGHT}
+            hourHeight={effectiveHourHeight}
             scrollRef={timetableScrollRef}
             timeIndicatorTop={timeIndicatorTop}
             todayISO={todayISO}
@@ -228,7 +234,7 @@ export const CalendarView: React.FC = () => {
           <FourDaysView
             date={currentDate}
             items={displayItems}
-            hourHeight={HOUR_HEIGHT}
+            hourHeight={effectiveHourHeight}
             scrollRef={timetableScrollRef}
             timeIndicatorTop={timeIndicatorTop}
             todayISO={todayISO}

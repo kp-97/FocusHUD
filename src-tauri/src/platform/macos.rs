@@ -392,6 +392,32 @@ pub fn restore_work_area() -> Result<(), String> {
     Ok(())
 }
 
+pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(), String> {
+    if fullscreen {
+        if let Some(w) = app.get_webview_window("left-dock") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("right-dock") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    } else {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("left-dock") {
+            let _ = w.show();
+        }
+        if let Some(w) = app.get_webview_window("right-dock") {
+            let _ = w.show();
+        }
+    }
+    Ok(())
+}
+
 pub fn init_window_snapping(app: &tauri::AppHandle) {
     let _ = check_accessibility_permissions();
     let left_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);

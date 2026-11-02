@@ -13,7 +13,54 @@ export * from "./entityStore";
 export const DEFAULT_LEFT_WIDTH = 360;
 export const DEFAULT_RIGHT_WIDTH = 280;
 
+export const getRememberPaneWidths = (): boolean => {
+  const saved = localStorage.getItem("hud_remember_pane_widths");
+  return saved !== null ? saved === "true" : true;
+};
+
+export const setRememberPaneWidths = (remember: boolean) => {
+  localStorage.setItem("hud_remember_pane_widths", String(remember));
+};
+
+export const getCustomDefaultLeftWidth = (): number => {
+  const saved = localStorage.getItem("hud_custom_default_left_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  return DEFAULT_LEFT_WIDTH;
+};
+
+export const setCustomDefaultLeftWidth = (width: number) => {
+  localStorage.setItem("hud_custom_default_left_width", String(Math.round(width)));
+};
+
+export const getCustomDefaultRightWidth = (): number => {
+  const saved = localStorage.getItem("hud_custom_default_right_width");
+  if (saved) {
+    const val = Math.round(Number(saved));
+    if (!isNaN(val) && val >= 120) return val;
+  }
+  return DEFAULT_RIGHT_WIDTH;
+};
+
+export const setCustomDefaultRightWidth = (width: number) => {
+  localStorage.setItem("hud_custom_default_right_width", String(Math.round(width)));
+};
+
+export const getPanesReserveZones = (): boolean => {
+  const saved = localStorage.getItem("hud_panes_reserve_zones");
+  return saved !== null ? saved === "true" : true;
+};
+
+export const setPanesReserveZones = (reserve: boolean) => {
+  localStorage.setItem("hud_panes_reserve_zones", String(reserve));
+};
+
 export const getRememberedLeftWidth = (): number => {
+  if (!getRememberPaneWidths()) {
+    return getCustomDefaultLeftWidth();
+  }
   const saved = localStorage.getItem("hud_left_remembered_width");
   if (saved) {
     const val = Math.round(Number(saved));
@@ -34,6 +81,9 @@ export const setRememberedLeftWidth = (width: number) => {
 };
 
 export const getRememberedRightWidth = (): number => {
+  if (!getRememberPaneWidths()) {
+    return getCustomDefaultRightWidth();
+  }
   const saved = localStorage.getItem("hud_right_remembered_width");
   if (saved) {
     const val = Math.round(Number(saved));
@@ -93,11 +143,14 @@ const layoutChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastCha
 
 export type LayoutAction = (
   | { type: "MAXIMIZE_PANES" }
+  | { type: "MAXIMIZE_APP" }
+  | { type: "RESTORE_APP"; leftWidth: number; rightWidth: number }
   | { type: "SET_PANES_WIDTH"; leftWidth: number; rightWidth: number }
   | { type: "SET_LEFT_WIDTH"; width: number }
   | { type: "SET_RIGHT_WIDTH"; width: number }
   | { type: "NAV_CONFIG_CHANGE"; config: NavItemConfig[] }
   | { type: "SET_MAX_WIDTHS"; maxLeftWidth: number; maxRightWidth: number }
+  | { type: "SET_ACTIVE_NAV"; nav: string }
 ) & { sender?: string };
 
 export const broadcastLayoutAction = (action: LayoutAction) => {

@@ -8,6 +8,9 @@ import { NavViewId, NavItemConfig } from "../types/hud";
 export const NAV_CHANNEL_NAME = "focushud_nav_channel";
 const navChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(NAV_CHANNEL_NAME) : null;
 
+export const RIGHT_NAV_CHANNEL_NAME = "focushud_right_nav_channel";
+const rightNavChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(RIGHT_NAV_CHANNEL_NAME) : null;
+
 // Synchronize active navigation across windows
 export const broadcastNavChange = (nav: NavViewId) => {
   localStorage.setItem("focushud_active_nav", nav);
@@ -44,6 +47,45 @@ export const subscribeNavChange = (callback: (nav: NavViewId) => void): (() => v
 
 export const getInitialNav = (): NavViewId => {
   const saved = localStorage.getItem("focushud_active_nav");
+  return (saved as NavViewId) || "home";
+};
+
+// Synchronize active right pane view independently across windows
+export const broadcastRightNavChange = (nav: NavViewId) => {
+  localStorage.setItem("focushud_active_right_nav", nav);
+  if (rightNavChannel) {
+    rightNavChannel.postMessage({ type: "RIGHT_NAV_CHANGE", nav });
+  }
+};
+
+export const subscribeRightNavChange = (callback: (nav: NavViewId) => void): (() => void) => {
+  const handler = (e: MessageEvent) => {
+    if (e.data && e.data.type === "RIGHT_NAV_CHANGE" && e.data.nav) {
+      callback(e.data.nav);
+    }
+  };
+
+  const storageHandler = (e: StorageEvent) => {
+    if (e.key === "focushud_active_right_nav" && e.newValue) {
+      callback(e.newValue as NavViewId);
+    }
+  };
+
+  if (rightNavChannel) {
+    rightNavChannel.addEventListener("message", handler);
+  }
+  window.addEventListener("storage", storageHandler);
+
+  return () => {
+    if (rightNavChannel) {
+      rightNavChannel.removeEventListener("message", handler);
+    }
+    window.removeEventListener("storage", storageHandler);
+  };
+};
+
+export const getInitialRightNav = (): NavViewId => {
+  const saved = localStorage.getItem("focushud_active_right_nav");
   return (saved as NavViewId) || "home";
 };
 

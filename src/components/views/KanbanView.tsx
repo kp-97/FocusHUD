@@ -4,7 +4,11 @@ import { TaskItem } from "../../types/hud";
 import { getTodayString } from "../../stores/layoutStore";
 import { useSyncTasks } from "../../hooks/useSyncEntity";
 
-export const KanbanView: React.FC = () => {
+export interface KanbanViewProps {
+  isCompact?: boolean;
+}
+
+export const KanbanView: React.FC<KanbanViewProps> = ({ isCompact = false }) => {
   const [tasks, saveAndSetTasks] = useSyncTasks();
   const [newTitle, setNewTitle] = useState("");
   const [activeCol, setActiveCol] = useState<"todo" | "in_progress" | "done">("todo");
@@ -53,14 +57,16 @@ export const KanbanView: React.FC = () => {
   ];
 
   return (
-    <div className="h-full w-full flex flex-col p-2 bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none">
+    <div className={`h-full w-full flex flex-col ${isCompact ? "p-1.5" : "p-2"} bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none`}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-cyan-500/20 pb-1.5 mb-2 text-xs">
+      <div className={`flex items-center justify-between border-b border-cyan-500/20 ${isCompact ? "pb-1 mb-1" : "pb-1.5 mb-2"} text-xs`}>
         <div className="flex items-center gap-1.5">
           <Columns3 className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
-            KANBAN WORKFLOW
-          </span>
+          {!isCompact && (
+            <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
+              KANBAN WORKFLOW
+            </span>
+          )}
         </div>
 
         {/* Column Navigation Tabs */}

@@ -117,6 +117,67 @@ pub fn restore_work_area() -> Result<(), String> {
     crate::monitor::restore_work_area()
 }
 
+pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(), String> {
+    crate::dock::FULLSCREEN_ACTIVE.store(fullscreen, Ordering::Relaxed);
+
+    if fullscreen {
+        let _ = crate::monitor::restore_work_area();
+
+        if let Some(w) = app.get_webview_window("left-dock") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("right-dock") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("main") {
+            unsafe {
+                let (rc_monitor, _) = crate::monitor::get_primary_monitor_rects();
+                let mon_left = rc_monitor.left;
+                let mon_top = rc_monitor.top;
+                let mon_width = rc_monitor.right - rc_monitor.left;
+                let mon_height = rc_monitor.bottom - rc_monitor.top;
+
+                if let Ok(hwnd) = w.hwnd() {
+                    let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                    windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                        h,
+                        windows_sys::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
+                        mon_left,
+                        mon_top,
+                        mon_width,
+                        mon_height,
+                        windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
+                    );
+                } else {
+                    let _ = w.set_position(tauri::PhysicalPosition::new(mon_left, mon_top));
+                    let _ = w.set_size(tauri::PhysicalSize::new(
+                        mon_width as u32,
+                        mon_height as u32,
+                    ));
+                }
+            }
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    } else {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("left-dock") {
+            let _ = w.show();
+        }
+        if let Some(w) = app.get_webview_window("right-dock") {
+            let _ = w.show();
+        }
+
+        let l_w = crate::dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
+        let r_w = crate::dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
+        crate::dock::apply_dock_geometry(app, l_w, r_w);
+        update_dock_work_area(app, l_w, r_w, true);
+    }
+    Ok(())
+}
+
 pub fn init_window_snapping(_app: &tauri::AppHandle) {
     unsafe {
         crate::snap::init_window_snap_hooks();

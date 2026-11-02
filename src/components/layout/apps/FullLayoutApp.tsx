@@ -7,6 +7,16 @@ import { ResizeHandle } from "../ResizeHandle";
 import { UpdateNotificationToast } from "../../ui/UpdateNotificationToast";
 import { SettingsModal } from "../../features/settings/SettingsModal";
 import { UseDockLayoutReturn } from "../../../hooks/useDockLayout";
+import { HomeView } from "../../views/HomeView";
+import { ChatView } from "../../views/ChatView";
+import { CalendarView } from "../../views/CalendarView";
+import { GoalsView } from "../../views/GoalsView";
+import { TasksView } from "../../views/TasksView";
+import { NotesView } from "../../views/NotesView";
+import { KanbanView } from "../../views/KanbanView";
+import { ActionPlansView } from "../../views/ActionPlansView";
+import { TimerView } from "../../views/TimerView";
+import { HudBrackets } from "../../ui/HudBrackets";
 
 interface FullLayoutAppProps {
   layout: UseDockLayoutReturn;
@@ -16,8 +26,6 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
   const {
     leftWidth,
     rightWidth,
-    maxLeftWidth,
-    maxRightWidth,
     containerRef,
     containerWidth,
     middleWidth,
@@ -39,18 +47,47 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     handleLeftDragEnd,
     handleLeftDoubleClick,
     handleLeftToggleCollapse,
+    handleToggleLeftPane,
     handleRightDragChange,
     handleRightDragEnd,
     handleRightDoubleClick,
     handleRightToggleCollapse,
+    handleToggleRightPane,
+    handleToggleBothPanes,
     handleMaximizePanes,
+    isAppMaximized,
+    handleToggleMaximizeApp,
     handleResetWidths,
     handleApplyPreset,
     handleReset,
     SNAP_POINTS,
     MIN_LEFT_WIDTH,
-    MIN_MIDDLE_WIDTH,
   } = layout;
+
+  const renderFullScreenView = (nav: string) => {
+    switch (nav) {
+      case "home":
+        return <HomeView />;
+      case "chat":
+        return <ChatView />;
+      case "calendar":
+        return <CalendarView />;
+      case "goals":
+        return <GoalsView />;
+      case "tasks":
+        return <TasksView />;
+      case "notes":
+        return <NotesView />;
+      case "kanban":
+        return <KanbanView />;
+      case "action_plans":
+        return <ActionPlansView />;
+      case "timer":
+        return <TimerView />;
+      default:
+        return <HomeView />;
+    }
+  };
 
   return (
     <div
@@ -60,71 +97,97 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
       {/* Subtle futuristic scanline overlay across whole UI */}
       <div className="absolute inset-0 scanlines pointer-events-none z-50" />
 
-      {/* Top HUD control toolbar */}
-      <TopNavHUD
-        leftWidth={leftWidth}
-        rightWidth={rightWidth}
-        magneticSnap={magneticSnap}
-        onToggleMagneticSnap={() => setMagneticSnap(!magneticSnap)}
-        desktopDockActive={desktopDockActive}
-        onToggleDesktopDock={handleToggleDesktopDock}
-        onApplyPreset={handleApplyPreset}
-        onReset={handleReset}
-      />
+      {/* Top HUD control toolbar (hidden in full-screen mode) */}
+      {!isAppMaximized && (
+        <TopNavHUD
+          leftWidth={leftWidth}
+          rightWidth={rightWidth}
+          magneticSnap={magneticSnap}
+          onToggleMagneticSnap={() => setMagneticSnap(!magneticSnap)}
+          desktopDockActive={desktopDockActive}
+          onToggleDesktopDock={handleToggleDesktopDock}
+          onApplyPreset={handleApplyPreset}
+          onReset={handleReset}
+        />
+      )}
 
-      {/* Main Resizable 3-Column HUD Layout */}
+      {/* Main Resizable 3-Column HUD Layout / Full Screen Merged Mode */}
       <div
         ref={containerRef}
         className="flex-1 flex flex-row overflow-hidden relative z-10"
       >
-        {/* Left Sidebar */}
+        {/* Left Sidebar (fixed to compact rail 68px in full screen mode) */}
         <LeftSidebar
-          width={leftWidth}
+          width={isAppMaximized ? 68 : leftWidth}
+          leftWidth={leftWidth}
+          rightWidth={rightWidth}
           activeNav={activeNav}
           onSelectNav={setActiveNav}
-          isCompact={leftWidth < 220}
+          isCompact={isAppMaximized || leftWidth < 220}
           onToggleCollapse={handleLeftToggleCollapse}
+          onToggleLeftPane={handleToggleLeftPane}
+          onToggleRightPane={handleToggleRightPane}
+          onToggleBothPanes={handleToggleBothPanes}
           onOpenSettings={handleOpenSettings}
         />
 
-        {/* Left Resize Splitter Handle */}
-        <ResizeHandle
-          side="left"
-          currentWidth={leftWidth}
-          minWidth={MIN_LEFT_WIDTH}
-          maxWidth={Math.min(maxLeftWidth, containerWidth - rightWidth - MIN_MIDDLE_WIDTH)}
-          snapPoints={magneticSnap ? SNAP_POINTS : []}
-          onDragChange={handleLeftDragChange}
-          onDragEnd={handleLeftDragEnd}
-          onDoubleClick={handleLeftDoubleClick}
-        />
+        {/* Center: In full screen mode, merges the left & right panes and displays the full view version of each view. In docked mode, displays resizers & center workspace. */}
+        {isAppMaximized ? (
+          <div
+            data-testid="full-screen-view-container"
+            className="flex-1 h-full min-w-0 p-2 bg-[#03070d] text-cyan-200 overflow-hidden flex flex-col"
+          >
+            <HudBrackets variant="cyan" showTicks={false} className="h-full w-full flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col p-2 min-w-0 overflow-y-auto">
+                {renderFullScreenView(activeNav)}
+              </div>
+            </HudBrackets>
+          </div>
+        ) : (
+          <>
+            <ResizeHandle
+              side="left"
+              currentWidth={leftWidth}
+              minWidth={MIN_LEFT_WIDTH}
+              maxWidth={containerWidth - MIN_LEFT_WIDTH}
+              snapPoints={magneticSnap ? SNAP_POINTS : []}
+              onDragChange={handleLeftDragChange}
+              onDragEnd={handleLeftDragEnd}
+              onDoubleClick={handleLeftDoubleClick}
+            />
 
-        {/* Center Workspace (Contents snap nicely) */}
-        <CenterWorkspace
-          middleWidth={middleWidth}
-          snapMode={snapMode}
-          onToggleSnapMode={setSnapMode}
-        />
+            <CenterWorkspace
+              middleWidth={middleWidth}
+              snapMode={snapMode}
+              onToggleSnapMode={setSnapMode}
+            />
 
-        {/* Right Resize Splitter Handle */}
-        <ResizeHandle
-          side="right"
-          currentWidth={rightWidth}
-          minWidth={MIN_LEFT_WIDTH}
-          maxWidth={Math.min(maxRightWidth, containerWidth - leftWidth - MIN_MIDDLE_WIDTH)}
-          snapPoints={magneticSnap ? SNAP_POINTS : []}
-          onDragChange={handleRightDragChange}
-          onDragEnd={handleRightDragEnd}
-          onDoubleClick={handleRightDoubleClick}
-        />
+            <ResizeHandle
+              side="right"
+              currentWidth={rightWidth}
+              minWidth={MIN_LEFT_WIDTH}
+              maxWidth={containerWidth - MIN_LEFT_WIDTH}
+              snapPoints={magneticSnap ? SNAP_POINTS : []}
+              onDragChange={handleRightDragChange}
+              onDragEnd={handleRightDragEnd}
+              onDoubleClick={handleRightDoubleClick}
+            />
+          </>
+        )}
 
-        {/* Right Sidebar */}
+        {/* Right Sidebar (fixed to compact rail 68px in full screen mode) */}
         <RightSidebar
-          width={rightWidth}
+          width={isAppMaximized ? 68 : rightWidth}
+          leftWidth={leftWidth}
           activeNav={activeNav}
-          isCompact={rightWidth < 220}
+          isCompact={isAppMaximized || rightWidth < 220}
+          isAppMaximized={isAppMaximized}
           onExpand={handleRightToggleCollapse}
           onCollapse={handleRightToggleCollapse}
+          onToggleLeftPane={handleToggleLeftPane}
+          onToggleRightPane={handleToggleRightPane}
+          onToggleBothPanes={handleToggleBothPanes}
+          onToggleMaximizeApp={handleToggleMaximizeApp}
           onMaximizePanes={handleMaximizePanes}
           onOpenSettings={handleOpenSettings}
         />

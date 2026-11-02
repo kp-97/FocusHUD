@@ -11,13 +11,16 @@ interface DockAppProps {
 export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
   const {
     leftWidth,
+    rightWidth,
     activeNav,
     setActiveNav,
-    maxLeftWidth,
     magneticSnap,
     isSettingsOpen,
     settingsTab,
     setIsSettingsOpen,
+    handleToggleLeftPane,
+    handleToggleRightPane,
+    handleToggleBothPanes,
     handleLeftToggleCollapse,
     handleOpenSettings,
     handleLeftDragChange,
@@ -39,11 +42,16 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
       >
         <LeftSidebar
           width={leftWidth}
+          leftWidth={leftWidth}
+          rightWidth={rightWidth}
           activeNav={activeNav}
           onSelectNav={setActiveNav}
           isCompact={leftWidth < 220}
           isDockMode={true}
           onToggleCollapse={handleLeftToggleCollapse}
+          onToggleLeftPane={handleToggleLeftPane}
+          onToggleRightPane={handleToggleRightPane}
+          onToggleBothPanes={handleToggleBothPanes}
           onOpenSettings={handleOpenSettings}
         />
         <div className="absolute top-0 bottom-0 right-0 w-2.5 z-50">
@@ -51,7 +59,7 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
             side="left"
             currentWidth={leftWidth}
             minWidth={MIN_LEFT_WIDTH}
-            maxWidth={maxLeftWidth}
+            maxWidth={typeof window !== "undefined" ? window.innerWidth - MIN_LEFT_WIDTH : undefined}
             snapPoints={magneticSnap ? SNAP_POINTS : []}
             className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
             onDragChange={handleLeftDragChange}

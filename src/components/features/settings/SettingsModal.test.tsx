@@ -178,4 +178,19 @@ describe("SettingsModal component", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
+
+  it("allows dragging the preferences & settings modal around", () => {
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const header = screen.getByText("HUD PREFERENCES & SETTINGS").parentElement!.parentElement!;
+    const modalContent = screen.getByTestId("settings-modal-content");
+
+    expect(modalContent).toHaveStyle({ transform: "translate(0px, 0px)" });
+
+    fireEvent.pointerDown(header, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(header, { clientX: 150, clientY: 180, pointerId: 1 });
+    fireEvent.pointerUp(header, { clientX: 150, clientY: 180, pointerId: 1 });
+
+    expect(modalContent).toHaveStyle({ transform: "translate(50px, 80px)" });
+  });
 });

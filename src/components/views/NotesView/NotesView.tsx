@@ -12,8 +12,9 @@ import {
   isTauriEnvironment,
 } from "../../../services/dbService";
 
-interface NotesViewProps {
+export interface NotesViewProps {
   isLeftDock?: boolean;
+  isCompact?: boolean;
   onBackToMonitoring?: () => void;
 }
 
@@ -25,6 +26,7 @@ const notesChannel =
 
 export const NotesView: React.FC<NotesViewProps> = ({
   isLeftDock = false,
+  isCompact = false,
   onBackToMonitoring,
 }) => {
   const [notes, setNotes] = useState<NoteItem[]>(() => loadNotes());
@@ -436,6 +438,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
           <NotesList
             notes={notes}
             selectedNoteId={selectedNoteId}
+            isCompact={isCompact}
             onSelectNote={(id) => {
               setSelectedNoteId(id);
               setViewingDetailOnCompact(true);
@@ -447,7 +450,6 @@ export const NotesView: React.FC<NotesViewProps> = ({
             onChangeFilter={setFilter}
             searchQuery={searchQuery}
             onChangeSearchQuery={setSearchQuery}
-            isCompact={!isSplitLayout}
           />
         </div>
 

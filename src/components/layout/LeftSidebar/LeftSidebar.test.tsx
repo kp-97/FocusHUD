@@ -31,8 +31,8 @@ describe("LeftSidebar component", () => {
 
     expect(screen.getByText("FocusHUD")).toBeInTheDocument();
 
-    // 1. Dual pane sidebar toggle button
-    const toggleBtn = screen.getByTestId("sidebar-toggle-both");
+    // 1. Left pane sidebar toggle button
+    const toggleBtn = screen.getByTestId("sidebar-toggle-left");
     expect(toggleBtn).toBeInTheDocument();
     fireEvent.click(toggleBtn);
     expect(handleToggle).toHaveBeenCalledTimes(1);
@@ -187,8 +187,8 @@ describe("LeftSidebar component", () => {
     // Text label hidden
     expect(screen.queryByText("FocusHUD")).not.toBeInTheDocument();
 
-    // Dual toggle button exists and triggers onToggleCollapse
-    const toggleBtn = screen.getByTestId("sidebar-toggle-both");
+    // Left toggle button exists and triggers onToggleCollapse
+    const toggleBtn = screen.getByTestId("sidebar-toggle-left");
     expect(toggleBtn).toBeInTheDocument();
     fireEvent.click(toggleBtn);
     expect(handleToggle).toHaveBeenCalledTimes(1);
@@ -292,5 +292,99 @@ describe("LeftSidebar component", () => {
 
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(tauriBridge.setDockPopoutMode).toHaveBeenCalledWith("left", false);
+  });
+
+  it("changes the view of the left pane when selecting views from the left rail", () => {
+    const handleSelectNav = vi.fn();
+    const { rerender } = render(
+      <LeftSidebar
+        width={280}
+        activeNav="home"
+        onSelectNav={handleSelectNav}
+      />
+    );
+
+    // Click Calendar icon button on left rail
+    const calendarBtn = screen.getByTestId("left-rail-nav-calendar");
+    expect(calendarBtn).toBeInTheDocument();
+    fireEvent.click(calendarBtn);
+    expect(handleSelectNav).toHaveBeenCalledWith("calendar");
+
+    // Re-render with activeNav="calendar"
+    rerender(
+      <LeftSidebar
+        width={280}
+        activeNav="calendar"
+        onSelectNav={handleSelectNav}
+      />
+    );
+
+    // Left pane now displays Calendar view components
+    expect(screen.getByText("CALENDAR")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Today/i })).toBeInTheDocument();
+  });
+
+  it("renders hamburger menu fixed at top and left pane toggle button vertically underneath", () => {
+    const handleToggleLeft = vi.fn();
+
+    render(
+      <LeftSidebar
+        width={68}
+        activeNav="home"
+        onSelectNav={vi.fn()}
+        onToggleLeftPane={handleToggleLeft}
+      />
+    );
+
+    const menuBtn = screen.getByLabelText("System Menu");
+    const toggleLeft = screen.getByTestId("sidebar-toggle-left");
+
+    expect(menuBtn).toBeInTheDocument();
+    expect(toggleLeft).toBeInTheDocument();
+
+    // Right and both toggles are removed from left rail
+    expect(screen.queryByTestId("sidebar-toggle-right")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-toggle-both")).not.toBeInTheDocument();
+
+    // Verify vertical order: Menu -> Toggle Left
+    expect(menuBtn.compareDocumentPosition(toggleLeft)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    // Test clicking toggle
+    fireEvent.click(toggleLeft);
+    expect(handleToggleLeft).toHaveBeenCalledTimes(1);
+  });
+
+  it("fixes the top-right and bottom-right blue dots on the left rail so components do not move around", () => {
+    const { container } = render(
+      <LeftSidebar
+        width={68}
+        activeNav="home"
+        onSelectNav={vi.fn()}
+      />
+    );
+
+    // Assert top-right and bottom-right blue mini square/dot exist on the rail
+    const dots = container.querySelectorAll(".bg-cyan-400\\/80");
+    expect(dots.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("locates navigation view buttons directly under the top header line", () => {
+    render(
+      <LeftSidebar
+        width={68}
+        activeNav="home"
+        onSelectNav={vi.fn()}
+      />
+    );
+
+    const toggleLeft = screen.getByTestId("sidebar-toggle-left");
+    const homeBtn = screen.getByTestId("left-rail-nav-home");
+
+    expect(homeBtn).toBeInTheDocument();
+    // Nav icons are located after the header toggle line
+    expect(toggleLeft.compareDocumentPosition(homeBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    const navContainer = homeBtn.parentElement!;
+    expect(navContainer).toHaveClass("justify-start");
   });
 });

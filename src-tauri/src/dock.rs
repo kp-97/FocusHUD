@@ -29,6 +29,7 @@ pub static LEFT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static LEFT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static FULLSCREEN_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
 pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -105,6 +106,9 @@ pub fn calculate_work_area_margins(
 /// and Win32 stationary canvas clipping.
 #[cfg(target_os = "windows")]
 pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
+    if FULLSCREEN_ACTIVE.load(Ordering::Relaxed) {
+        return;
+    }
     let (rc_monitor, rc_work) = unsafe { get_primary_monitor_rects() };
     let monitor = app.primary_monitor().ok().flatten().or_else(|| {
         app.get_webview_window("left-dock")
