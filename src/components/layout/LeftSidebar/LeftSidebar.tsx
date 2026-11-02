@@ -13,7 +13,6 @@ import {
   FileText,
 } from "lucide-react";
 import { HudBrackets } from "../../ui/HudBrackets";
-import { WaveformVisualizer } from "../../ui/WaveformVisualizer";
 import { SidebarToggleIcon } from "../../ui/SidebarToggleIcon";
 import { getSystemDiagnostics, setDockPopoutMode } from "../../../services/tauriBridge";
 import type { SystemDiagnostics } from "../../../types/diagnostics";
@@ -21,9 +20,18 @@ import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../../
 import { NavViewId, NavItemConfig } from "../../../types/hud";
 import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
-import { DiagnosticsCard } from "./DiagnosticsCard";
-import { NotesView } from "../../views/NotesView";
 import { useTheme } from "../../../stores/themeStore";
+
+// View components for Left Pane
+import { HomeView } from "../../views/HomeView";
+import { ChatView } from "../../views/ChatView";
+import { CalendarView } from "../../views/CalendarView";
+import { GoalsView } from "../../views/GoalsView";
+import { TasksView } from "../../views/TasksView";
+import { NotesView } from "../../views/NotesView";
+import { KanbanView } from "../../views/KanbanView";
+import { ActionPlansView } from "../../views/ActionPlansView";
+import { TimerView } from "../../views/TimerView";
 
 const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -43,7 +51,12 @@ interface LeftSidebarProps {
   onSelectNav: (id: string) => void;
   isCompact?: boolean;
   isDockMode?: boolean;
+  leftWidth?: number;
+  rightWidth?: number;
   onToggleCollapse?: () => void;
+  onToggleLeftPane?: () => void;
+  onToggleRightPane?: () => void;
+  onToggleBothPanes?: () => void;
   onOpenSettings?: (tab?: string) => void;
 }
 
@@ -51,16 +64,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   width,
   activeNav,
   onSelectNav,
-  isCompact = false,
+  isDockMode = false,
+  leftWidth,
+  rightWidth: _rightWidth,
   onToggleCollapse,
+  onToggleLeftPane,
+  onToggleRightPane: _onToggleRightPane,
+  onToggleBothPanes: _onToggleBothPanes,
   onOpenSettings,
 }) => {
   const { themeConfig } = useTheme();
-  const [diag, setDiag] = useState<SystemDiagnostics | null>(null);
-  const [diagnosticsCollapsed, setDiagnosticsCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem("hud_diag_collapsed") === "true";
-  });
-  const [dockMode, setDockMode] = useState<"monitoring" | "notes">("monitoring");
+  const [, setDiag] = useState<SystemDiagnostics | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isMenuOpenRef = useRef(isMenuOpen);
   isMenuOpenRef.current = isMenuOpen;
@@ -76,209 +90,244 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       popoutCloseTimer.current = null;
     }
     activeTooltipRef.current = id;
-    setDockPopoutMode("left", true);
+    try {
+      Promise.resolve(setDockPopoutMode("left", true)).catch(() => {});
+    } catch {}
   }, []);
 
   const handleTooltipClose = useCallback((id: string) => {
     if (activeTooltipRef.current === id) {
       activeTooltipRef.current = null;
+      if (popoutCloseTimer.current) {
+        clearTimeout(popoutCloseTimer.current);
+      }
+      popoutCloseTimer.current = setTimeout(() => {
+        if (!activeTooltipRef.current && !isMenuOpenRef.current) {
+          try {
+            Promise.resolve(setDockPopoutMode("left", false)).catch(() => {});
+          } catch {}
+        }
+      }, 100);
     }
+  }, []);
+
+  const handleSidebarMouseLeave = useCallback(() => {
+    activeTooltipRef.current = null;
     if (popoutCloseTimer.current) {
       clearTimeout(popoutCloseTimer.current);
     }
     popoutCloseTimer.current = setTimeout(() => {
-      if (!isMenuOpenRef.current && !activeTooltipRef.current) {
-        setDockPopoutMode("left", false);
+      if (!isMenuOpenRef.current) {
+        try {
+          Promise.resolve(setDockPopoutMode("left", false)).catch(() => {});
+        } catch {}
       }
-    }, 150);
+    }, 100);
   }, []);
 
-  const handleSidebarMouseLeave = useCallback(() => {
-    if (popoutCloseTimer.current) {
-      clearTimeout(popoutCloseTimer.current);
-      popoutCloseTimer.current = null;
-    }
-    activeTooltipRef.current = null;
-    if (!isMenuOpenRef.current) {
-      setDockPopoutMode("left", false);
-    }
-  }, []);
+  const isLeftCollapsed = (leftWidth ?? width) < 120;
 
-  // Sync dock popout mode with native window for hamburger menu
+  const handleToggleLeft = () => {
+    if (onToggleLeftPane) {
+      onToggleLeftPane();
+    } else if (onToggleCollapse) {
+      onToggleCollapse();
+    }
+  };
+
   useEffect(() => {
-    isMenuOpenRef.current = isMenuOpen;
+    const fetchStats = async () => {
+      const data = await getSystemDiagnostics();
+      if (data) setDiag(data);
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
+  const [navItems, setNavItems] = useState<NavItemConfig[]>(() => loadNavConfig());
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "focushud_nav_config") {
+        setNavItems(loadNavConfig());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
+    const activeItem = navItems.find((item) => item.id === activeNav);
+    if (activeItem && !activeItem.visible) {
+      const firstVisible = navItems.find((item) => item.visible);
+      if (firstVisible) {
+        onSelectNav(firstVisible.id);
+        broadcastNavChange(firstVisible.id);
+      } else {
+        onSelectNav("home");
+        broadcastNavChange("home");
+      }
+    }
+  }, [navItems, activeNav, onSelectNav]);
+
+  useEffect(() => {
+    const unsub = subscribeLayoutAction((action) => {
+      if (action.type === "SET_ACTIVE_NAV") {
+        onSelectNav(action.nav);
+      }
+    });
+    return () => unsub();
+  }, [onSelectNav]);
+
+  useEffect(() => {
     if (isMenuOpen) {
       menuOpenedAtRef.current = Date.now();
-      if (popoutCloseTimer.current) {
-        clearTimeout(popoutCloseTimer.current);
-        popoutCloseTimer.current = null;
+      try {
+        Promise.resolve(setDockPopoutMode("left", true)).catch(() => {});
+      } catch {}
+    } else {
+      if (!activeTooltipRef.current) {
+        try {
+          Promise.resolve(setDockPopoutMode("left", false)).catch(() => {});
+        } catch {}
       }
-      setDockPopoutMode("left", true);
-    } else if (!activeTooltipRef.current) {
-      setDockPopoutMode("left", false);
     }
+  }, [isMenuOpen]);
 
+  useEffect(() => {
     if (!isMenuOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      // Prevent outside-click dismissal during the opening click phase
-      if (Date.now() - menuOpenedAtRef.current < 100) {
-        return;
-      }
       if (
         menuRef.current &&
         !menuRef.current.contains(e.target as Node) &&
-        !menuBtnRef.current?.contains(e.target as Node)
+        menuBtnRef.current &&
+        !menuBtnRef.current.contains(e.target as Node)
       ) {
         setIsMenuOpen(false);
       }
     };
+
+    const handleWindowBlur = () => {
+      const elapsed = Date.now() - menuOpenedAtRef.current;
+      if (elapsed > 250) {
+        setIsMenuOpen(false);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsMenuOpen(false);
       }
     };
-    const handleBlur = () => {
-      // Ignore blur events that occur during opening focus shifts / dock popout geometry updates
-      if (Date.now() - menuOpenedAtRef.current < 250) {
-        return;
-      }
-      setIsMenuOpen(false);
-    };
 
     document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("blur", handleWindowBlur);
     document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("blur", handleBlur);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("blur", handleWindowBlur);
       document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("blur", handleBlur);
-      if (!activeTooltipRef.current) {
-        setDockPopoutMode("left", false);
-      }
     };
   }, [isMenuOpen]);
 
-  const toggleDiagnosticsCollapsed = () => {
-    setDiagnosticsCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("hud_diag_collapsed", String(next));
-      return next;
-    });
+  const isIconOnly = width < 120;
+
+  const renderActiveView = () => {
+    switch (activeNav) {
+      case "home":
+        return <HomeView />;
+      case "chat":
+        return <ChatView />;
+      case "calendar":
+        return <CalendarView />;
+      case "goals":
+        return <GoalsView />;
+      case "tasks":
+        return <TasksView />;
+      case "notes":
+        return <NotesView isLeftDock={isDockMode} />;
+      case "kanban":
+        return <KanbanView />;
+      case "action_plans":
+        return <ActionPlansView />;
+      case "timer":
+        return <TimerView />;
+      default:
+        return <HomeView />;
+    }
   };
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchDiag = async () => {
-      const data = await getSystemDiagnostics();
-      if (mounted && data) {
-        setDiag(data);
-      }
-    };
-
-    fetchDiag();
-    const interval = setInterval(fetchDiag, 1200);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const [navConfig, setNavConfig] = useState<NavItemConfig[]>(() => loadNavConfig());
-
-  // Listen for navigation configuration changes across windows
-  useEffect(() => {
-    const unsubscribe = subscribeLayoutAction((action) => {
-      if (action.type === "NAV_CONFIG_CHANGE") {
-        setNavConfig(action.config);
-      }
-    });
-    return unsubscribe;
-  }, []);
-
-  // If the currently selected navigation view was toggled off, fallback to home
-  useEffect(() => {
-    const isCurrentVisible = navConfig.some(
-      (item) => item.id === activeNav && item.visible
-    );
-    if (!isCurrentVisible) {
-      onSelectNav("home");
-      broadcastNavChange("home");
-    }
-  }, [navConfig, activeNav, onSelectNav]);
-
-  const visibleNavItems = navConfig
-    .filter((item) => item.visible)
-    .map((item) => ({
-      id: item.id,
-      label: item.label,
-      icon: NAV_ICON_MAP[item.id] || Home,
-    }));
-
-  const isIconOnly = width < 120;
-  const compactMode = isCompact || width < 220;
+  const handleNavClick = (id: string) => {
+    onSelectNav(id);
+    broadcastNavChange(id as NavViewId);
+  };
 
   return (
     <aside
       style={{ width: `${width}px` }}
       onMouseLeave={handleSidebarMouseLeave}
-      className="h-full shrink-0 flex flex-col p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
+      className="h-full shrink-0 flex flex-row p-2 bg-[#03070d] border-r border-cyan-500/30 text-cyan-300 select-none overflow-visible relative z-30"
     >
       <TooltipProvider
         onTooltipOpen={handleTooltipOpen}
         onTooltipClose={handleTooltipClose}
       >
-        <HudBrackets className="h-full flex flex-col justify-between p-2 overflow-visible">
-        {/* Top Header: FocusHUD & Controls (Pinned) */}
-        <div className="shrink-0 flex flex-col w-full relative">
-          {/* Header Row: Dual Expand/Collapse Button + Title & Controls */}
-          <div className="border-b border-cyan-500/30 pb-1 mb-1">
-            <div className="flex items-center">
-              {/* Left Column: Fixed Left-Right Pane Expand/Collapse Button */}
-              <div className="w-8 shrink-0 flex items-center justify-center h-7">
-                {onToggleCollapse && (
-                  <SidebarToggleIcon
-                    side="both"
-                    isCollapsed={isIconOnly}
-                    onToggle={onToggleCollapse}
-                    theme="cyan"
-                  />
-                )}
-              </div>
+        {/* ================= LEFT RAIL COLUMN (Permanently fixed width with its own brackets & dots) ================= */}
+        <div
+          className="relative hud-panel rounded-sm shadow-[0_0_12px_rgba(0,229,255,0.2)] h-full w-[52px] shrink-0 flex flex-col justify-between items-center p-1 select-none overflow-visible"
+        >
+          {/* Top Left Bracket & Dot */}
+          <div className="absolute -top-[2px] -left-[2px] w-3 h-3 border-t-2 border-l-2 border-cyan-400 pointer-events-none z-20" />
+          <div className="absolute top-1 left-1 w-1 h-1 bg-cyan-400/80 pointer-events-none z-20" />
 
-              {/* Expanded Section: FocusHUD Title + Settings + Menu */}
-              {!isIconOnly && (
-                <div className="flex-1 min-w-0 flex items-center justify-between h-7 pl-2">
-                  <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-200 hud-glow-cyan truncate">
-                    FocusHUD
-                  </h1>
+          {/* Top Right Bracket & Dot: FIXED on the Left Rail */}
+          <div className="absolute -top-[2px] -right-[2px] w-3 h-3 border-t-2 border-r-2 border-cyan-400 pointer-events-none z-20" />
+          <div className="absolute top-1 right-1 w-1 h-1 bg-cyan-400/80 pointer-events-none z-20" />
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Tooltip content="System Menu" side="right" theme="cyan" disabled={isMenuOpen}>
-                      <button
-                        ref={menuBtnRef}
-                        onClick={() => setIsMenuOpen((prev) => !prev)}
-                        aria-label="System Menu"
-                        aria-expanded={isMenuOpen}
-                        className="hover:scale-110 transition p-1 cursor-pointer"
-                        style={{
-                          color: themeConfig?.category === "light"
-                            ? "var(--hud-text-primary)"
-                            : (themeConfig?.accentColor || "#00e5ff"),
-                        }}
-                      >
-                        <Menu className="w-3.5 h-3.5" />
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-              )}
+          {/* Bottom Left Bracket & Dot */}
+          <div className="absolute -bottom-[2px] -left-[2px] w-3 h-3 border-b-2 border-l-2 border-cyan-400 pointer-events-none z-20" />
+          <div className="absolute bottom-1 left-1 w-1 h-1 bg-cyan-400/80 pointer-events-none z-20" />
+
+          {/* Bottom Right Bracket & Dot: FIXED on the Left Rail */}
+          <div className="absolute -bottom-[2px] -right-[2px] w-3 h-3 border-b-2 border-r-2 border-cyan-400 pointer-events-none z-20" />
+          <div className="absolute bottom-1 right-1 w-1 h-1 bg-cyan-400/80 pointer-events-none z-20" />
+
+          {/* Top Rail Header: Fixed Hamburger Menu + Toggles underneath */}
+          <div className="shrink-0 flex flex-col items-center w-full border-b border-cyan-500/30 pb-1.5 mb-1 gap-1">
+            {/* 1. Hamburger Menu replacing old toggle, fixed at top of rail */}
+            <Tooltip content="System Menu" side="right" theme="cyan" disabled={isMenuOpen}>
+              <button
+                ref={menuBtnRef}
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                aria-label="System Menu"
+                aria-expanded={isMenuOpen}
+                className="hover:scale-110 transition p-1 cursor-pointer w-8 h-8 flex items-center justify-center rounded"
+                style={{
+                  color:
+                    themeConfig?.category === "light"
+                      ? "var(--hud-text-primary)"
+                      : (themeConfig?.accentColor || "#00e5ff"),
+                }}
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            </Tooltip>
+
+            {/* 2. Left Pane Toggle fixed underneath hamburger */}
+            <div className="flex flex-col items-center gap-1 w-full pt-0.5">
+              <SidebarToggleIcon
+                side="left"
+                isCollapsed={isLeftCollapsed}
+                onToggle={handleToggleLeft}
+                theme="cyan"
+              />
             </div>
           </div>
 
-          {/* Floating Hamburger Dropdown Menu (Extracted Component) */}
+          {/* Hamburger Popout Menu */}
           <SystemMenuDropdown
             isOpen={isMenuOpen}
             menuRef={menuRef}
@@ -286,132 +335,70 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             onOpenSettings={onOpenSettings}
           />
 
-          {/* Diagnostic Waveform Banner */}
-          {!isIconOnly && (
-            <div className="my-1">
-              <WaveformVisualizer isCompact={compactMode} />
-            </div>
-          )}
-
-          {/* Dock Mode Switcher: Monitoring vs Notes Scratchpad */}
-          {!isIconOnly && (
-            <div className="flex items-center gap-1 my-1 p-0.5 rounded bg-black/60 border border-cyan-500/30 text-[10px] font-tech shrink-0">
-              <button
-                type="button"
-                onClick={() => setDockMode("monitoring")}
-                className={`flex-1 py-0.5 rounded text-center uppercase tracking-wider font-semibold transition cursor-pointer ${
-                  dockMode === "monitoring"
-                    ? "bg-cyan-500/20 text-cyan-100 border border-cyan-500/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]"
-                    : "text-cyan-400/60 hover:text-cyan-200"
-                }`}
-              >
-                MONITORING
-              </button>
-              <button
-                type="button"
-                onClick={() => setDockMode("notes")}
-                className={`flex-1 py-0.5 rounded text-center uppercase tracking-wider font-semibold transition cursor-pointer ${
-                  dockMode === "notes"
-                    ? "bg-cyan-500/20 text-cyan-100 border border-cyan-500/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]"
-                    : "text-cyan-400/60 hover:text-cyan-200"
-                }`}
-              >
-                NOTES
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Content Section: Notes View OR Navigation Views & Diagnostics with smooth transition */}
-        {dockMode === "notes" && !isIconOnly ? (
-          <div className="flex-1 min-h-0 w-full overflow-hidden transition-all duration-300 animate-in fade-in">
-            <NotesView isLeftDock={true} onBackToMonitoring={() => setDockMode("monitoring")} />
+          {/* Center Navigation Icons (Vertically fixed, icon-only, located under the line) */}
+          <div className="flex-1 flex flex-col gap-1 items-center justify-start w-full min-h-0 pt-0.5 pb-1 overflow-y-auto overflow-x-hidden">
+            {navItems
+              .filter((item) => item.visible)
+              .map((item) => {
+                const IconComponent = NAV_ICON_MAP[item.id] || Home;
+                const isActive = activeNav === item.id;
+                return (
+                  <Tooltip key={item.id} content={item.label} side="right" theme="cyan">
+                    <button
+                      onClick={() => handleNavClick(item.id)}
+                      data-testid={`left-rail-nav-${item.id}`}
+                      aria-label={item.label}
+                      className={`w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-cyan-500/20 text-cyan-200 border border-cyan-400 shadow-[0_0_8px_rgba(0,229,255,0.4)]"
+                          : "text-cyan-400/60 hover:text-cyan-200 hover:bg-cyan-500/10"
+                      }`}
+                    >
+                      <IconComponent className="w-4 h-4" />
+                      <span className="sr-only">{item.label}</span>
+                    </button>
+                  </Tooltip>
+                );
+              })}
           </div>
-        ) : (
-          <>
-            {/* Scrollable Navigation Views: Starts at HOME and ends above DIAGNOSTICS */}
-            <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden my-2 pr-0.5 transition-all duration-300">
-              <nav className={`flex flex-col ${isIconOnly ? "gap-2 items-center w-full" : "gap-2"}`}>
-                {visibleNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeNav === item.id;
 
-                  return (
-                    <div key={item.id} className={`flex flex-col ${isIconOnly ? "w-full items-center" : ""}`}>
-                      <Tooltip
-                        content={item.label}
-                        side="right"
-                        disabled={!isIconOnly}
-                        theme="cyan"
-                      >
-                        <button
-                          onClick={() => {
-                            onSelectNav(item.id);
-                            broadcastNavChange(item.id as NavViewId);
-                          }}
-                          aria-label={item.label}
-                          className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all ${
-                            isActive ? "hud-btn-active text-cyan-100" : "text-cyan-300/80"
-                          } ${
-                            isIconOnly
-                              ? "w-full aspect-square justify-center p-0 max-w-[44px]"
-                              : "justify-start px-3 py-2.5"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Icon className={`w-4 h-4 ${isActive ? "text-cyan-200" : "text-cyan-400/80"}`} />
-                            {!isIconOnly && <span className="font-semibold">{item.label}</span>}
-                          </div>
-                        </button>
-                      </Tooltip>
-                    </div>
-                  );
-                })}
-              </nav>
-            </div>
-          </>
-        )}
-
-        {/* Bottom Section: System Stats & Settings Button */}
-        <div className="shrink-0 w-full flex flex-col border-t border-cyan-500/30 pt-2">
-          {dockMode === "monitoring" && !isIconOnly && (
-            <DiagnosticsCard
-              diag={diag}
-              collapsed={diagnosticsCollapsed}
-              onToggleCollapse={toggleDiagnosticsCollapsed}
-            />
-          )}
-
-          {/* Pinned Bottom Left Settings Button (both contracted and expanded views) */}
-          <div
-            className={`w-full flex items-center ${
-              isIconOnly ? "justify-center pt-0" : "justify-start border-t border-cyan-500/20 pt-1.5"
-            }`}
-          >
-            <Tooltip
-              content="Settings"
-              side="right"
-              disabled={!isIconOnly}
-              theme="cyan"
-            >
+          {/* Bottom Settings Button */}
+          <div className="shrink-0 flex flex-col items-center w-full border-t border-cyan-500/30 pt-1.5 mt-1">
+            <Tooltip content="Settings" side="right" theme="cyan">
               <button
-                onClick={() => onOpenSettings?.("all")}
+                onClick={() => onOpenSettings && onOpenSettings()}
                 aria-label="Settings"
-                className={`hud-btn flex items-center rounded text-xs font-hud tracking-widest uppercase cursor-pointer transition-all text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-500/20 ${
-                  isIconOnly
-                    ? "w-full aspect-square justify-center p-0 max-w-[44px]"
-                    : "w-full justify-start px-2.5 py-1.5"
-                }`}
+                className="w-8 h-8 flex items-center justify-center rounded text-cyan-400/60 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all cursor-pointer"
               >
-                <div className="flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-cyan-400 shrink-0" />
-                  {!isIconOnly && <span className="font-semibold text-xs tracking-wider">SETTINGS</span>}
-                </div>
+                <Settings className="w-4 h-4" />
               </button>
             </Tooltip>
           </div>
         </div>
-      </HudBrackets>
+
+        {/* ================= LEFT PANE CONTENT (Only rendered when expanded, width >= 120) ================= */}
+        {!isIconOnly && (
+          <div className="flex-1 min-w-0 h-full pl-2">
+            <HudBrackets className="h-full w-full flex flex-col min-w-0 overflow-y-auto">
+              <div className="flex-1 flex flex-col p-2 min-w-0 overflow-y-auto">
+                <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-cyan-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-cyan-400 rotate-45 shadow-[0_0_6px_#00e5ff]" />
+                    <span className="font-tech text-xs tracking-widest text-cyan-400 uppercase font-bold">
+                      FocusHUD
+                    </span>
+                  </div>
+                  <div className="text-[9px] font-tech text-cyan-500/60 uppercase">
+                    SYS.ZONE.01
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0">
+                  {renderActiveView()}
+                </div>
+              </div>
+            </HudBrackets>
+          </div>
+        )}
       </TooltipProvider>
     </aside>
   );
