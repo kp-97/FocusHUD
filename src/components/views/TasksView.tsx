@@ -5,11 +5,15 @@ import { getTodayString } from "../../stores/layoutStore";
 import { Tree3DView, TreeNode3D } from "../features/tree3d/Tree3DView";
 import { useSyncTasks, useSyncGoals } from "../../hooks/useSyncEntity";
 
-interface TasksViewProps {
+export interface TasksViewProps {
   show3D?: boolean;
+  isCompact?: boolean;
 }
 
-export const TasksView: React.FC<TasksViewProps> = ({ show3D = true }) => {
+export const TasksView: React.FC<TasksViewProps> = ({
+  show3D = true,
+  isCompact = false,
+}) => {
   const [tasks, saveAndSetTasks] = useSyncTasks();
   const [goals] = useSyncGoals();
   const [searchQuery, setSearchQuery] = useState("");
@@ -281,20 +285,22 @@ export const TasksView: React.FC<TasksViewProps> = ({ show3D = true }) => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col p-2 bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none gap-2">
+    <div className={`h-full w-full flex flex-col ${isCompact ? "p-1 gap-1" : "p-2 gap-2"} bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none`}>
       {/* ================= TOP HALF: TASK LIST (SEARCHABLE & GOAL-GROUPED) ================= */}
       <div
         className={`${
           show3D ? "flex-1 min-h-[190px]" : "h-full"
-        } flex flex-col rounded bg-[#050b14] border border-cyan-500/30 p-2 overflow-hidden shadow-[0_0_15px_rgba(0,229,255,0.08)]`}
+        } flex flex-col rounded bg-[#050b14] border border-cyan-500/30 ${isCompact ? "p-1" : "p-2"} overflow-hidden shadow-[0_0_15px_rgba(0,229,255,0.08)]`}
       >
         {/* Header & Filter Tabs */}
-        <div className="flex items-center justify-between border-b border-cyan-500/20 pb-1.5 mb-1.5 text-xs">
+        <div className={`flex items-center justify-between border-b border-cyan-500/20 ${isCompact ? "pb-1 mb-1" : "pb-1.5 mb-1.5"} text-xs`}>
           <div className="flex items-center gap-1.5">
             <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
-              TASK INVENTORY
-            </span>
+            {!isCompact && (
+              <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
+                TASK INVENTORY
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1 text-[9px] font-tech uppercase">

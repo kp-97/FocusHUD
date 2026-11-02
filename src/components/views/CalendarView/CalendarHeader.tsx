@@ -15,6 +15,7 @@ export interface CalendarHeaderProps {
   mode: CalendarMode;
   setMode: (mode: CalendarMode) => void;
   headerTitle: string;
+  isCompact?: boolean;
   onToday: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -28,6 +29,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   mode,
   setMode,
   headerTitle,
+  isCompact = false,
   onToday,
   onPrev,
   onNext,
@@ -63,18 +65,18 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   const activeModeOption = CALENDAR_MODES.find((m) => m.id === mode) || CALENDAR_MODES[1];
 
   return (
-    <div className="h-14 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-[#050b14] relative z-40">
+    <div className={`${isCompact ? "h-9 px-2" : "h-14 px-3"} shrink-0 flex items-center justify-between border-b border-cyan-500/20 bg-[#050b14] relative z-40`}>
       {/* Left Navigation Controls */}
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center ${isCompact ? "gap-1.5" : "gap-3"}`}>
         <button
           onClick={onToday}
           data-testid="today-button"
-          className="rounded-full px-3.5 py-1 text-xs font-medium border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/15 hover:border-cyan-400/50 transition cursor-pointer"
+          className={`rounded-full ${isCompact ? "px-2.5 py-0.5" : "px-3.5 py-1"} text-xs font-medium border border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/15 hover:border-cyan-400/50 transition cursor-pointer`}
         >
           Today
         </button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={onPrev}
             title="Previous"
@@ -93,12 +95,14 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           </button>
         </div>
 
-        <h1
-          data-testid="calendar-header-title"
-          className="text-base font-orbitron font-medium text-cyan-100 tracking-wide select-text ml-1"
-        >
-          {headerTitle}
-        </h1>
+        {!isCompact && (
+          <h1
+            data-testid="calendar-header-title"
+            className="text-base font-orbitron font-medium text-cyan-100 tracking-wide select-text ml-1"
+          >
+            {headerTitle}
+          </h1>
+        )}
       </div>
 
       {/* Right Controls: Mode Dropdown + Independent Events/Tasks Toggles */}

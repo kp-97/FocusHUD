@@ -5,11 +5,15 @@ import { getTodayString } from "../../stores/layoutStore";
 import { Tree3DView } from "../features/tree3d/Tree3DView";
 import { useSyncGoals } from "../../hooks/useSyncEntity";
 
-interface GoalsViewProps {
+export interface GoalsViewProps {
   show3D?: boolean;
+  isCompact?: boolean;
 }
 
-export const GoalsView: React.FC<GoalsViewProps> = ({ show3D = true }) => {
+export const GoalsView: React.FC<GoalsViewProps> = ({
+  show3D = true,
+  isCompact = false,
+}) => {
   const [goals, saveAndSetGoals] = useSyncGoals();
   const [newRootTitle, setNewRootTitle] = useState("");
   const [addingSubToId, setAddingSubToId] = useState<string | null>(null);
@@ -228,20 +232,22 @@ export const GoalsView: React.FC<GoalsViewProps> = ({ show3D = true }) => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col p-2 bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none gap-2">
+    <div className={`h-full w-full flex flex-col ${isCompact ? "p-1 gap-1" : "p-2 gap-2"} bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none`}>
       {/* ================= TOP HALF: GOALS HIERARCHICAL LIST ================= */}
       <div
         className={`${
           show3D ? "flex-1 min-h-[190px]" : "h-full"
-        } flex flex-col rounded bg-[#050b14] border border-cyan-500/30 p-2 overflow-hidden shadow-[0_0_15px_rgba(0,229,255,0.08)]`}
+        } flex flex-col rounded bg-[#050b14] border border-cyan-500/30 ${isCompact ? "p-1" : "p-2"} overflow-hidden shadow-[0_0_15px_rgba(0,229,255,0.08)]`}
       >
         {/* Header with Stats */}
-        <div className="flex items-center justify-between border-b border-cyan-500/20 pb-1.5 mb-1 text-xs">
+        <div className={`flex items-center justify-between border-b border-cyan-500/20 ${isCompact ? "pb-1 mb-0.5" : "pb-1.5 mb-1"} text-xs`}>
           <div className="flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
-              GOALS HIERARCHY
-            </span>
+            {!isCompact && (
+              <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
+                GOALS HIERARCHY
+              </span>
+            )}
           </div>
 
           <span className="text-[10px] font-tech text-cyan-400/80 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/30">
@@ -250,7 +256,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({ show3D = true }) => {
         </div>
 
         {/* Add Root Goal Input */}
-        <form onSubmit={handleAddRootGoal} className="flex items-center gap-1 my-1">
+        <form onSubmit={handleAddRootGoal} className={`flex items-center gap-1 ${isCompact ? "my-0.5" : "my-1"}`}>
           <input
             type="text"
             value={newRootTitle}

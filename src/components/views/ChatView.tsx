@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Send, Bot, User, Radio, Sparkles } from "lucide-react";
 import { ChatMessage } from "../../types/hud";
+import { WaveformVisualizer } from "../ui/WaveformVisualizer";
 
 const SAMPLE_RESPONSES = [
   "Analyzing system telemetry... All core processes are operating within nominal thresholds. Memory allocation is stable at 48% and GPU rendering latency is 2.4ms.",
@@ -9,7 +10,11 @@ const SAMPLE_RESPONSES = [
   "Task decomposition complete: 1 primary goal has been divided into 3 actionable milestones with nested subtasks. The 3D neural tree projection is updated.",
 ];
 
-export const ChatView: React.FC = () => {
+export interface ChatViewProps {
+  isCompact?: boolean;
+}
+
+export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "m0",
@@ -99,12 +104,12 @@ export const ChatView: React.FC = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col p-2.5 bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none">
+    <div className={`h-full w-full flex flex-col ${isCompact ? "p-1.5" : "p-2.5"} bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none`}>
       {/* Header with Streaming Mode Toggle */}
-      <div className="w-full flex items-center justify-between border-b border-cyan-500/30 pb-2 mb-2 text-[10px] font-tech uppercase tracking-wider">
+      <div className={`w-full flex items-center justify-between border-b border-cyan-500/30 ${isCompact ? "pb-1 mb-1" : "pb-2 mb-2"} text-[10px] font-tech uppercase tracking-wider`}>
         <div className="flex items-center gap-1.5">
           <Bot className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="font-bold text-cyan-200">AI AGENT CHAT</span>
+          {!isCompact && <span className="font-bold text-cyan-200">AI AGENT CHAT</span>}
         </div>
 
         {/* Streaming Mode Toggle */}
@@ -122,10 +127,15 @@ export const ChatView: React.FC = () => {
         </button>
       </div>
 
+      {/* Relocated Voice Waveform Visualizer to keep navigation rail buttons vertically fixed */}
+      <div className={`${isCompact ? "mb-1" : "mb-2"} shrink-0`}>
+        <WaveformVisualizer isCompact={isCompact} />
+      </div>
+
       {/* Messages Scroll Area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1 font-tech"
+        className={`flex-1 min-h-0 overflow-y-auto ${isCompact ? "space-y-1.5" : "space-y-2.5"} pr-1 font-tech`}
       >
         {messages.map((msg, idx) => {
           const isUser = msg.role === "user";
