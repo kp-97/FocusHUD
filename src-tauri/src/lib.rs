@@ -12,6 +12,14 @@ use std::sync::atomic::Ordering;
 use tauri::Manager;
 
 pub fn restore_from_tray(app: &tauri::AppHandle) {
+    if dock::FULLSCREEN_ACTIVE.load(Ordering::Relaxed) {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+        return;
+    }
+
     let l_w = dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
     let r_w = dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
 
@@ -24,10 +32,6 @@ pub fn restore_from_tray(app: &tauri::AppHandle) {
     }
     if let Some(w) = app.get_webview_window("right-dock") {
         let _ = w.show();
-    }
-    if let Some(w) = app.get_webview_window("main") {
-        let _ = w.show();
-        let _ = w.set_focus();
     }
 }
 
@@ -73,7 +77,8 @@ pub fn run() {
             commands::save_calendar_event,
             commands::delete_calendar_event,
             commands::sync_calendar_events,
-            commands::migrate_legacy_data
+            commands::migrate_legacy_data,
+            commands::set_fullscreen_mode
         ])
         .setup(|app| {
             let conn = db::init_db(app.handle())?;

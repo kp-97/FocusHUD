@@ -3,6 +3,7 @@ import {
   updateDockSizes,
   restoreWorkArea,
   openSettingsWindow,
+  setFullscreenMode,
 } from "../services/tauriBridge";
 import {
   getRememberedLeftWidth,
@@ -15,6 +16,7 @@ import {
   subscribeLayoutAction,
   getMaxLeftWidth,
   getMaxRightWidth,
+  getPanesReserveZones,
 } from "../stores/layoutStore";
 import { runLegacyStorageMigrationIfNeeded } from "../services/storageMigration";
 import { checkForUpdates, AppUpdateInfo } from "../services/updaterService";
@@ -45,13 +47,38 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
   const [magneticSnap, setMagneticSnap] = useState<boolean>(true);
   const [desktopDockActive, setDesktopDockActive] = useState<boolean>(false);
   const [snapMode, setSnapMode] = useState<"fluid" | "grid-snap" | "ratio-16-9">("fluid");
-  const [activeNav, setActiveNav] = useState<string>("home");
+  const [activeNav, setActiveNavState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("focushud_active_nav") || "home";
+    }
+    return "home";
+  });
+
+  const setActiveNav = (nav: string) => {
+    setActiveNavState(nav);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_active_nav", nav);
+    }
+    broadcastLayoutAction({ type: "SET_ACTIVE_NAV", nav, sender: dockWindowType });
+  };
+
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [settingsTab, setSettingsTab] = useState<string>("all");
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
 
   const [maxLeftWidth, setMaxLeftWidth] = useState<number>(() => getMaxLeftWidth());
   const [maxRightWidth, setMaxRightWidth] = useState<number>(() => getMaxRightWidth());
+
+  const [isAppMaximized, setIsAppMaximized] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("focushud_is_app_maximized");
+      if (saved !== null) return saved === "true";
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("dock") === "full") return true;
+    }
+    return false;
+  });
+  const preMaximizedLayoutRef = useRef<{ left: number; right: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(() =>
@@ -124,7 +151,24 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
       // Do NOT re-invoke updateDockSizes to avoid duplicate Win32 work area / snap calculations.
       const isRemote = Boolean(action.sender && action.sender !== dockWindowType);
 
-      if (action.type === "MAXIMIZE_PANES") {
+      if (action.type === "MAXIMIZE_APP") {
+        setIsAppMaximized(true);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_is_app_maximized", "true");
+        }
+      } else if (action.type === "RESTORE_APP") {
+        setIsAppMaximized(false);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_is_app_maximized", "false");
+        }
+        setLeftWidth(action.leftWidth);
+        setRightWidth(action.rightWidth);
+      } else if (action.type === "SET_ACTIVE_NAV") {
+        setActiveNavState(action.nav);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_active_nav", action.nav);
+        }
+      } else if (action.type === "MAXIMIZE_PANES") {
         const prevL = getRememberedLeftWidth();
         const prevR = getRememberedRightWidth();
         setLeftWidth(prevL);
@@ -265,9 +309,27 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     }
   };
 
-  const handleLeftToggleCollapse = handleToggleBothPanes;
+  // Toggle left pane individually
+  const handleToggleLeftPane = () => {
+    if (leftWidth < 120) {
+      const next = getRememberedLeftWidth();
+      setLeftWidth(next);
+      broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: next, sender: dockWindowType });
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(next, null, true);
+      }
+    } else {
+      setRememberedLeftWidth(leftWidth);
+      setLeftWidth(68);
+      broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: 68, sender: dockWindowType });
+      if (dockWindowType !== "full" || desktopDockActive) {
+        updateDockSizes(68, null, true);
+      }
+    }
+  };
 
-  const handleRightToggleCollapse = () => {
+  // Toggle right pane individually
+  const handleToggleRightPane = () => {
     if (rightWidth < 120) {
       const next = getRememberedRightWidth();
       setRightWidth(next);
@@ -285,6 +347,9 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     }
   };
 
+  const handleLeftToggleCollapse = handleToggleLeftPane;
+  const handleRightToggleCollapse = handleToggleRightPane;
+
   const handleMaximizePanes = () => {
     const prevLeft = getRememberedLeftWidth();
     const prevRight = getRememberedRightWidth();
@@ -293,6 +358,43 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     broadcastLayoutAction({ type: "MAXIMIZE_PANES", sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(prevLeft, prevRight, true);
+    }
+  };
+
+  const handleToggleMaximizeApp = async () => {
+    if (!isAppMaximized) {
+      preMaximizedLayoutRef.current = { left: leftWidth, right: rightWidth };
+      await setFullscreenMode(true);
+      await restoreWorkArea();
+      setIsAppMaximized(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("focushud_is_app_maximized", "true");
+      }
+      broadcastLayoutAction({
+        type: "MAXIMIZE_APP",
+        sender: dockWindowType,
+      });
+    } else {
+      await setFullscreenMode(false);
+      setIsAppMaximized(false);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("focushud_is_app_maximized", "false");
+      }
+      const restored = preMaximizedLayoutRef.current || {
+        left: getRememberedLeftWidth(),
+        right: getRememberedRightWidth(),
+      };
+      setLeftWidth(restored.left);
+      setRightWidth(restored.right);
+      broadcastLayoutAction({
+        type: "RESTORE_APP",
+        leftWidth: restored.left,
+        rightWidth: restored.right,
+        sender: dockWindowType,
+      });
+      if (getPanesReserveZones() && (dockWindowType !== "full" || desktopDockActive)) {
+        await updateDockSizes(restored.left, restored.right, true);
+      }
     }
   };
 
@@ -422,12 +524,16 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     handleLeftDragEnd,
     handleLeftDoubleClick,
     handleLeftToggleCollapse,
+    handleToggleLeftPane,
     handleRightDragChange,
     handleRightDragEnd,
     handleRightDoubleClick,
     handleRightToggleCollapse,
+    handleToggleRightPane,
     handleToggleBothPanes,
     handleMaximizePanes,
+    isAppMaximized,
+    handleToggleMaximizeApp,
     handleResetWidths,
     handleApplyPreset,
     handleReset,

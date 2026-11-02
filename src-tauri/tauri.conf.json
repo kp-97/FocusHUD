@@ -12,6 +12,20 @@
   "app": {
     "windows": [
       {
+        "label": "main",
+        "title": "FocusHUD Full",
+        "url": "index.html?dock=full",
+        "width": 1920,
+        "height": 1080,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": true,
+        "shadow": false,
+        "visible": false,
+        "skipTaskbar": true
+      },
+      {
         "label": "left-dock",
         "title": "FocusHUD",
         "url": "index.html?dock=left",

@@ -64,15 +64,22 @@ pub fn update_dock_sizes(
         RIGHT_DRAG_ACTIVE.store(false, Ordering::Relaxed);
     }
 
-    platform::apply_dock_geometry(&app, l_w, r_w);
+    if !crate::dock::FULLSCREEN_ACTIVE.load(Ordering::Relaxed) {
+        platform::apply_dock_geometry(&app, l_w, r_w);
 
-    if commit {
-        platform::update_dock_work_area(&app, l_w, r_w, true);
-    } else {
-        platform::live_resize_active_window(&app, l_w, r_w);
+        if commit {
+            platform::update_dock_work_area(&app, l_w, r_w, true);
+        } else {
+            platform::live_resize_active_window(&app, l_w, r_w);
+        }
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn set_fullscreen_mode(app: tauri::AppHandle, fullscreen: bool) -> Result<(), String> {
+    platform::set_fullscreen_mode(&app, fullscreen)
 }
 
 #[tauri::command]

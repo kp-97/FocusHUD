@@ -34,6 +34,7 @@ export async function restoreWorkArea(): Promise<boolean> {
 }
 
 export async function minimizeToTray(): Promise<boolean> {
+  await restoreWorkArea();
   return invokeTauriBool("minimize_to_tray");
 }
 
@@ -62,4 +63,8 @@ export async function openSettingsWindow(): Promise<boolean> {
 
 export async function closeSettingsWindow(): Promise<boolean> {
   return invokeTauriBool("close_settings_window");
+}
+
+export async function setFullscreenMode(fullscreen: boolean): Promise<boolean> {
+  return invokeTauriBool("set_fullscreen_mode", { fullscreen });
 }
