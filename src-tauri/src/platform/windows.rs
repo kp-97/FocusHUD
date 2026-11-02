@@ -150,7 +150,10 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
                     );
                 } else {
                     let _ = w.set_position(tauri::PhysicalPosition::new(mon_left, mon_top));
-                    let _ = w.set_size(tauri::PhysicalSize::new(mon_width as u32, mon_height as u32));
+                    let _ = w.set_size(tauri::PhysicalSize::new(
+                        mon_width as u32,
+                        mon_height as u32,
+                    ));
                 }
             }
             let _ = w.show();
