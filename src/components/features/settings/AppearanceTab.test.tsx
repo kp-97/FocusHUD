@@ -52,5 +52,43 @@ describe("AppearanceTab", () => {
     fireEvent.click(resetBtn);
     expect(handleReset).toHaveBeenCalledTimes(1);
   });
+
+  it("toggles desktop work area zone reservation", () => {
+    render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
+
+    const reserveToggle = screen.getByRole("checkbox", { name: /Toggle Reserve Desktop Zones/i });
+    expect(reserveToggle).toBeChecked();
+
+    fireEvent.click(reserveToggle);
+    expect(reserveToggle).not.toBeChecked();
+    expect(localStorage.getItem("hud_panes_reserve_zones")).toBe("false");
+  });
+
+  it("switches pane sizing mode to custom defaults and updates default widths", () => {
+    render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
+
+    // Default mode is remember
+    const rememberRadio = screen.getByLabelText(/Remember expanded independent widths/i);
+    const customRadio = screen.getByLabelText(/Set default pane widths via settings/i);
+    expect(rememberRadio).toBeChecked();
+    expect(customRadio).not.toBeChecked();
+
+    // Switch to custom default mode
+    fireEvent.click(customRadio);
+    expect(customRadio).toBeChecked();
+    expect(localStorage.getItem("hud_remember_pane_widths")).toBe("false");
+
+    // Inputs for default left and right pane widths become visible
+    const leftInput = screen.getByLabelText(/Default Left Pane Width \(px\)/i);
+    const rightInput = screen.getByLabelText(/Default Right Pane Width \(px\)/i);
+    expect(leftInput).toBeInTheDocument();
+    expect(rightInput).toBeInTheDocument();
+
+    fireEvent.change(leftInput, { target: { value: "320" } });
+    expect(localStorage.getItem("hud_custom_default_left_width")).toBe("320");
+
+    fireEvent.change(rightInput, { target: { value: "350" } });
+    expect(localStorage.getItem("hud_custom_default_right_width")).toBe("350");
+  });
 });
 

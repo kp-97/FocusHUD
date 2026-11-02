@@ -44,6 +44,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [maxLeft, setMaxLeft] = useState<number>(() => getMaxLeftWidth());
   const [maxRight, setMaxRight] = useState<number>(() => getMaxRightWidth());
 
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isDraggingModalRef = React.useRef(false);
+  const dragStartRef = React.useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
+    mouseX: 0,
+    mouseY: 0,
+    startX: 0,
+    startY: 0,
+  });
+
+  const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    isDraggingModalRef.current = true;
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: position.x,
+      startY: position.y,
+    };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingModalRef.current) return;
+    const deltaX = e.clientX - dragStartRef.current.mouseX;
+    const deltaY = e.clientY - dragStartRef.current.mouseY;
+    setPosition({
+      x: dragStartRef.current.startX + deltaX,
+      y: dragStartRef.current.startY + deltaY,
+    });
+  };
+
+  const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDraggingModalRef.current = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab || "all");
@@ -53,6 +93,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setNavConfig(loadNavConfig());
       setMaxLeft(getMaxLeftWidth());
       setMaxRight(getMaxRightWidth());
+      setPosition({ x: 0, y: 0 });
     }
   }, [isOpen, initialTab]);
 
@@ -123,6 +164,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const modalContent = (
     <div
+      data-testid="settings-modal-content"
+      style={{
+        transform: `translate(${position.x}px, ${position.y}px)`,
+      }}
       className={`w-full ${
         isStandalone ? "h-full max-w-none" : "max-w-xl"
       } bg-[#040d1a] border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(0,229,255,0.25)] overflow-hidden text-cyan-200 relative font-hud flex flex-col`}
@@ -132,10 +177,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         showTicks={true}
         className="p-5 flex flex-col h-full overflow-hidden"
       >
-        {/* Header */}
+        {/* Header (Draggable) */}
         <div
           data-tauri-drag-region
-          className="flex items-center justify-between border-b border-cyan-500/30 pb-3 mb-3 shrink-0 select-none cursor-default"
+          onPointerDown={handleHeaderPointerDown}
+          onPointerMove={handleHeaderPointerMove}
+          onPointerUp={handleHeaderPointerUp}
+          className="flex items-center justify-between border-b border-cyan-500/30 pb-3 mb-3 shrink-0 select-none cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2.5 pointer-events-none">
             <div className="w-3 h-3 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
