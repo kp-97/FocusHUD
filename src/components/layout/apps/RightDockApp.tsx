@@ -10,15 +10,20 @@ interface DockAppProps {
 
 export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
   const {
+    leftWidth,
     rightWidth,
     activeNav,
-    maxRightWidth,
     magneticSnap,
     isSettingsOpen,
     settingsTab,
     setIsSettingsOpen,
+    handleToggleLeftPane,
+    handleToggleRightPane,
+    handleToggleBothPanes,
     handleRightToggleCollapse,
     handleMaximizePanes,
+    isAppMaximized,
+    handleToggleMaximizeApp,
     handleOpenSettings,
     handleRightDragChange,
     handleRightDragEnd,
@@ -42,7 +47,7 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
             side="right"
             currentWidth={rightWidth}
             minWidth={MIN_LEFT_WIDTH}
-            maxWidth={maxRightWidth}
+            maxWidth={typeof window !== "undefined" ? window.innerWidth - MIN_LEFT_WIDTH : undefined}
             snapPoints={magneticSnap ? SNAP_POINTS : []}
             className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
             onDragChange={handleRightDragChange}
@@ -52,11 +57,17 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
         </div>
         <RightSidebar
           width={rightWidth}
+          leftWidth={leftWidth}
           activeNav={activeNav}
           isCompact={rightWidth < 220}
           isDockMode={true}
+          isAppMaximized={isAppMaximized}
           onExpand={handleRightToggleCollapse}
           onCollapse={handleRightToggleCollapse}
+          onToggleLeftPane={handleToggleLeftPane}
+          onToggleRightPane={handleToggleRightPane}
+          onToggleBothPanes={handleToggleBothPanes}
+          onToggleMaximizeApp={handleToggleMaximizeApp}
           onMaximizePanes={handleMaximizePanes}
           onOpenSettings={handleOpenSettings}
         />
