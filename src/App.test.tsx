@@ -78,7 +78,7 @@ describe("App root window dispatcher", () => {
     render(<App />);
 
     // Initially in docked mode: Center workspace is present, full screen view container is not
-    expect(screen.getByText("Fluid Fit")).toBeInTheDocument();
+    expect(screen.getByTestId("center-preview-container")).toBeInTheDocument();
     expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
 
     const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
@@ -92,7 +92,7 @@ describe("App root window dispatcher", () => {
     // In full screen mode:
     // 1. Center workspace is replaced by full-screen view container (merging left & right panes)
     expect(screen.getByTestId("full-screen-view-container")).toBeInTheDocument();
-    expect(screen.queryByText("Fluid Fit")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("center-preview-container")).not.toBeInTheDocument();
 
     // 2. Left and right rails are still on the left and right
     expect(screen.getByLabelText("System Menu")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("App root window dispatcher", () => {
 
     // Returns to docked mode
     expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
-    expect(screen.getByText("Fluid Fit")).toBeInTheDocument();
+    expect(screen.getByTestId("center-preview-container")).toBeInTheDocument();
     expect(screen.getByLabelText(/Maximize FocusHUD/i)).toBeInTheDocument();
   });
 });

@@ -4,6 +4,12 @@ import { GoalNode } from "../../types/hud";
 import { getTodayString } from "../../stores/layoutStore";
 import { Tree3DView } from "../features/tree3d/Tree3DView";
 import { useSyncGoals } from "../../hooks/useSyncEntity";
+import {
+  insertChildNode,
+  toggleNodeComplete,
+  removeTreeNode,
+  countTreeStats,
+} from "../../utils/treeUtils";
 
 export interface GoalsViewProps {
   show3D?: boolean;
@@ -48,65 +54,20 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
       children: [],
     };
 
-    const insertSub = (list: GoalNode[]): GoalNode[] => {
-      return list.map((item) => {
-        if (item.id === parentId) {
-          return {
-            ...item,
-            children: [...(item.children || []), newSub],
-          };
-        }
-        if (item.children && item.children.length > 0) {
-          return { ...item, children: insertSub(item.children) };
-        }
-        return item;
-      });
-    };
-
-    saveAndSetGoals(insertSub(goals));
+    saveAndSetGoals(insertChildNode(goals, parentId, newSub));
     setSubGoalTitle("");
     setAddingSubToId(null);
   };
 
   // Toggle Completed (with strikethrough)
   const toggleGoalCompleted = (id: string) => {
-    const today = getTodayString();
-
-    const updateComplete = (list: GoalNode[]): GoalNode[] => {
-      return list.map((item) => {
-        if (item.id === id) {
-          const next = !item.completed;
-          return {
-            ...item,
-            completed: next,
-            completedAt: next ? today : undefined,
-          };
-        }
-        if (item.children && item.children.length > 0) {
-          return { ...item, children: updateComplete(item.children) };
-        }
-        return item;
-      });
-    };
-
-    saveAndSetGoals(updateComplete(goals));
+    saveAndSetGoals(toggleNodeComplete(goals, id, getTodayString()));
   };
 
   // Delete Goal
   const deleteGoal = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const remove = (list: GoalNode[]): GoalNode[] => {
-      return list
-        .filter((item) => item.id !== id)
-        .map((item) => {
-          if (item.children && item.children.length > 0) {
-            return { ...item, children: remove(item.children) };
-          }
-          return item;
-        });
-    };
-
-    saveAndSetGoals(remove(goals));
+    saveAndSetGoals(removeTreeNode(goals, id));
   };
 
   const toggleCollapse = (id: string) => {
@@ -114,16 +75,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
   };
 
   // Count stats
-  let totalCount = 0;
-  let completedCount = 0;
-  const countStats = (list: GoalNode[]) => {
-    list.forEach((item) => {
-      totalCount++;
-      if (item.completed) completedCount++;
-      if (item.children) countStats(item.children);
-    });
-  };
-  countStats(goals);
+  const { total: totalCount, completed: completedCount } = countTreeStats(goals);
 
   // Recursive Goal Tree Item Renderer
   const renderGoalNode = (node: GoalNode, depth: number = 0) => {

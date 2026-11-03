@@ -2,8 +2,24 @@ use super::ScreenMetrics;
 use std::sync::atomic::Ordering;
 use tauri::Manager;
 
-pub fn init_dpi_awareness() {
-    crate::monitor::init_dpi_awareness();
+pub use crate::dock::apply_dock_geometry;
+pub use crate::monitor::{init_dpi_awareness, restore_work_area, restore_work_area_sync};
+
+fn get_physical_dock_widths(
+    app: &tauri::AppHandle,
+    left_width: i32,
+    right_width: i32,
+) -> (i32, i32) {
+    let monitor = app.primary_monitor().ok().flatten().or_else(|| {
+        app.get_webview_window("left-dock")
+            .and_then(|w| w.current_monitor().ok().flatten())
+    });
+    let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
+    let phys_left =
+        (((left_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+    let phys_right =
+        (((right_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
+    (phys_left, phys_right)
 }
 
 pub fn get_screen_metrics(_app: &tauri::AppHandle) -> Result<ScreenMetrics, String> {
@@ -37,25 +53,12 @@ pub fn configure_dock_windows(app: &tauri::AppHandle) {
 
         crate::dock::apply_dock_geometry(app, left_w, right_w);
 
-        let monitor = app.primary_monitor().ok().flatten().or_else(|| {
-            app.get_webview_window("left-dock")
-                .and_then(|w| w.current_monitor().ok().flatten())
-        });
-        let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
-        let phys_left =
-            (((left_w + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-        let phys_right =
-            (((right_w + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-
+        let (phys_left, phys_right) = get_physical_dock_widths(app, left_w, right_w);
         crate::dock::update_dock_work_area(orig_work, phys_left, phys_right, true);
     }
 }
 
 pub fn configure_settings_window(_window: &tauri::WebviewWindow) {}
-
-pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
-    crate::dock::apply_dock_geometry(app, left_width, right_width);
-}
 
 pub fn update_dock_work_area(
     app: &tauri::AppHandle,
@@ -64,16 +67,7 @@ pub fn update_dock_work_area(
     snap_open_windows: bool,
 ) {
     if let Some(orig) = crate::monitor::get_original_work_area() {
-        let monitor = app.primary_monitor().ok().flatten().or_else(|| {
-            app.get_webview_window("left-dock")
-                .and_then(|w| w.current_monitor().ok().flatten())
-        });
-        let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
-        let phys_left =
-            (((left_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-        let phys_right =
-            (((right_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-
+        let (phys_left, phys_right) = get_physical_dock_widths(app, left_width, right_width);
         unsafe {
             crate::dock::update_dock_work_area(orig, phys_left, phys_right, snap_open_windows);
         }
@@ -82,16 +76,7 @@ pub fn update_dock_work_area(
 
 pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
     if let Some(orig) = crate::monitor::get_original_work_area() {
-        let monitor = app.primary_monitor().ok().flatten().or_else(|| {
-            app.get_webview_window("left-dock")
-                .and_then(|w| w.current_monitor().ok().flatten())
-        });
-        let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
-        let phys_left =
-            (((left_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-        let phys_right =
-            (((right_width + crate::dock::HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32;
-
+        let (phys_left, phys_right) = get_physical_dock_widths(app, left_width, right_width);
         let (new_left, new_right) =
             crate::dock::calculate_work_area_margins(orig.left, orig.right, phys_left, phys_right);
         let prospective_rect = windows_sys::Win32::Foundation::RECT {
@@ -107,14 +92,6 @@ pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_
             }
         }
     }
-}
-
-pub fn restore_work_area_sync() {
-    crate::monitor::restore_work_area_sync();
-}
-
-pub fn restore_work_area() -> Result<(), String> {
-    crate::monitor::restore_work_area()
 }
 
 pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(), String> {

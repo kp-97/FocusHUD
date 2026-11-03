@@ -31,7 +31,7 @@ import { TasksView } from "../../views/TasksView";
 import { NotesView } from "../../views/NotesView";
 import { KanbanView } from "../../views/KanbanView";
 import { ActionPlansView } from "../../views/ActionPlansView";
-import { TimerView } from "../../views/TimerView";
+import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
 
 const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,
@@ -254,7 +254,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       case "action_plans":
         return <ActionPlansView />;
       case "timer":
-        return <TimerView />;
+        return <PomodoroDial isCompact={false} />;
       default:
         return <HomeView />;
     }

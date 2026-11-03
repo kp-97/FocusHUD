@@ -4,6 +4,13 @@ import { ActionPlanNode } from "../../types/hud";
 import { getTodayString } from "../../stores/layoutStore";
 import { Tree3DView, TreeNode3D } from "../features/tree3d/Tree3DView";
 import { useSyncActionPlans } from "../../hooks/useSyncEntity";
+import {
+  insertChildNode,
+  toggleNodeComplete,
+  removeTreeNode,
+  hasAnyTreeNesting,
+  mapTreeTo3D,
+} from "../../utils/treeUtils";
 
 export interface ActionPlansViewProps {
   show3D?: boolean;
@@ -48,65 +55,20 @@ export const ActionPlansView: React.FC<ActionPlansViewProps> = ({
       children: [],
     };
 
-    const insertStep = (list: ActionPlanNode[]): ActionPlanNode[] => {
-      return list.map((item) => {
-        if (item.id === parentId) {
-          return {
-            ...item,
-            children: [...(item.children || []), newStep],
-          };
-        }
-        if (item.children && item.children.length > 0) {
-          return { ...item, children: insertStep(item.children) };
-        }
-        return item;
-      });
-    };
-
-    saveAndSetPlans(insertStep(plans));
+    saveAndSetPlans(insertChildNode(plans, parentId, newStep));
     setStepTitle("");
     setAddingStepToId(null);
   };
 
   // Toggle Completion
   const toggleStepCompleted = (id: string) => {
-    const today = getTodayString();
-
-    const updateComplete = (list: ActionPlanNode[]): ActionPlanNode[] => {
-      return list.map((item) => {
-        if (item.id === id) {
-          const next = !item.completed;
-          return {
-            ...item,
-            completed: next,
-            completedAt: next ? today : undefined,
-          };
-        }
-        if (item.children && item.children.length > 0) {
-          return { ...item, children: updateComplete(item.children) };
-        }
-        return item;
-      });
-    };
-
-    saveAndSetPlans(updateComplete(plans));
+    saveAndSetPlans(toggleNodeComplete(plans, id, getTodayString()));
   };
 
   // Delete Action Plan or Step
   const deletePlan = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const remove = (list: ActionPlanNode[]): ActionPlanNode[] => {
-      return list
-        .filter((item) => item.id !== id)
-        .map((item) => {
-          if (item.children && item.children.length > 0) {
-            return { ...item, children: remove(item.children) };
-          }
-          return item;
-        });
-    };
-
-    saveAndSetPlans(remove(plans));
+    saveAndSetPlans(removeTreeNode(plans, id));
   };
 
   const toggleCollapse = (id: string) => {
@@ -114,28 +76,10 @@ export const ActionPlansView: React.FC<ActionPlansViewProps> = ({
   };
 
   // Check if any action plan has nested children
-  const hasAnyNesting = useMemo(() => {
-    const checkNesting = (list: ActionPlanNode[]): boolean => {
-      for (const p of list) {
-        if (p.children && p.children.length > 0) return true;
-      }
-      return false;
-    };
-    return checkNesting(plans);
-  }, [plans]);
+  const hasAnyNesting = useMemo(() => hasAnyTreeNesting(plans), [plans]);
 
   // Convert plans to TreeNode3D format
-  const treeData: TreeNode3D[] = useMemo(() => {
-    const mapToTree = (list: ActionPlanNode[]): TreeNode3D[] => {
-      return list.map((item) => ({
-        id: item.id,
-        title: item.title,
-        completed: item.completed,
-        children: item.children ? mapToTree(item.children) : undefined,
-      }));
-    };
-    return mapToTree(plans);
-  }, [plans]);
+  const treeData: TreeNode3D[] = useMemo(() => mapTreeTo3D(plans), [plans]);
 
   // Recursive Item Renderer
   const renderPlanNode = (node: ActionPlanNode, depth: number = 0) => {

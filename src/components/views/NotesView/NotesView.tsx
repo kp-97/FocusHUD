@@ -3,12 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { NoteItem } from "../../../types/hud";
 import { NotesList, NoteFilter } from "./NotesList";
 import { NoteEditor } from "./NoteEditor";
-import { loadNotes, saveNotes } from "../../../stores/layoutStore";
+import { useSyncNotes } from "../../../hooks/useSyncEntity";
+import { saveNotes } from "../../../stores/layoutStore";
 import {
-  fetchNotes,
   persistNote,
   removeNote,
-  onDbChange,
   isTauriEnvironment,
 } from "../../../services/dbService";
 
@@ -18,21 +17,14 @@ export interface NotesViewProps {
   onBackToMonitoring?: () => void;
 }
 
-const NOTES_CHANNEL_NAME = "focushud_notes_channel";
-const notesChannel =
-  typeof BroadcastChannel !== "undefined"
-    ? new BroadcastChannel(NOTES_CHANNEL_NAME)
-    : null;
-
 export const NotesView: React.FC<NotesViewProps> = ({
   isLeftDock = false,
   isCompact = false,
   onBackToMonitoring,
 }) => {
-  const [notes, setNotes] = useState<NoteItem[]>(() => loadNotes());
+  const [notes, saveAndSetNotes, setNotes] = useSyncNotes();
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(() => {
-    const list = loadNotes();
-    return list.length > 0 ? list[0].id : null;
+    return notes.length > 0 ? notes[0].id : null;
   });
 
   const [filter, setFilter] = useState<NoteFilter>("all");
@@ -50,8 +42,11 @@ export const NotesView: React.FC<NotesViewProps> = ({
     return 600;
   });
 
-  const selectedNoteIdRef = useRef<string | null>(selectedNoteId);
-  selectedNoteIdRef.current = selectedNoteId;
+  const activeId =
+    selectedNoteId && notes.some((n) => n.id === selectedNoteId)
+      ? selectedNoteId
+      : notes[0]?.id || null;
+  const activeNote = notes.find((n) => n.id === activeId) || null;
 
   // Debounce timer ref
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,133 +81,6 @@ export const NotesView: React.FC<NotesViewProps> = ({
     };
   }, []);
 
-  // Fetch initial notes from SQLite on mount
-  useEffect(() => {
-    let active = true;
-    if (isTauriEnvironment()) {
-      fetchNotes().then((dbNotes) => {
-        if (!active) return;
-        if (dbNotes && dbNotes.length > 0) {
-          const mapped: NoteItem[] = dbNotes.map((n) => ({
-            id: n.id,
-            parentId: n.parentId,
-            goalId: n.goalId,
-            taskId: n.taskId,
-            actionPlanId: n.actionPlanId,
-            title: n.title,
-            content: n.content,
-            isPinned: n.isPinned,
-            sortOrder: n.sortOrder,
-            createdAt: n.createdAt,
-            updatedAt: n.updatedAt,
-          }));
-          setNotes(mapped);
-          setSelectedNoteId((prev) => (prev && mapped.some((m) => m.id === prev) ? prev : mapped[0].id));
-        } else {
-          // If SQLite is empty, persist default notes
-          const initial = loadNotes();
-          if (initial.length > 0) {
-            persistNote({
-              ...initial[0],
-            }).catch(() => {});
-          }
-        }
-      });
-    }
-
-    // Dual-window cross-dock synchronization via Tauri SQLite events
-    const unlistenPromise = onDbChange((payload) => {
-      if (payload.entity === "notes" || payload.entity === "all") {
-        fetchNotes().then((dbNotes) => {
-          if (!active || !dbNotes) return;
-          const mapped: NoteItem[] = dbNotes.map((n) => ({
-            id: n.id,
-            parentId: n.parentId,
-            goalId: n.goalId,
-            taskId: n.taskId,
-            actionPlanId: n.actionPlanId,
-            title: n.title,
-            content: n.content,
-            isPinned: n.isPinned,
-            sortOrder: n.sortOrder,
-            createdAt: n.createdAt,
-            updatedAt: n.updatedAt,
-          }));
-
-          setNotes((prevNotes) => {
-            // Guard active note's uncommitted in-memory text from being clobbered by async db roundtrip
-            const activeId = selectedNoteIdRef.current;
-            const currentActive = prevNotes.find((p) => p.id === activeId);
-
-            return mapped.map((dbN) => {
-              if (currentActive && dbN.id === activeId) {
-                if (currentActive.content !== dbN.content || currentActive.title !== dbN.title) {
-                  return {
-                    ...dbN,
-                    content: currentActive.content,
-                    title: currentActive.title,
-                  };
-                }
-              }
-              return dbN;
-            });
-          });
-
-          setSelectedNoteId((prev) => (prev && mapped.some((m) => m.id === prev) ? prev : mapped[0]?.id || null));
-        });
-      }
-    });
-
-    // Dual-window cross-dock synchronization via BroadcastChannel
-    const handleBroadcast = (e: MessageEvent) => {
-      if (e.data && e.data.type === "SYNC_NOTES" && Array.isArray(e.data.notes)) {
-        setNotes((prevNotes) => {
-          const activeId = selectedNoteIdRef.current;
-          const currentActive = prevNotes.find((p) => p.id === activeId);
-          return (e.data.notes as NoteItem[]).map((incoming) => {
-            if (currentActive && incoming.id === activeId && currentActive.content !== incoming.content) {
-              return {
-                ...incoming,
-                content: currentActive.content,
-                title: currentActive.title,
-              };
-            }
-            return incoming;
-          });
-        });
-        if (e.data.selectedId && e.data.broadcastSelect) {
-          setSelectedNoteId(e.data.selectedId);
-        }
-      }
-    };
-
-    if (notesChannel) {
-      notesChannel.addEventListener("message", handleBroadcast);
-    }
-
-    // Storage event sync (browser fallback)
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "focushud_notes" && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) {
-            setNotes(parsed);
-          }
-        } catch {}
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      active = false;
-      unlistenPromise.then((unlisten) => unlisten && unlisten());
-      if (notesChannel) {
-        notesChannel.removeEventListener("message", handleBroadcast);
-      }
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
-
   // Debounced auto-save function (350ms)
   const triggerAutoSave = useCallback((updatedList: NoteItem[], targetNote: NoteItem) => {
     setSaveStatus("saving");
@@ -223,16 +91,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        // Save to localStorage
         saveNotes(updatedList);
-
-        // Broadcast to other dock window
-        if (notesChannel) {
-          notesChannel.postMessage({
-            type: "SYNC_NOTES",
-            notes: updatedList,
-          });
-        }
 
         // Persist to SQLite
         if (isTauriEnvironment()) {
@@ -259,29 +118,31 @@ export const NotesView: React.FC<NotesViewProps> = ({
   // Update a note in state and trigger auto-save
   const updateNote = useCallback(
     (updater: (prevNote: NoteItem) => NoteItem) => {
-      if (!selectedNoteId) return;
+      const targetId = activeId;
+      if (!targetId) return;
 
-      setNotes((prevNotes) => {
-        let changedTarget: NoteItem | null = null;
-        const next = prevNotes.map((n) => {
-          if (n.id === selectedNoteId) {
-            const updated = updater(n);
-            changedTarget = {
-              ...updated,
-              updatedAt: Date.now(),
-            };
-            return changedTarget;
-          }
-          return n;
-        });
+      setSaveStatus("saving");
 
-        if (changedTarget) {
-          triggerAutoSave(next, changedTarget);
+      const prevNotes = notesRef.current;
+      let changedTarget: NoteItem | null = null;
+      const next = prevNotes.map((n) => {
+        if (n.id === targetId) {
+          const updated = updater(n);
+          changedTarget = {
+            ...updated,
+            updatedAt: Date.now(),
+          };
+          return changedTarget;
         }
-        return next;
+        return n;
       });
+
+      setNotes(next);
+      if (changedTarget) {
+        triggerAutoSave(next, changedTarget);
+      }
     },
-    [selectedNoteId, triggerAutoSave]
+    [activeId, triggerAutoSave, setNotes]
   );
 
   // Note Field Handlers
@@ -294,7 +155,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
   };
 
   const handleTogglePin = (id?: string) => {
-    const targetId = id || selectedNoteId;
+    const targetId = id || activeId;
     if (!targetId) return;
 
     setNotes((prevNotes) => {
@@ -352,15 +213,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
       if (!targetId) return;
 
       const remaining = notesRef.current.filter((n) => n.id !== targetId);
-      setNotes(remaining);
-      saveNotes(remaining);
-
-      if (notesChannel) {
-        notesChannel.postMessage({
-          type: "SYNC_NOTES",
-          notes: remaining,
-        });
-      }
+      saveAndSetNotes(remaining);
 
       if (isTauriEnvironment()) {
         removeNote(targetId).catch(() => {});
@@ -402,7 +255,6 @@ export const NotesView: React.FC<NotesViewProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNewNote, handleDeleteNote]);
 
-  const activeNote = notes.find((n) => n.id === selectedNoteId) || null;
   const isSplitLayout = containerWidth >= 480;
 
   return (
@@ -437,7 +289,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
         >
           <NotesList
             notes={notes}
-            selectedNoteId={selectedNoteId}
+            selectedNoteId={activeId}
             isCompact={isCompact}
             onSelectNote={(id) => {
               setSelectedNoteId(id);
