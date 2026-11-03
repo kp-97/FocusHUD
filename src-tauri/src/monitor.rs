@@ -139,6 +139,11 @@ pub fn restore_work_area_sync() {
     {
         let lock = ORIGINAL_WORK_AREA.lock().unwrap();
         if let Some(orig) = *lock {
+            let mut cur_lock = CURRENT_WORK_AREA.lock().unwrap();
+            let mut prev_lock = PREVIOUS_WORK_AREA.lock().unwrap();
+            *prev_lock = *cur_lock;
+            *cur_lock = Some(orig);
+
             unsafe {
                 SystemParametersInfoW(
                     SPI_SETWORKAREA,
@@ -152,7 +157,37 @@ pub fn restore_work_area_sync() {
 }
 
 pub fn restore_work_area() -> Result<(), String> {
-    restore_work_area_sync();
+    #[cfg(target_os = "windows")]
+    {
+        let lock = ORIGINAL_WORK_AREA.lock().unwrap();
+        if let Some(orig) = *lock {
+            let mut cur_lock = CURRENT_WORK_AREA.lock().unwrap();
+            let mut prev_lock = PREVIOUS_WORK_AREA.lock().unwrap();
+            *prev_lock = *cur_lock;
+            *cur_lock = Some(orig);
+
+            let seq = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+            unsafe {
+                // Immediate application without blocking broadcast delay
+                SystemParametersInfoW(SPI_SETWORKAREA, 0, &orig as *const _ as *mut _, 0);
+            }
+
+            // Non-blocking detached thread for broadcast to external windows and taskbars
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+                if WORK_AREA_SEQ.load(Ordering::SeqCst) == seq {
+                    unsafe {
+                        SystemParametersInfoW(
+                            SPI_SETWORKAREA,
+                            0,
+                            &orig as *const _ as *mut _,
+                            SPIF_SENDCHANGE,
+                        );
+                    }
+                }
+            });
+        }
+    }
     Ok(())
 }
 
