@@ -3,12 +3,67 @@
  * Manages dual-pane HUD layout widths, constraints, snapping, and cross-window commands.
  */
 
-import { NavItemConfig } from "../types/hud";
-import { setNavBroadcastDelegate } from "./navStore";
+import { NavItemConfig, NavViewId } from "../types/hud";
 
-// Re-export navigation and entity stores for full backwards compatibility
-export * from "./navStore";
+// Re-export entity store for full backwards compatibility
 export * from "./entityStore";
+
+export const DEFAULT_NAV_CONFIG: NavItemConfig[] = [
+  { id: "home", label: "HOME", visible: true },
+  { id: "chat", label: "AI CHAT", visible: true },
+  { id: "calendar", label: "CALENDAR", visible: true },
+  { id: "goals", label: "GOALS", visible: true },
+  { id: "tasks", label: "TASKS", visible: true },
+  { id: "notes", label: "NOTES", visible: true },
+  { id: "action_plans", label: "ACTION PLANS", visible: true },
+  { id: "timer", label: "TIMER", visible: true },
+  { id: "kanban", label: "KANBAN", visible: true },
+];
+
+export const loadNavConfig = (): NavItemConfig[] => {
+  const raw = localStorage.getItem("focushud_nav_config");
+  if (!raw) return DEFAULT_NAV_CONFIG;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_NAV_CONFIG;
+
+    const validIds = new Set(DEFAULT_NAV_CONFIG.map((d) => d.id));
+    const result: NavItemConfig[] = [];
+    const seen = new Set<string>();
+
+    for (const item of parsed) {
+      if (item && validIds.has(item.id) && !seen.has(item.id)) {
+        seen.add(item.id);
+        const defaultMatch = DEFAULT_NAV_CONFIG.find((d) => d.id === item.id);
+        result.push({
+          id: item.id,
+          label: item.label || defaultMatch?.label || item.id.toUpperCase(),
+          visible: typeof item.visible === "boolean" ? item.visible : true,
+        });
+      }
+    }
+
+    for (const def of DEFAULT_NAV_CONFIG) {
+      if (!seen.has(def.id)) {
+        result.push({ ...def });
+      }
+    }
+
+    return result;
+  } catch {
+    return DEFAULT_NAV_CONFIG;
+  }
+};
+
+export const getInitialNav = (): NavViewId => {
+  const saved = localStorage.getItem("focushud_active_nav");
+  return (saved as NavViewId) || "home";
+};
+
+export const getInitialRightNav = (): NavViewId => {
+  const saved = localStorage.getItem("focushud_active_right_nav");
+  return (saved as NavViewId) || "home";
+};
 
 export const DEFAULT_LEFT_WIDTH = 360;
 export const DEFAULT_RIGHT_WIDTH = 280;
@@ -151,6 +206,7 @@ export type LayoutAction = (
   | { type: "NAV_CONFIG_CHANGE"; config: NavItemConfig[] }
   | { type: "SET_MAX_WIDTHS"; maxLeftWidth: number; maxRightWidth: number }
   | { type: "SET_ACTIVE_NAV"; nav: string }
+  | { type: "SET_ACTIVE_RIGHT_NAV"; nav: string }
 ) & { sender?: string };
 
 export const broadcastLayoutAction = (action: LayoutAction) => {
@@ -162,10 +218,42 @@ export const broadcastLayoutAction = (action: LayoutAction) => {
   } catch {}
 };
 
-// Connect navigation store changes to broadcast layout channel
-setNavBroadcastDelegate((action) => {
-  broadcastLayoutAction(action);
-});
+export const saveNavConfig = (config: NavItemConfig[]) => {
+  localStorage.setItem("focushud_nav_config", JSON.stringify(config));
+  broadcastLayoutAction({ type: "NAV_CONFIG_CHANGE", config });
+};
+
+export const resetNavConfig = (): NavItemConfig[] => {
+  localStorage.setItem("focushud_nav_config", JSON.stringify(DEFAULT_NAV_CONFIG));
+  broadcastLayoutAction({ type: "NAV_CONFIG_CHANGE", config: DEFAULT_NAV_CONFIG });
+  return DEFAULT_NAV_CONFIG;
+};
+
+export const broadcastNavChange = (nav: NavViewId) => {
+  localStorage.setItem("focushud_active_nav", nav);
+  broadcastLayoutAction({ type: "SET_ACTIVE_NAV", nav });
+};
+
+export const subscribeNavChange = (callback: (nav: NavViewId) => void): (() => void) => {
+  return subscribeLayoutAction((action) => {
+    if (action.type === "SET_ACTIVE_NAV" && action.nav) {
+      callback(action.nav as NavViewId);
+    }
+  });
+};
+
+export const broadcastRightNavChange = (nav: NavViewId) => {
+  localStorage.setItem("focushud_active_right_nav", nav);
+  broadcastLayoutAction({ type: "SET_ACTIVE_RIGHT_NAV", nav });
+};
+
+export const subscribeRightNavChange = (callback: (nav: NavViewId) => void): (() => void) => {
+  return subscribeLayoutAction((action) => {
+    if (action.type === "SET_ACTIVE_RIGHT_NAV" && action.nav) {
+      callback(action.nav as NavViewId);
+    }
+  });
+};
 
 export const subscribeLayoutAction = (callback: (action: LayoutAction) => void): (() => void) => {
   const handler = (e: MessageEvent) => {

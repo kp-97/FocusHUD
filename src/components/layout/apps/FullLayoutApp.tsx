@@ -1,8 +1,6 @@
 import React from "react";
-import { TopNavHUD } from "../TopNavHUD";
 import { LeftSidebar } from "../LeftSidebar/LeftSidebar";
 import { RightSidebar } from "../RightSidebar/RightSidebar";
-import { CenterWorkspace } from "../CenterWorkspace";
 import { ResizeHandle } from "../ResizeHandle";
 import { UpdateNotificationToast } from "../../ui/UpdateNotificationToast";
 import { SettingsModal } from "../../features/settings/SettingsModal";
@@ -15,7 +13,7 @@ import { TasksView } from "../../views/TasksView";
 import { NotesView } from "../../views/NotesView";
 import { KanbanView } from "../../views/KanbanView";
 import { ActionPlansView } from "../../views/ActionPlansView";
-import { TimerView } from "../../views/TimerView";
+import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
 import { HudBrackets } from "../../ui/HudBrackets";
 
 interface FullLayoutAppProps {
@@ -30,11 +28,6 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     containerWidth,
     middleWidth,
     magneticSnap,
-    setMagneticSnap,
-    desktopDockActive,
-    handleToggleDesktopDock,
-    snapMode,
-    setSnapMode,
     activeNav,
     setActiveNav,
     isSettingsOpen,
@@ -58,8 +51,6 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     isAppMaximized,
     handleToggleMaximizeApp,
     handleResetWidths,
-    handleApplyPreset,
-    handleReset,
     SNAP_POINTS,
     MIN_LEFT_WIDTH,
   } = layout;
@@ -83,7 +74,7 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
       case "action_plans":
         return <ActionPlansView />;
       case "timer":
-        return <TimerView />;
+        return <PomodoroDial isCompact={false} />;
       default:
         return <HomeView />;
     }
@@ -96,20 +87,6 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     >
       {/* Subtle futuristic scanline overlay across whole UI */}
       <div className="absolute inset-0 scanlines pointer-events-none z-50" />
-
-      {/* Top HUD control toolbar (hidden in full-screen mode) */}
-      {!isAppMaximized && (
-        <TopNavHUD
-          leftWidth={leftWidth}
-          rightWidth={rightWidth}
-          magneticSnap={magneticSnap}
-          onToggleMagneticSnap={() => setMagneticSnap(!magneticSnap)}
-          desktopDockActive={desktopDockActive}
-          onToggleDesktopDock={handleToggleDesktopDock}
-          onApplyPreset={handleApplyPreset}
-          onReset={handleReset}
-        />
-      )}
 
       {/* Main Resizable 3-Column HUD Layout / Full Screen Merged Mode */}
       <div
@@ -156,11 +133,15 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
               onDoubleClick={handleLeftDoubleClick}
             />
 
-            <CenterWorkspace
-              middleWidth={middleWidth}
-              snapMode={snapMode}
-              onToggleSnapMode={setSnapMode}
-            />
+            <div
+              data-testid="center-preview-container"
+              className="flex-1 h-full min-w-0 p-4 flex flex-col items-center justify-center bg-black/40 text-cyan-400/60 font-mono text-xs border-x border-cyan-500/20 select-none"
+            >
+              <div className="text-center space-y-1">
+                <div className="uppercase tracking-widest text-cyan-500/50">Desktop Work Area ({middleWidth}px)</div>
+                <div className="text-[11px] text-neutral-500">External application windows snap here</div>
+              </div>
+            </div>
 
             <ResizeHandle
               side="right"

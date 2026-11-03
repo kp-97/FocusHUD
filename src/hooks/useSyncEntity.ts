@@ -40,6 +40,7 @@ export interface SyncEntityOptions<TApp, TDb> {
   fetchDb: () => Promise<TDb[]>;
   adapter: (db: TDb[]) => TApp;
   saveFn?: (items: TApp) => void;
+  mergeFn?: (prev: TApp, incoming: TApp) => TApp;
 }
 
 export function useSyncEntity<TApp, TDb>({
@@ -48,6 +49,7 @@ export function useSyncEntity<TApp, TDb>({
   fetchDb,
   adapter,
   saveFn,
+  mergeFn,
 }: SyncEntityOptions<TApp, TDb>): [
   TApp,
   (next: TApp) => void,
@@ -61,7 +63,8 @@ export function useSyncEntity<TApp, TDb>({
     if (isTauriEnvironment()) {
       fetchDb().then((dbItems) => {
         if (active && dbItems && (!Array.isArray(dbItems) || dbItems.length > 0)) {
-          setData(adapter(dbItems));
+          const adapted = adapter(dbItems);
+          setData((prev) => (mergeFn ? mergeFn(prev, adapted) : adapted));
         }
       });
     }
@@ -70,7 +73,8 @@ export function useSyncEntity<TApp, TDb>({
       if (payload.entity === entity || payload.entity === "all") {
         fetchDb().then((dbItems) => {
           if (active && dbItems) {
-            setData(adapter(dbItems));
+            const adapted = adapter(dbItems);
+            setData((prev) => (mergeFn ? mergeFn(prev, adapted) : adapted));
           }
         });
       }
@@ -80,7 +84,7 @@ export function useSyncEntity<TApp, TDb>({
       active = false;
       unlistenPromise.then((unlisten) => unlisten && unlisten());
     };
-  }, [entity, fetchDb, adapter]);
+  }, [entity, fetchDb, adapter, mergeFn]);
 
   const saveAndSet = useCallback(
     (next: TApp) => {
@@ -177,6 +181,22 @@ export function useSyncNotes(): [
     fetchDb: fetchNotes,
     adapter: dbNotesToApp,
     saveFn: saveNotes,
+    mergeFn: (prevNotes, incomingNotes) => {
+      return incomingNotes.map((inc) => {
+        const existing = prevNotes.find((p) => p.id === inc.id);
+        if (existing && (existing.content !== inc.content || existing.title !== inc.title)) {
+          if ((existing.updatedAt || 0) >= (inc.updatedAt || 0)) {
+            return {
+              ...inc,
+              title: existing.title,
+              content: existing.content,
+              updatedAt: existing.updatedAt,
+            };
+          }
+        }
+        return inc;
+      });
+    },
   });
 }
 

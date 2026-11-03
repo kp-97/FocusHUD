@@ -28,8 +28,8 @@ import { GoalsView } from "../../views/GoalsView";
 import { TasksView } from "../../views/TasksView";
 import { KanbanView } from "../../views/KanbanView";
 import { ActionPlansView } from "../../views/ActionPlansView";
-import { TimerView } from "../../views/TimerView";
 import { NotesView } from "../../views/NotesView";
+import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
 
 const AVAILABLE_RIGHT_VIEWS: Array<{ id: NavViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "home", label: "HOME", icon: Home },
@@ -139,7 +139,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       case "action_plans":
         return <ActionPlansView />;
       case "timer":
-        return <TimerView />;
+        return <PomodoroDial isCompact={false} />;
       default:
         return <HomeView />;
     }
