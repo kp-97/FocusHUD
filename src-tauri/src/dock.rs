@@ -35,6 +35,8 @@ pub static FULLSCREEN_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
 #[cfg(target_os = "windows")]
 pub static RIGHT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
+#[cfg(target_os = "windows")]
+pub static MAIN_HWND: AtomicIsize = AtomicIsize::new(0);
 
 #[cfg(target_os = "windows")]
 static LAST_LEFT_REGION: AtomicI64 = AtomicI64::new(-1);

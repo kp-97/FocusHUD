@@ -173,12 +173,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   useEffect(() => {
     const unsub = subscribeLayoutAction((action) => {
-      if (action.type === "SET_ACTIVE_NAV") {
+      if (action.type === "SET_ACTIVE_NAV" && action.nav !== activeNav) {
         onSelectNav(action.nav);
       }
     });
     return () => unsub();
-  }, [onSelectNav]);
+  }, [onSelectNav, activeNav]);
 
   useEffect(() => {
     if (isMenuOpen) {

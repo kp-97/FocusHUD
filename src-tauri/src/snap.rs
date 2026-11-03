@@ -33,7 +33,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 #[cfg(target_os = "windows")]
-use crate::dock::{LEFT_DOCK_HWND, RIGHT_DOCK_HWND};
+use crate::dock::{LEFT_DOCK_HWND, MAIN_HWND, RIGHT_DOCK_HWND};
 #[cfg(target_os = "windows")]
 use crate::monitor::{get_current_work_area, get_original_work_area, get_primary_monitor_rects};
 
@@ -307,6 +307,7 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
     let h_val = hwnd as isize;
     if h_val == LEFT_DOCK_HWND.load(Ordering::Relaxed)
         || h_val == RIGHT_DOCK_HWND.load(Ordering::Relaxed)
+        || h_val == MAIN_HWND.load(Ordering::Relaxed)
     {
         return false;
     }
@@ -334,6 +335,7 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             let r_val = root as isize;
             if r_val == LEFT_DOCK_HWND.load(Ordering::Relaxed)
                 || r_val == RIGHT_DOCK_HWND.load(Ordering::Relaxed)
+                || r_val == MAIN_HWND.load(Ordering::Relaxed)
             {
                 return false;
             }
@@ -344,6 +346,7 @@ pub unsafe fn is_snappable_app_window(hwnd: HWND) -> bool {
             let o_val = owner as isize;
             if o_val == LEFT_DOCK_HWND.load(Ordering::Relaxed)
                 || o_val == RIGHT_DOCK_HWND.load(Ordering::Relaxed)
+                || o_val == MAIN_HWND.load(Ordering::Relaxed)
             {
                 return false;
             }
@@ -484,6 +487,10 @@ pub unsafe extern "system" fn win_event_hook_proc(
     _dwms_event_time: u32,
 ) {
     if id_object != 0 || hwnd.is_null() {
+        return;
+    }
+
+    if crate::dock::FULLSCREEN_ACTIVE.load(Ordering::Relaxed) {
         return;
     }
 

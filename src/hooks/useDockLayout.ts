@@ -55,6 +55,7 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
   });
 
   const setActiveNav = (nav: string) => {
+    if (nav === activeNav) return;
     setActiveNavState(nav);
     if (typeof window !== "undefined") {
       localStorage.setItem("focushud_active_nav", nav);
@@ -364,8 +365,6 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
   const handleToggleMaximizeApp = async () => {
     if (!isAppMaximized) {
       preMaximizedLayoutRef.current = { left: leftWidth, right: rightWidth };
-      await setFullscreenMode(true);
-      await restoreWorkArea();
       setIsAppMaximized(true);
       if (typeof window !== "undefined") {
         localStorage.setItem("focushud_is_app_maximized", "true");
@@ -374,8 +373,8 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
         type: "MAXIMIZE_APP",
         sender: dockWindowType,
       });
+      await setFullscreenMode(true);
     } else {
-      await setFullscreenMode(false);
       setIsAppMaximized(false);
       if (typeof window !== "undefined") {
         localStorage.setItem("focushud_is_app_maximized", "false");
@@ -392,6 +391,7 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
         rightWidth: restored.right,
         sender: dockWindowType,
       });
+      await setFullscreenMode(false);
       if (getPanesReserveZones() && (dockWindowType !== "full" || desktopDockActive)) {
         await updateDockSizes(restored.left, restored.right, true);
       }

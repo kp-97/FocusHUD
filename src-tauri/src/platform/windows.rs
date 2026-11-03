@@ -121,14 +121,6 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
     crate::dock::FULLSCREEN_ACTIVE.store(fullscreen, Ordering::Relaxed);
 
     if fullscreen {
-        let _ = crate::monitor::restore_work_area();
-
-        if let Some(w) = app.get_webview_window("left-dock") {
-            let _ = w.hide();
-        }
-        if let Some(w) = app.get_webview_window("right-dock") {
-            let _ = w.hide();
-        }
         if let Some(w) = app.get_webview_window("main") {
             unsafe {
                 let (rc_monitor, _) = crate::monitor::get_primary_monitor_rects();
@@ -139,6 +131,7 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
 
                 if let Ok(hwnd) = w.hwnd() {
                     let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                    crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
                     windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
                         h,
                         windows_sys::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
@@ -159,7 +152,17 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
             let _ = w.show();
             let _ = w.set_focus();
         }
+
+        if let Some(w) = app.get_webview_window("left-dock") {
+            let _ = w.hide();
+        }
+        if let Some(w) = app.get_webview_window("right-dock") {
+            let _ = w.hide();
+        }
+
+        let _ = crate::monitor::restore_work_area();
     } else {
+        crate::dock::MAIN_HWND.store(0, Ordering::Relaxed);
         if let Some(w) = app.get_webview_window("main") {
             let _ = w.hide();
         }
