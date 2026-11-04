@@ -5,8 +5,9 @@ import { execSync } from "node:child_process";
 const rootDir = process.cwd();
 const args = process.argv.slice(2);
 
-// Check for --no-commit flag
+// Check for flags
 const noCommit = args.includes("--no-commit");
+const skipTests = args.includes("--skip-tests");
 const positionalArgs = args.filter((arg) => !arg.startsWith("--"));
 const targetArg = positionalArgs[0] || "patch";
 
@@ -15,6 +16,15 @@ console.log(`  FocusHUD Version Bump: ${targetArg}`);
 console.log(`========================================\n`);
 
 try {
+  // 0. Run full CI verification gate before mutating any version files
+  if (skipTests) {
+    console.log(`⚠️  --skip-tests specified. Skipping pre-flight CI verification...\n`);
+  } else {
+    console.log(`🧪 Running pre-flight CI verification (npm run test:ci)...`);
+    execSync(`npm run test:ci`, { stdio: "inherit" });
+    console.log(`  ✓ Pre-flight CI verification passed!\n`);
+  }
+
   // 1. Run npm version to compute and update package.json & package-lock.json
   console.log(`📦 Bumping frontend version (${targetArg})...`);
   execSync(`npm version ${targetArg} --no-git-tag-version --allow-same-version`, { stdio: "inherit" });
@@ -66,7 +76,8 @@ try {
   } else {
     console.log(`\n📝 Staging and committing release bump...`);
     execSync(`git add ${filesToStage.join(" ")}`, { stdio: "inherit" });
-    execSync(`git commit -m "chore(release): bump version to ${newVersion}"`, { stdio: "inherit" });
+    const verifyFlag = skipTests ? "" : " --no-verify";
+    execSync(`git commit${verifyFlag} -m "chore(release): bump version to ${newVersion}"`, { stdio: "inherit" });
     console.log(`  ✓ Created commit: "chore(release): bump version to ${newVersion}"`);
   }
 
