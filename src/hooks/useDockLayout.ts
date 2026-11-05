@@ -4,6 +4,7 @@ import {
   restoreWorkArea,
   openSettingsWindow,
   setFullscreenMode,
+  setPanesReserveZonesMode,
 } from "../services/tauriBridge";
 import {
   getRememberedLeftWidth,
@@ -31,7 +32,7 @@ export const SNAP_POINTS = [
 export const MIN_LEFT_WIDTH = 68;
 export const MIN_MIDDLE_WIDTH = 340;
 
-export type DockWindowType = "left" | "right" | "settings" | "full";
+export type DockWindowType = "left" | "right" | "settings" | "snap-overlay" | "full";
 
 export function useDockLayout(dockWindowType: DockWindowType = "full") {
   const [leftWidth, setLeftWidth] = useState<number>(() => {
@@ -134,13 +135,16 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     }
   }, [rightWidth]);
 
-  // Initial sync of dock sizes on startup
+  // Initial sync of dock sizes and reserve-zones mode on startup
   useEffect(() => {
+    const reserve = getPanesReserveZones();
     if (dockWindowType === "left") {
+      setPanesReserveZonesMode(reserve);
       updateDockSizes(leftWidth, null, true);
     } else if (dockWindowType === "right") {
       updateDockSizes(null, rightWidth, true);
     } else if (desktopDockActive) {
+      setPanesReserveZonesMode(reserve);
       updateDockSizes(leftWidth, rightWidth, true);
     }
   }, [dockWindowType, desktopDockActive]);
@@ -196,6 +200,10 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
       } else if (action.type === "SET_MAX_WIDTHS") {
         setMaxLeftWidth(action.maxLeftWidth);
         setMaxRightWidth(action.maxRightWidth);
+      } else if (action.type === "SET_PANES_RESERVE_ZONES") {
+        if (dockWindowType === "left" || (dockWindowType === "full" && desktopDockActive)) {
+          setPanesReserveZonesMode(action.reserve);
+        }
       }
     });
     return () => unsubscribe();
@@ -228,27 +236,15 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     }
   };
 
-  const leftDragRafRef = useRef<number | null>(null);
-  const rightDragRafRef = useRef<number | null>(null);
-
   // Drag handlers for Left Bar
   const handleLeftDragChange = (newWidth: number) => {
     setLeftWidth(newWidth);
     if (dockWindowType !== "full" || desktopDockActive) {
-      if (leftDragRafRef.current === null) {
-        leftDragRafRef.current = requestAnimationFrame(() => {
-          leftDragRafRef.current = null;
-          updateDockSizes(newWidth, null, false);
-        });
-      }
+      updateDockSizes(newWidth, null, false);
     }
   };
 
   const handleLeftDragEnd = (finalWidth: number) => {
-    if (leftDragRafRef.current !== null) {
-      cancelAnimationFrame(leftDragRafRef.current);
-      leftDragRafRef.current = null;
-    }
     setLeftWidth(finalWidth);
     if (finalWidth >= 120) {
       setRememberedLeftWidth(finalWidth);
@@ -402,20 +398,11 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
   const handleRightDragChange = (newWidth: number) => {
     setRightWidth(newWidth);
     if (dockWindowType !== "full" || desktopDockActive) {
-      if (rightDragRafRef.current === null) {
-        rightDragRafRef.current = requestAnimationFrame(() => {
-          rightDragRafRef.current = null;
-          updateDockSizes(null, newWidth, false);
-        });
-      }
+      updateDockSizes(null, newWidth, false);
     }
   };
 
   const handleRightDragEnd = (finalWidth: number) => {
-    if (rightDragRafRef.current !== null) {
-      cancelAnimationFrame(rightDragRafRef.current);
-      rightDragRafRef.current = null;
-    }
     setRightWidth(finalWidth);
     if (finalWidth >= 120) {
       setRememberedRightWidth(finalWidth);

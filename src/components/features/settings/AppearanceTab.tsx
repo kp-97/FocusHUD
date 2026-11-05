@@ -13,6 +13,7 @@ import {
   setPanesReserveZones,
 } from "../../../stores/layoutStore";
 import { useTheme, THEME_LIST } from "../../../stores/themeStore";
+import { setPanesReserveZonesMode } from "../../../services/tauriBridge";
 
 interface AppearanceTabProps {
   onResetDefaults: () => void;
@@ -33,6 +34,7 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
   const handleToggleReserveZones = (checked: boolean) => {
     setReserveZones(checked);
     setPanesReserveZones(checked);
+    void setPanesReserveZonesMode(checked);
   };
 
   const handleToggleRememberWidths = (remember: boolean) => {
@@ -177,6 +179,30 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
           When enabled, expanded side panes deduct from Windows desktop work area so other application
           windows snap neatly around them. When disabled, panes render as non-intrusive floating overlays.
         </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 pt-1">
+          <label className="flex items-center gap-2 text-[11px] text-cyan-200 cursor-pointer font-tech select-none">
+            <input
+              type="radio"
+              name="pane-boundary-mode"
+              checked={reserveZones}
+              onChange={() => handleToggleReserveZones(true)}
+              className="accent-cyan-400 cursor-pointer"
+            />
+            <span>Screen Borders Mode (Push Desktop Work Area)</span>
+          </label>
+
+          <label className="flex items-center gap-2 text-[11px] text-cyan-200 cursor-pointer font-tech select-none">
+            <input
+              type="radio"
+              name="pane-boundary-mode"
+              checked={!reserveZones}
+              onChange={() => handleToggleReserveZones(false)}
+              className="accent-cyan-400 cursor-pointer"
+            />
+            <span>Overlay Mode (Floating HUD Over Desktop)</span>
+          </label>
+        </div>
       </div>
 
       {/* PANE SIZING & MEMORY */}

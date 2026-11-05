@@ -7,6 +7,7 @@ import {
   RightDockApp,
   SettingsModalApp,
   FullLayoutApp,
+  SnapOverlayApp,
 } from "./components/layout/apps";
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const dockParam = urlParams.get("dock");
     const viewParam = urlParams.get("view");
+    if (dockParam === "snap-overlay") return "snap-overlay";
     if (dockParam === "settings" || viewParam === "settings") return "settings";
     if (dockParam === "left") return "left";
     if (dockParam === "right") return "right";
@@ -27,6 +29,11 @@ export default function App() {
   }, []);
 
   const layout = useDockLayout(dockWindowType);
+
+  // Dedicated Top Snap Layouts & Snap Assist Overlay window
+  if (dockWindowType === "snap-overlay") {
+    return <SnapOverlayApp />;
+  }
 
   // Dedicated Centered Settings window
   if (dockWindowType === "settings") {

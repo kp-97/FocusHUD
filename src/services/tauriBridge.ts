@@ -68,3 +68,89 @@ export async function closeSettingsWindow(): Promise<boolean> {
 export async function setFullscreenMode(fullscreen: boolean): Promise<boolean> {
   return invokeTauriBool("set_fullscreen_mode", { fullscreen });
 }
+
+export async function setPanesReserveZonesMode(reserve: boolean): Promise<boolean> {
+  return invokeTauriBool("set_panes_reserve_zones", { reserve });
+}
+
+export interface LogicalRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type SnapLayoutTemplate =
+  | "single_full"
+  | "split50_50"
+  | "split65_35"
+  | "split35_65"
+  | "left1_right2"
+  | "grid2x2"
+  | "cols3_equal"
+  | "cols3_wide_center";
+
+export interface TopBarLayoutGroup {
+  template: SnapLayoutTemplate;
+  label: string;
+  rect: LogicalRect;
+  zones: LogicalRect[];
+}
+
+export interface TopBarGeometry {
+  pill_rect: LogicalRect;
+  pill_trigger_rect: LogicalRect;
+  bar_rect: LogicalRect;
+  groups: TopBarLayoutGroup[];
+}
+
+export interface SnapCandidateWindow {
+  hwnd: number;
+  title: string;
+  app_name: string;
+  exe_name: string;
+}
+
+export type SnapOverlayMode = "hidden" | "pill" | "expanded" | "assist";
+
+export interface SnapOverlayState {
+  mode: SnapOverlayMode;
+  work_width_logical: number;
+  work_height_logical: number;
+  top_bar: TopBarGeometry;
+  hovered_template: SnapLayoutTemplate | null;
+  hovered_zone_index: number | null;
+  preview_rect: LogicalRect | null;
+  active_template: SnapLayoutTemplate | null;
+  assist_zone_index: number | null;
+  assist_zone_rect: LogicalRect | null;
+  assist_all_zone_rects: LogicalRect[];
+  assist_filled_zones: boolean[];
+  assist_candidates: SnapCandidateWindow[];
+}
+
+export async function getSnapOverlayState(): Promise<SnapOverlayState | null> {
+  return invokeTauri<SnapOverlayState>("get_snap_overlay_state");
+}
+
+export async function selectSnapAssistWindow(
+  hwnd: number,
+  zoneIndex: number
+): Promise<SnapOverlayState | null> {
+  return invokeTauri<SnapOverlayState>("select_snap_assist_window", {
+    hwnd,
+    zoneIndex,
+  });
+}
+
+export async function skipSnapAssistZone(
+  zoneIndex: number
+): Promise<SnapOverlayState | null> {
+  return invokeTauri<SnapOverlayState>("skip_snap_assist_zone", {
+    zoneIndex,
+  });
+}
+
+export async function dismissSnapAssist(): Promise<boolean> {
+  return invokeTauriBool("dismiss_snap_assist");
+}
