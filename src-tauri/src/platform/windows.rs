@@ -54,7 +54,16 @@ pub fn configure_dock_windows(app: &tauri::AppHandle) {
         crate::dock::apply_dock_geometry(app, left_w, right_w);
 
         let (phys_left, phys_right) = get_physical_dock_widths(app, left_w, right_w);
-        crate::dock::update_dock_work_area(orig_work, phys_left, phys_right, true);
+        if crate::dock::PANES_RESERVE_ZONES.load(Ordering::Relaxed) {
+            crate::dock::update_dock_work_area(orig_work, phys_left, phys_right, true);
+        }
+
+        if let Some(snap_win) = app.get_webview_window("snap-overlay") {
+            if let Ok(hwnd) = snap_win.hwnd() {
+                let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                crate::dock::SNAP_OVERLAY_HWND.store(h as isize, Ordering::Relaxed);
+            }
+        }
     }
 }
 
@@ -66,6 +75,10 @@ pub fn update_dock_work_area(
     right_width: i32,
     snap_open_windows: bool,
 ) {
+    if !crate::dock::PANES_RESERVE_ZONES.load(Ordering::Relaxed) {
+        let _ = crate::monitor::restore_work_area();
+        return;
+    }
     if let Some(orig) = crate::monitor::get_original_work_area() {
         let (phys_left, phys_right) = get_physical_dock_widths(app, left_width, right_width);
         unsafe {
@@ -74,28 +87,47 @@ pub fn update_dock_work_area(
     }
 }
 
-pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
-    if let Some(orig) = crate::monitor::get_original_work_area() {
-        let (phys_left, phys_right) = get_physical_dock_widths(app, left_width, right_width);
-        let (new_left, new_right) =
-            crate::dock::calculate_work_area_margins(orig.left, orig.right, phys_left, phys_right);
-        let prospective_rect = windows_sys::Win32::Foundation::RECT {
-            left: new_left,
-            top: orig.top,
-            right: new_right,
-            bottom: orig.bottom,
-        };
-
+pub fn prepare_dock_drag() {
+    if !crate::dock::PANES_RESERVE_ZONES.load(Ordering::Relaxed) {
+        return;
+    }
+    if let Some(work_rect) = crate::monitor::get_current_work_area() {
         unsafe {
-            if let Some(hwnd) = crate::snap::get_target_app_window() {
-                crate::snap::fit_window_to_visible_rect(hwnd, prospective_rect);
-            }
+            crate::snap::prepare_for_dock_drag(work_rect);
         }
     }
 }
 
+pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
+    if !crate::dock::PANES_RESERVE_ZONES.load(Ordering::Relaxed) {
+        return;
+    }
+    update_dock_work_area(app, left_width, right_width, false);
+}
+
+pub fn set_panes_reserve_zones(app: &tauri::AppHandle, reserve: bool) -> Result<(), String> {
+    crate::dock::PANES_RESERVE_ZONES.store(reserve, Ordering::Relaxed);
+    if !reserve {
+        crate::snap::hide_snap_overlay();
+    }
+    if crate::dock::FULLSCREEN_ACTIVE.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    if reserve {
+        let l_w = crate::dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
+        let r_w = crate::dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
+        update_dock_work_area(app, l_w, r_w, true);
+    } else {
+        let _ = crate::monitor::restore_work_area();
+    }
+    Ok(())
+}
+
 pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(), String> {
     crate::dock::FULLSCREEN_ACTIVE.store(fullscreen, Ordering::Relaxed);
+    if fullscreen {
+        crate::snap::hide_snap_overlay();
+    }
 
     if fullscreen {
         if let Some(w) = app.get_webview_window("main") {
@@ -158,9 +190,9 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
     Ok(())
 }
 
-pub fn init_window_snapping(_app: &tauri::AppHandle) {
+pub fn init_window_snapping(app: &tauri::AppHandle) {
     unsafe {
-        crate::snap::init_window_snap_hooks();
+        crate::snap::init_window_snap_hooks(app);
     }
 }
 

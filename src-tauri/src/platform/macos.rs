@@ -209,14 +209,22 @@ pub fn update_dock_work_area(
     }
 }
 
-pub fn live_resize_active_window(app: &tauri::AppHandle, left_width: i32, right_width: i32) {
-    if !check_accessibility_permissions() {
-        return;
+pub fn prepare_dock_drag() {}
+
+pub fn live_resize_active_window(_app: &tauri::AppHandle, _left_width: i32, _right_width: i32) {
+    // Do not aggressively resize the frontmost window on every drag frame.
+}
+
+pub fn set_panes_reserve_zones(app: &tauri::AppHandle, reserve: bool) -> Result<(), String> {
+    crate::dock::PANES_RESERVE_ZONES.store(reserve, Ordering::Relaxed);
+    if !reserve {
+        restore_work_area_sync();
+    } else {
+        let l_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
+        let r_w = CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
+        update_dock_work_area(app, l_w, r_w, false);
     }
-    #[cfg(target_os = "macos")]
-    {
-        snap_frontmost_window_macos(app, left_width, right_width);
-    }
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]

@@ -67,6 +67,20 @@
         "shadow": true,
         "visible": false,
         "skipTaskbar": true
+      },
+      {
+        "label": "snap-overlay",
+        "title": "FocusHUD Snap Overlay",
+        "url": "index.html?dock=snap-overlay",
+        "width": 1200,
+        "height": 900,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

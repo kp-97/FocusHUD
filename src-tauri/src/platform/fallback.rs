@@ -41,7 +41,14 @@ pub fn update_dock_work_area(
 ) {
 }
 
+pub fn prepare_dock_drag() {}
+
 pub fn live_resize_active_window(_app: &tauri::AppHandle, _left_width: i32, _right_width: i32) {}
+
+pub fn set_panes_reserve_zones(_app: &tauri::AppHandle, reserve: bool) -> Result<(), String> {
+    crate::dock::PANES_RESERVE_ZONES.store(reserve, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
+}
 
 pub fn restore_work_area_sync() {}
 
