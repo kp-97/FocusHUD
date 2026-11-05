@@ -1,3 +1,5 @@
+#[cfg(target_os = "windows")]
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI32};
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicI64, AtomicIsize, Ordering};
@@ -5,31 +7,32 @@ use std::sync::atomic::{AtomicI64, AtomicIsize, Ordering};
 use tauri::Manager;
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT};
+use windows_sys::Win32::Foundation::{HWND, RECT};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Gdi::{CreateRectRgn, SetWindowRgn};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindowRect, HWND_TOPMOST, SWP_NOACTIVATE, SetWindowPos,
+    GetWindowRect, HWND_TOPMOST, SWP_NOACTIVATE, SetWindowPos,
 };
 
 #[cfg(target_os = "windows")]
 use crate::monitor::{
-    apply_system_work_area, get_current_work_area, get_primary_monitor_rects, set_work_area_cache,
+    apply_system_work_area, apply_system_work_area_no_broadcast, get_current_work_area,
+    get_primary_monitor_rects, restore_work_area, set_work_area_cache,
 };
-#[cfg(target_os = "windows")]
-use crate::snap::enum_windows_snap_callback;
 
 pub const MAX_DOCK_LOGICAL_WIDTH: i32 = 800;
 pub const HANDLE_GUTTER_LOGICAL_PX: i32 = 0;
 
 pub static CURRENT_LEFT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static CURRENT_RIGHT_WIDTH: AtomicI32 = AtomicI32::new(280);
+pub static PRIMARY_SCALE_MILLI: AtomicI32 = AtomicI32::new(1000);
 pub static LEFT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static LEFT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static FULLSCREEN_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static PANES_RESERVE_ZONES: AtomicBool = AtomicBool::new(true);
 
 #[cfg(target_os = "windows")]
 pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -37,11 +40,17 @@ pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
 pub static RIGHT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
 #[cfg(target_os = "windows")]
 pub static MAIN_HWND: AtomicIsize = AtomicIsize::new(0);
+#[cfg(target_os = "windows")]
+pub static SNAP_OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
 
 #[cfg(target_os = "windows")]
 static LAST_LEFT_REGION: AtomicI64 = AtomicI64::new(-1);
 #[cfg(target_os = "windows")]
 static LAST_RIGHT_REGION: AtomicI64 = AtomicI64::new(-1);
+#[cfg(target_os = "windows")]
+static DOCK_LIVE_RESIZE_ACTIVE: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "windows")]
+static PRE_DRAG_WORK_AREA: Mutex<Option<RECT>> = Mutex::new(None);
 
 /// Position/size the window only if it differs from the target (no-op otherwise).
 #[cfg(target_os = "windows")]
@@ -118,6 +127,10 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
     });
 
     let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
+    PRIMARY_SCALE_MILLI.store(
+        ((scale * 1000.0).round() as i32).max(100),
+        Ordering::Relaxed,
+    );
     let mon_width = rc_monitor.right - rc_monitor.left;
     let mon_left = rc_monitor.left;
     let top_y = rc_work.top;
@@ -136,11 +149,6 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
     let right_visible = calculate_visible_width(right_width, right_expanded, scale);
 
     if let Some(left_win) = app.get_webview_window("left-dock") {
-        let _ = left_win.set_position(tauri::PhysicalPosition::new(mon_left, top_y));
-        let _ = left_win.set_size(tauri::PhysicalSize::new(
-            phys_canvas as u32,
-            dock_height as u32,
-        ));
         if let Ok(hwnd) = left_win.hwnd() {
             let h = hwnd.0 as HWND;
             LEFT_DOCK_HWND.store(h as isize, Ordering::Relaxed);
@@ -151,16 +159,17 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
                     let _ = left_win.show();
                 }
             }
+        } else {
+            let _ = left_win.set_position(tauri::PhysicalPosition::new(mon_left, top_y));
+            let _ = left_win.set_size(tauri::PhysicalSize::new(
+                phys_canvas as u32,
+                dock_height as u32,
+            ));
         }
     }
 
     if let Some(right_win) = app.get_webview_window("right-dock") {
         let right_x = calculate_right_dock_x(mon_left, mon_width, phys_canvas);
-        let _ = right_win.set_position(tauri::PhysicalPosition::new(right_x, top_y));
-        let _ = right_win.set_size(tauri::PhysicalSize::new(
-            phys_canvas as u32,
-            dock_height as u32,
-        ));
         if let Ok(hwnd) = right_win.hwnd() {
             let h = hwnd.0 as HWND;
             RIGHT_DOCK_HWND.store(h as isize, Ordering::Relaxed);
@@ -177,18 +186,33 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
                     let _ = right_win.show();
                 }
             }
+        } else {
+            let _ = right_win.set_position(tauri::PhysicalPosition::new(right_x, top_y));
+            let _ = right_win.set_size(tauri::PhysicalSize::new(
+                phys_canvas as u32,
+                dock_height as u32,
+            ));
         }
     }
 }
 
 /// Updates the desktop work area reservation so external apps snap cleanly between docks.
+/// During live dock border dragging (`commit_system_work_area == false`), updates the
+/// in-memory work area cache and resizes center-column windows via the fast path without
+/// `SPI_SETWORKAREA` broadcast spam or `EnumWindows`. When `commit_system_work_area == true`,
+/// commits the OS work area via `SPI_SETWORKAREA`.
 #[cfg(target_os = "windows")]
 pub unsafe fn update_dock_work_area(
     orig: RECT,
     phys_left: i32,
     phys_right: i32,
-    snap_open_windows: bool,
+    commit_system_work_area: bool,
 ) {
+    if !PANES_RESERVE_ZONES.load(Ordering::Relaxed) {
+        let _ = restore_work_area();
+        return;
+    }
+
     let (new_left, new_right) =
         calculate_work_area_margins(orig.left, orig.right, phys_left, phys_right);
     let new_rect = RECT {
@@ -198,27 +222,46 @@ pub unsafe fn update_dock_work_area(
         bottom: orig.bottom,
     };
 
-    if let Some(curr) = get_current_work_area() {
-        if curr.left == new_rect.left
-            && curr.top == new_rect.top
-            && curr.right == new_rect.right
-            && curr.bottom == new_rect.bottom
-        {
-            return;
+    if !commit_system_work_area {
+        if !DOCK_LIVE_RESIZE_ACTIVE.swap(true, Ordering::SeqCst) {
+            let start_work = get_current_work_area().unwrap_or(orig);
+            if let Ok(mut lock) = PRE_DRAG_WORK_AREA.lock() {
+                *lock = Some(start_work);
+            }
+            unsafe {
+                crate::snap::prepare_for_dock_drag(start_work);
+            }
         }
+        if let Some(curr) = get_current_work_area() {
+            if curr.left == new_rect.left
+                && curr.top == new_rect.top
+                && curr.right == new_rect.right
+                && curr.bottom == new_rect.bottom
+            {
+                return;
+            }
+        }
+        set_work_area_cache(new_rect, orig);
+        unsafe {
+            apply_system_work_area_no_broadcast(&new_rect);
+            crate::snap::reflow_snapped_windows_fast(new_rect);
+        }
+        return;
     }
 
+    let was_dragging = DOCK_LIVE_RESIZE_ACTIVE.swap(false, Ordering::SeqCst);
+    let prev_rect = if was_dragging {
+        PRE_DRAG_WORK_AREA.lock().ok().and_then(|mut l| l.take())
+    } else {
+        None
+    }
+    .or_else(get_current_work_area)
+    .unwrap_or(orig);
     set_work_area_cache(new_rect, orig);
 
     unsafe {
-        if snap_open_windows {
-            EnumWindows(
-                Some(enum_windows_snap_callback),
-                &new_rect as *const _ as LPARAM,
-            );
-        }
-
         apply_system_work_area(&new_rect);
+        crate::snap::reflow_snapped_windows_on_boundary_change(prev_rect, new_rect);
     }
 }
 

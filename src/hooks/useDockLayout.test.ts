@@ -10,6 +10,7 @@ vi.mock("../services/tauriBridge", () => ({
   openSettingsWindow: vi.fn().mockResolvedValue(true),
   closeSettingsWindow: vi.fn(),
   setFullscreenMode: vi.fn().mockResolvedValue(true),
+  setPanesReserveZonesMode: vi.fn().mockResolvedValue(true),
 }));
 
 describe("useDockLayout hook", () => {

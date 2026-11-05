@@ -13,6 +13,11 @@ vi.mock("./services/tauriBridge", () => ({
   exitApp: vi.fn(),
   minimizeToTray: vi.fn(),
   setFullscreenMode: vi.fn().mockResolvedValue(true),
+  setPanesReserveZonesMode: vi.fn().mockResolvedValue(true),
+  getSnapOverlayState: vi.fn().mockResolvedValue(null),
+  selectSnapAssistWindow: vi.fn().mockResolvedValue(null),
+  skipSnapAssistZone: vi.fn().mockResolvedValue(null),
+  dismissSnapAssist: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("./components/features/settings/UpdatesTab", () => ({
@@ -71,6 +76,13 @@ describe("App root window dispatcher", () => {
     setLocationSearch("?view=settings");
     render(<App />);
     expect(screen.getByTestId("settings-modal-app")).toBeInTheDocument();
+  });
+
+  it("renders SnapOverlayApp when ?dock=snap-overlay is present", () => {
+    setLocationSearch("?dock=snap-overlay");
+    render(<App />);
+    expect(screen.getByTestId("snap-overlay-app")).toBeInTheDocument();
+    expect(screen.queryByTestId("full-layout-app")).not.toBeInTheDocument();
   });
 
   it("switches to full screen mode when clicking maximise and returns to docked mode when clicking restore", async () => {

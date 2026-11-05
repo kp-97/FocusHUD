@@ -20,6 +20,10 @@ pub fn set_dock_drag_mode(app: tauri::AppHandle, side: String, active: bool) -> 
         RIGHT_DRAG_ACTIVE.store(active, Ordering::Relaxed);
     }
 
+    if active {
+        platform::prepare_dock_drag();
+    }
+
     let l_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
     let r_w = CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
 
@@ -83,6 +87,34 @@ pub fn set_fullscreen_mode(app: tauri::AppHandle, fullscreen: bool) -> Result<()
 }
 
 #[tauri::command]
+pub fn set_panes_reserve_zones(app: tauri::AppHandle, reserve: bool) -> Result<(), String> {
+    platform::set_panes_reserve_zones(&app, reserve)
+}
+
+#[tauri::command]
+pub fn get_snap_overlay_state() -> Result<crate::snap::SnapOverlayState, String> {
+    Ok(crate::snap::get_snap_overlay_state_snapshot())
+}
+
+#[tauri::command]
+pub fn select_snap_assist_window(
+    hwnd: isize,
+    zone_index: usize,
+) -> Result<crate::snap::SnapOverlayState, String> {
+    crate::snap::select_snap_assist_window_impl(hwnd, zone_index)
+}
+
+#[tauri::command]
+pub fn skip_snap_assist_zone(zone_index: usize) -> Result<crate::snap::SnapOverlayState, String> {
+    crate::snap::skip_snap_assist_zone_impl(zone_index)
+}
+
+#[tauri::command]
+pub fn dismiss_snap_assist() -> Result<(), String> {
+    crate::snap::dismiss_snap_assist_impl()
+}
+
+#[tauri::command]
 pub fn restore_work_area() -> Result<(), String> {
     platform::restore_work_area()
 }
@@ -103,7 +135,7 @@ pub fn minimize_to_tray(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn exit_app(app: tauri::AppHandle) {
-    let _ = platform::restore_work_area();
+    platform::restore_work_area_sync();
     platform::signal_watchdog_clean_exit();
     app.exit(0);
 }

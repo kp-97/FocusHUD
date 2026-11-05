@@ -78,7 +78,12 @@ pub fn run() {
             commands::delete_calendar_event,
             commands::sync_calendar_events,
             commands::migrate_legacy_data,
-            commands::set_fullscreen_mode
+            commands::set_fullscreen_mode,
+            commands::set_panes_reserve_zones,
+            commands::get_snap_overlay_state,
+            commands::select_snap_assist_window,
+            commands::skip_snap_assist_zone,
+            commands::dismiss_snap_assist
         ])
         .setup(|app| {
             let conn = db::init_db(app.handle())?;
@@ -113,7 +118,7 @@ pub fn run() {
         })
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                let _ = platform::restore_work_area();
+                platform::restore_work_area_sync();
                 platform::signal_watchdog_clean_exit();
             }
         })

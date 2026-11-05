@@ -110,6 +110,7 @@ export const getPanesReserveZones = (): boolean => {
 
 export const setPanesReserveZones = (reserve: boolean) => {
   localStorage.setItem("hud_panes_reserve_zones", String(reserve));
+  broadcastLayoutAction({ type: "SET_PANES_RESERVE_ZONES", reserve });
 };
 
 export const getRememberedLeftWidth = (): number => {
@@ -205,6 +206,7 @@ export type LayoutAction = (
   | { type: "SET_RIGHT_WIDTH"; width: number }
   | { type: "NAV_CONFIG_CHANGE"; config: NavItemConfig[] }
   | { type: "SET_MAX_WIDTHS"; maxLeftWidth: number; maxRightWidth: number }
+  | { type: "SET_PANES_RESERVE_ZONES"; reserve: boolean }
   | { type: "SET_ACTIVE_NAV"; nav: string }
   | { type: "SET_ACTIVE_RIGHT_NAV"; nav: string }
 ) & { sender?: string };

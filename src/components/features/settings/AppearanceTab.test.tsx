@@ -57,11 +57,21 @@ describe("AppearanceTab", () => {
     render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
 
     const reserveToggle = screen.getByRole("checkbox", { name: /Toggle Reserve Desktop Zones/i });
+    const bordersRadio = screen.getByLabelText(/Screen Borders Mode/i);
+    const overlayRadio = screen.getByLabelText(/Overlay Mode/i);
     expect(reserveToggle).toBeChecked();
+    expect(bordersRadio).toBeChecked();
+    expect(overlayRadio).not.toBeChecked();
 
-    fireEvent.click(reserveToggle);
+    fireEvent.click(overlayRadio);
     expect(reserveToggle).not.toBeChecked();
+    expect(overlayRadio).toBeChecked();
     expect(localStorage.getItem("hud_panes_reserve_zones")).toBe("false");
+
+    fireEvent.click(bordersRadio);
+    expect(reserveToggle).toBeChecked();
+    expect(bordersRadio).toBeChecked();
+    expect(localStorage.getItem("hud_panes_reserve_zones")).toBe("true");
   });
 
   it("switches pane sizing mode to custom defaults and updates default widths", () => {

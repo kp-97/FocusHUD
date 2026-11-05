@@ -10,12 +10,18 @@ use windows_sys::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
 };
 #[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Registry::{
+    HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_DWORD, RegCloseKey, RegOpenKeyExW, RegSetValueExW,
+};
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::HiDpi::{
     DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    SPI_SETWORKAREA, SPIF_SENDCHANGE, SystemParametersInfoW,
+    HWND_BROADCAST, SMTO_ABORTIFHUNG, SPI_SETDOCKMOVING, SPI_SETSNAPSIZING, SPI_SETWINARRANGING,
+    SPI_SETWORKAREA, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SendMessageTimeoutW,
+    SystemParametersInfoW, WM_SETTINGCHANGE,
 };
 
 #[cfg(target_os = "windows")]
@@ -32,8 +38,83 @@ static CLEAN_EXIT_EVENT: AtomicIsize = AtomicIsize::new(0);
 static WATCHDOG_SPAWNED: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "windows")]
 static CONSOLE_HANDLER_INSTALLED: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "windows")]
+static WINDOWS_SNAP_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 
 pub use crate::platform::ScreenMetrics;
+
+/// Low-level helper that enables (`true`) or disables (`false`) the native Windows 11
+/// Snap Layouts bar (`EnableSnapBar`), hover flyout (`EnableSnapAssistFlyout`),
+/// Snap Assist (`SnapAssist`), and OS window arranging (`SPI_SETWINARRANGING`,
+/// `SPI_SETDOCKMOVING`, `SPI_SETSNAPSIZING`), then broadcasts `WM_SETTINGCHANGE` so
+/// `explorer.exe` and `win32k` apply the change immediately without restarting Explorer.
+#[cfg(target_os = "windows")]
+pub unsafe fn set_windows_snap_enabled_raw(enabled: bool) {
+    let val: u32 = if enabled { 1 } else { 0 };
+
+    let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\0"
+        .encode_utf16()
+        .collect();
+    let mut hkey: HKEY = std::ptr::null_mut();
+    unsafe {
+        if RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            subkey.as_ptr(),
+            0,
+            KEY_SET_VALUE,
+            &mut hkey,
+        ) == 0
+            && !hkey.is_null()
+        {
+            for name in [
+                "EnableSnapBar\0",
+                "EnableSnapAssistFlyout\0",
+                "SnapAssist\0",
+            ] {
+                let name_w: Vec<u16> = name.encode_utf16().collect();
+                let _ = RegSetValueExW(
+                    hkey,
+                    name_w.as_ptr(),
+                    0,
+                    REG_DWORD,
+                    &val as *const u32 as *const u8,
+                    std::mem::size_of::<u32>() as u32,
+                );
+            }
+            let _ = RegCloseKey(hkey);
+        }
+
+        let flags = SPIF_UPDATEINIFILE | SPIF_SENDCHANGE;
+        let _ = SystemParametersInfoW(SPI_SETWINARRANGING, val, std::ptr::null_mut(), flags);
+        let _ = SystemParametersInfoW(SPI_SETDOCKMOVING, val, std::ptr::null_mut(), flags);
+        let _ = SystemParametersInfoW(SPI_SETSNAPSIZING, val, std::ptr::null_mut(), flags);
+
+        for param in ["ShellState\0", "Policy\0"] {
+            let param_w: Vec<u16> = param.encode_utf16().collect();
+            let mut result: usize = 0;
+            let _ = SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                param_w.as_ptr() as isize,
+                SMTO_ABORTIFHUNG,
+                50,
+                &mut result,
+            );
+        }
+    }
+}
+
+/// Idempotently suppresses or restores the native Windows layout selector and Aero Snap.
+#[cfg(target_os = "windows")]
+pub fn set_windows_snap_enabled(enabled: bool) {
+    let should_suppress = !enabled;
+    if WINDOWS_SNAP_SUPPRESSED.swap(should_suppress, Ordering::SeqCst) != should_suppress {
+        unsafe {
+            set_windows_snap_enabled_raw(enabled);
+        }
+    }
+}
 
 /// Enforces Per-Monitor DPI v2 awareness so Ultrawide and high-DPI displays
 /// report true physical resolutions instead of legacy scaled bounds.
@@ -106,7 +187,20 @@ pub fn set_work_area_cache(new_rect: RECT, orig: RECT) {
 }
 
 #[cfg(target_os = "windows")]
+pub unsafe fn apply_system_work_area_no_broadcast(new_rect: &RECT) {
+    set_windows_snap_enabled(false);
+    let rect_copy = *new_rect;
+    let _ = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst);
+    unsafe {
+        SystemParametersInfoW(SPI_SETWORKAREA, 0, &rect_copy as *const _ as *mut _, 0);
+    }
+}
+
+#[cfg(target_os = "windows")]
 pub unsafe fn apply_system_work_area(new_rect: &RECT) {
+    // Ensure native Windows layout selector / Aero Snap is disabled while FocusHUD reserves work area
+    set_windows_snap_enabled(false);
+
     let rect_copy = *new_rect;
     let seq = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
     unsafe {
@@ -132,11 +226,13 @@ pub unsafe fn apply_system_work_area(new_rect: &RECT) {
     });
 }
 
-/// Synchronously restores the desktop work area to the captured original dimensions
-/// and broadcasts the change immediately via SPIF_SENDCHANGE.
+/// Synchronously restores the desktop work area to the captured original dimensions,
+/// re-enables the native Windows layout selector, and broadcasts the change immediately.
 pub fn restore_work_area_sync() {
     #[cfg(target_os = "windows")]
     {
+        set_windows_snap_enabled(true);
+
         let lock = ORIGINAL_WORK_AREA.lock().unwrap();
         if let Some(orig) = *lock {
             let mut cur_lock = CURRENT_WORK_AREA.lock().unwrap();
@@ -159,6 +255,8 @@ pub fn restore_work_area_sync() {
 pub fn restore_work_area() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        set_windows_snap_enabled(true);
+
         let lock = ORIGINAL_WORK_AREA.lock().unwrap();
         if let Some(orig) = *lock {
             let mut cur_lock = CURRENT_WORK_AREA.lock().unwrap();
@@ -213,7 +311,7 @@ pub fn signal_watchdog_clean_exit() {
 /// Spawns a lightweight background watchdog sentinel process that monitors the main
 /// FocusHUD process. If FocusHUD terminates abruptly (crash, taskkill /F, terminal kill),
 /// the watchdog detects the kernel process handle signal and immediately restores
-/// the original desktop work area.
+/// the original desktop work area and re-enables the native Windows layout selector.
 #[cfg(target_os = "windows")]
 pub fn spawn_watchdog(orig: RECT) {
     use std::os::windows::process::CommandExt;
@@ -299,7 +397,8 @@ pub fn run_watchdog(pid: u32, left: i32, top: i32, right: i32, bottom: i32) {
         unsafe {
             let h_process = OpenProcess(PROCESS_SYNCHRONIZE, 0, pid);
             if h_process.is_null() {
-                // Parent already terminated or cannot be opened; restore work area immediately.
+                // Parent already terminated or cannot be opened; restore work area and Windows snap immediately.
+                set_windows_snap_enabled_raw(true);
                 SystemParametersInfoW(
                     SPI_SETWORKAREA,
                     0,
@@ -319,9 +418,10 @@ pub fn run_watchdog(pid: u32, left: i32, top: i32, right: i32, bottom: i32) {
                 let wait_res = WaitForMultipleObjects(2, handles.as_ptr(), 0, INFINITE);
                 if wait_res == WAIT_OBJECT_0 {
                     // h_event was signaled: parent process exited cleanly.
-                    // Work area was already restored by parent.
+                    // Work area and Windows snap were already restored by parent.
                 } else {
                     // h_process was signaled without h_event: abnormal termination!
+                    set_windows_snap_enabled_raw(true);
                     SystemParametersInfoW(
                         SPI_SETWORKAREA,
                         0,
@@ -333,6 +433,7 @@ pub fn run_watchdog(pid: u32, left: i32, top: i32, right: i32, bottom: i32) {
             } else {
                 // Event handle could not be opened; wait directly for process termination.
                 let _ = WaitForSingleObject(h_process, INFINITE);
+                set_windows_snap_enabled_raw(true);
                 SystemParametersInfoW(
                     SPI_SETWORKAREA,
                     0,
