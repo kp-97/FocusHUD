@@ -19,6 +19,7 @@ import { PaneLimitsTab } from "./PaneLimitsTab";
 import { AppearanceTab } from "./AppearanceTab";
 import { EditorTab } from "./EditorTab";
 import { UpdatesTab } from "./UpdatesTab";
+import { startDraggingWindow } from "../../../services/tauriBridge";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -55,6 +56,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("button")) return;
+    if (isStandalone) {
+      void startDraggingWindow();
+      return;
+    }
     isDraggingModalRef.current = true;
     dragStartRef.current = {
       mouseX: e.clientX,
@@ -68,7 +73,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDraggingModalRef.current) return;
+    if (isStandalone || !isDraggingModalRef.current) return;
     const deltaX = e.clientX - dragStartRef.current.mouseX;
     const deltaY = e.clientY - dragStartRef.current.mouseY;
     setPosition({
@@ -78,6 +83,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isStandalone) return;
     isDraggingModalRef.current = false;
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
@@ -166,7 +172,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div
       data-testid="settings-modal-content"
       style={{
-        transform: `translate(${position.x}px, ${position.y}px)`,
+        transform: isStandalone ? undefined : `translate(${position.x}px, ${position.y}px)`,
       }}
       className={`w-full ${
         isStandalone ? "h-full max-w-none" : "max-w-xl"
