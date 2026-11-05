@@ -12,7 +12,7 @@ export const SettingsModalApp: React.FC<SettingsModalAppProps> = ({ layout }) =>
     (typeof localStorage !== "undefined" && localStorage.getItem("hud_settings_tab")) || "all";
 
   return (
-    <div data-testid="settings-modal-app">
+    <div data-testid="settings-modal-app" className="w-full h-full m-0 p-0 overflow-hidden">
       <SettingsModal
         isOpen={true}
         isStandalone={true}

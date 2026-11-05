@@ -19,7 +19,7 @@ import { PaneLimitsTab } from "./PaneLimitsTab";
 import { AppearanceTab } from "./AppearanceTab";
 import { EditorTab } from "./EditorTab";
 import { UpdatesTab } from "./UpdatesTab";
-import { startDraggingWindow } from "../../../services/tauriBridge";
+import { startDraggingWindow, moveWindowByDelta } from "../../../services/tauriBridge";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -47,6 +47,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const isDraggingModalRef = React.useRef(false);
+  const isDraggingStandaloneRef = React.useRef(false);
+  const lastScreenPosRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragStartRef = React.useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -55,8 +57,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
 
   const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest("button")) return;
+    if ((e.target as HTMLElement).closest("button") || e.button !== 0) return;
     if (isStandalone) {
+      isDraggingStandaloneRef.current = true;
+      lastScreenPosRef.current = { x: e.screenX, y: e.screenY };
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {}
       void startDraggingWindow();
       return;
     }
@@ -73,7 +80,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isStandalone || !isDraggingModalRef.current) return;
+    if (isStandalone) {
+      if (!isDraggingStandaloneRef.current) return;
+      const dX = e.screenX - lastScreenPosRef.current.x;
+      const dY = e.screenY - lastScreenPosRef.current.y;
+      const scale = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      const physDX = Math.round(dX * scale);
+      const physDY = Math.round(dY * scale);
+      if (physDX !== 0 || physDY !== 0) {
+        lastScreenPosRef.current.x += physDX / scale;
+        lastScreenPosRef.current.y += physDY / scale;
+        void moveWindowByDelta(physDX, physDY);
+      }
+      return;
+    }
+    if (!isDraggingModalRef.current) return;
     const deltaX = e.clientX - dragStartRef.current.mouseX;
     const deltaY = e.clientY - dragStartRef.current.mouseY;
     setPosition({
@@ -83,7 +104,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isStandalone) return;
+    if (isStandalone) {
+      isDraggingStandaloneRef.current = false;
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
+      return;
+    }
     isDraggingModalRef.current = false;
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
@@ -175,8 +202,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         transform: isStandalone ? undefined : `translate(${position.x}px, ${position.y}px)`,
       }}
       className={`w-full ${
-        isStandalone ? "h-full max-w-none" : "max-w-xl"
-      } bg-[#040d1a] border border-cyan-500/40 rounded-lg shadow-[0_0_30px_rgba(0,229,255,0.25)] overflow-hidden text-cyan-200 relative font-hud flex flex-col`}
+        isStandalone
+          ? "h-full max-w-none rounded-none border border-cyan-500/40 shadow-none"
+          : "max-w-xl rounded-lg border border-cyan-500/40 shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+      } bg-[#040d1a] overflow-hidden text-cyan-200 relative font-hud flex flex-col`}
     >
       <HudBrackets
         variant="cyan"
@@ -191,10 +220,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           onPointerUp={handleHeaderPointerUp}
           className="flex items-center justify-between border-b border-cyan-500/30 pb-3 mb-3 shrink-0 select-none cursor-grab active:cursor-grabbing"
         >
-          <div className="flex items-center gap-2.5 pointer-events-none">
+          <div className="flex items-center gap-2.5 pointer-events-none" data-tauri-drag-region>
             <div className="w-3 h-3 bg-cyan-400 rotate-45 shadow-[0_0_8px_#00e5ff]" />
             <h2
               id="settings-modal-title"
+              data-tauri-drag-region
               className="font-orbitron font-bold text-sm tracking-wider text-cyan-100 uppercase"
             >
               HUD PREFERENCES & SETTINGS
@@ -291,7 +321,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (isStandalone) {
     return (
-      <div className="w-screen h-screen bg-[#03070d]/95 p-2 overflow-hidden flex flex-col justify-center items-center">
+      <div className="w-screen h-screen m-0 p-0 overflow-hidden bg-[#040d1a] flex flex-col">
         {modalContent}
       </div>
     );

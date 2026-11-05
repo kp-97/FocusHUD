@@ -56,6 +56,8 @@ pub fn run() {
             commands::get_system_diagnostics,
             commands::open_settings_window,
             commands::close_settings_window,
+            commands::start_dragging_window,
+            commands::move_window_by_delta,
             commands::check_db_is_empty,
             commands::get_goals,
             commands::save_goal,

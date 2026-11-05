@@ -195,8 +195,9 @@ describe("SettingsModal component", () => {
     expect(modalContent).toHaveStyle({ transform: "translate(50px, 80px)" });
   });
 
-  it("does not apply CSS translate transform and calls startDraggingWindow in standalone mode", () => {
+  it("does not apply CSS translate transform and invokes moveWindowByDelta in standalone mode", () => {
     const startDraggingSpy = vi.spyOn(tauriBridge, "startDraggingWindow").mockResolvedValue(true);
+    const moveDeltaSpy = vi.spyOn(tauriBridge, "moveWindowByDelta").mockResolvedValue(true);
 
     render(<SettingsModal isOpen={true} isStandalone={true} onClose={vi.fn()} />);
 
@@ -206,11 +207,13 @@ describe("SettingsModal component", () => {
     // Standalone mode must not have translate transform
     expect(modalContent.style.transform).toBe("");
 
-    fireEvent.pointerDown(header, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerDown(header, { clientX: 100, clientY: 100, screenX: 200, screenY: 200, pointerId: 1 });
     expect(startDraggingSpy).toHaveBeenCalledTimes(1);
 
-    fireEvent.pointerMove(header, { clientX: 150, clientY: 180, pointerId: 1 });
-    fireEvent.pointerUp(header, { clientX: 150, clientY: 180, pointerId: 1 });
+    fireEvent.pointerMove(header, { clientX: 150, clientY: 180, screenX: 250, screenY: 280, pointerId: 1 });
+    expect(moveDeltaSpy).toHaveBeenCalledWith(50, 80);
+
+    fireEvent.pointerUp(header, { clientX: 150, clientY: 180, screenX: 250, screenY: 280, pointerId: 1 });
 
     // Ensure transform remains unset (no inner DOM dragging)
     expect(modalContent.style.transform).toBe("");

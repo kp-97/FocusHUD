@@ -169,6 +169,42 @@ pub fn close_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn start_dragging_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn move_window_by_delta(window: tauri::WebviewWindow, delta_x: i32, delta_y: i32) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if let Ok(hwnd) = window.hwnd() {
+            unsafe {
+                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                    GetWindowRect, SetWindowPos, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER,
+                };
+                let mut rect = windows_sys::Win32::Foundation::RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                GetWindowRect(hwnd.0 as _, &mut rect);
+                SetWindowPos(
+                    hwnd.0 as _,
+                    std::ptr::null_mut(),
+                    rect.left + delta_x,
+                    rect.top + delta_y,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+                );
+                return Ok(());
+            }
+        }
+    }
+    #[allow(unreachable_code)]
+    if let Ok(pos) = window.outer_position() {
+        let _ = window.set_position(tauri::PhysicalPosition::new(pos.x + delta_x, pos.y + delta_y));
+    }
+    Ok(())
+}
+
 // ========================================================
 // SQLite Database Commands & Helpers
 // ========================================================

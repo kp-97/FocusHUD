@@ -72,6 +72,9 @@ export async function closeSettingsWindow(): Promise<boolean> {
 export async function startDraggingWindow(): Promise<boolean> {
   if (!isTauriEnvironment()) return false;
   try {
+    const ok = await invokeTauriBool("start_dragging_window");
+    if (ok) return true;
+
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().startDragging();
     return true;
@@ -81,6 +84,14 @@ export async function startDraggingWindow(): Promise<boolean> {
     }
     return false;
   }
+}
+
+/**
+ * Moves the calling window by the specified physical pixel deltas.
+ * Direct Win32 fast path for smooth borderless window dragging on Windows.
+ */
+export async function moveWindowByDelta(deltaX: number, deltaY: number): Promise<boolean> {
+  return invokeTauriBool("move_window_by_delta", { deltaX, deltaY });
 }
 
 export async function setFullscreenMode(fullscreen: boolean): Promise<boolean> {
