@@ -5,7 +5,7 @@
  */
 
 import type { SystemDiagnostics } from "../types/diagnostics";
-import { invokeTauri, invokeTauriBool } from "./ipc";
+import { invokeTauri, invokeTauriBool, isTauriEnvironment } from "./ipc";
 
 export type { SystemDiagnostics };
 
@@ -63,6 +63,35 @@ export async function openSettingsWindow(): Promise<boolean> {
 
 export async function closeSettingsWindow(): Promise<boolean> {
   return invokeTauriBool("close_settings_window");
+}
+
+/**
+ * Initiates native OS window dragging for the current window.
+ * Used for custom titlebars / draggable headers in standalone windows.
+ */
+export async function startDraggingWindow(): Promise<boolean> {
+  if (!isTauriEnvironment()) return false;
+  try {
+    const ok = await invokeTauriBool("start_dragging_window");
+    if (ok) return true;
+
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().startDragging();
+    return true;
+  } catch (err) {
+    if (import.meta.env?.DEV && import.meta.env?.MODE !== "test") {
+      console.warn("[Tauri Bridge] Failed to start window dragging:", err);
+    }
+    return false;
+  }
+}
+
+/**
+ * Moves the calling window by the specified physical pixel deltas.
+ * Direct Win32 fast path for smooth borderless window dragging on Windows.
+ */
+export async function moveWindowByDelta(deltaX: number, deltaY: number): Promise<boolean> {
+  return invokeTauriBool("move_window_by_delta", { deltaX, deltaY });
 }
 
 export async function setFullscreenMode(fullscreen: boolean): Promise<boolean> {

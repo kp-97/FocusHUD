@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import * as store from "../../../stores/layoutStore";
+import * as tauriBridge from "../../../services/tauriBridge";
 
 vi.mock("./UpdatesTab", () => ({
   UpdatesTab: () => <div data-testid="updates-tab">Mock Updates Tab</div>,
@@ -179,7 +180,7 @@ describe("SettingsModal component", () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it("allows dragging the preferences & settings modal around", () => {
+  it("allows dragging the preferences & settings modal around in modal mode", () => {
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
 
     const header = screen.getByText("HUD PREFERENCES & SETTINGS").parentElement!.parentElement!;
@@ -192,5 +193,29 @@ describe("SettingsModal component", () => {
     fireEvent.pointerUp(header, { clientX: 150, clientY: 180, pointerId: 1 });
 
     expect(modalContent).toHaveStyle({ transform: "translate(50px, 80px)" });
+  });
+
+  it("does not apply CSS translate transform and invokes moveWindowByDelta in standalone mode", () => {
+    const startDraggingSpy = vi.spyOn(tauriBridge, "startDraggingWindow").mockResolvedValue(true);
+    const moveDeltaSpy = vi.spyOn(tauriBridge, "moveWindowByDelta").mockResolvedValue(true);
+
+    render(<SettingsModal isOpen={true} isStandalone={true} onClose={vi.fn()} />);
+
+    const header = screen.getByText("HUD PREFERENCES & SETTINGS").parentElement!.parentElement!;
+    const modalContent = screen.getByTestId("settings-modal-content");
+
+    // Standalone mode must not have translate transform
+    expect(modalContent.style.transform).toBe("");
+
+    fireEvent.pointerDown(header, { clientX: 100, clientY: 100, screenX: 200, screenY: 200, pointerId: 1 });
+    expect(startDraggingSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.pointerMove(header, { clientX: 150, clientY: 180, screenX: 250, screenY: 280, pointerId: 1 });
+    expect(moveDeltaSpy).toHaveBeenCalledWith(50, 80);
+
+    fireEvent.pointerUp(header, { clientX: 150, clientY: 180, screenX: 250, screenY: 280, pointerId: 1 });
+
+    // Ensure transform remains unset (no inner DOM dragging)
+    expect(modalContent.style.transform).toBe("");
   });
 });
