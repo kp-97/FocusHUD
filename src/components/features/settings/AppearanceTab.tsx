@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Sliders, RotateCcw, Check, Palette, Monitor } from "lucide-react";
+import { Sliders, RotateCcw, Check, Palette, Monitor, Moon, Sun } from "lucide-react";
 import {
   DEFAULT_LEFT_WIDTH,
   DEFAULT_RIGHT_WIDTH,
@@ -26,10 +26,81 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
 }) => {
   const { theme, effectiveTheme, autoSync, setTheme, setAutoSync } = useTheme();
 
+  const [themeCategoryFilter, setThemeCategoryFilter] = useState<"all" | "dark" | "light">("all");
   const [reserveZones, setReserveZones] = useState<boolean>(() => getPanesReserveZones());
   const [rememberWidths, setRememberWidths] = useState<boolean>(() => getRememberPaneWidths());
   const [defaultLeft, setDefaultLeft] = useState<number>(() => getCustomDefaultLeftWidth());
   const [defaultRight, setDefaultRight] = useState<number>(() => getCustomDefaultRightWidth());
+
+  const darkThemes = THEME_LIST.filter((t) => t.category === "dark");
+  const lightThemes = THEME_LIST.filter((t) => t.category === "light");
+
+  const renderThemeCard = (t: (typeof THEME_LIST)[number]) => {
+    const isSelected = autoSync ? effectiveTheme === t.id : theme === t.id;
+    return (
+      <button
+        key={t.id}
+        type="button"
+        onClick={() => {
+          if (autoSync) setAutoSync(false);
+          setTheme(t.id);
+        }}
+        className={`relative p-2.5 rounded border text-left transition-all duration-150 flex flex-col justify-between cursor-pointer group ${
+          isSelected
+            ? "border-cyan-400 bg-cyan-900/30 ring-1 ring-cyan-400/50 shadow-[0_0_12px_rgba(0,229,255,0.25)]"
+            : "border-cyan-500/20 hover:border-cyan-500/50 bg-black/40 hover:bg-cyan-950/20"
+        }`}
+        style={{
+          borderColor: isSelected ? t.accentColor : undefined,
+        }}
+        aria-label={`Select theme ${t.name}`}
+      >
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span
+              className="text-[11px] font-bold tracking-wider font-tech uppercase"
+              style={{ color: t.accentColor }}
+            >
+              {t.name}
+            </span>
+            {isSelected && (
+              <span
+                className="w-4 h-4 rounded-full flex items-center justify-center text-black"
+                style={{ backgroundColor: t.accentColor }}
+              >
+                <Check className="w-2.5 h-2.5 stroke-[3]" />
+              </span>
+            )}
+          </div>
+          <p className="text-[9.5px] line-clamp-2 text-cyan-200/60 leading-tight mb-2">
+            {t.description}
+          </p>
+        </div>
+
+        {/* Swatch color preview bar */}
+        <div className="flex items-center gap-1.5 mt-auto pt-1.5 border-t border-cyan-500/15">
+          <div
+            className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-inner shrink-0"
+            style={{ backgroundColor: t.bgColor }}
+            title={`Background: ${t.bgColor}`}
+          />
+          <div
+            className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0"
+            style={{ backgroundColor: t.accentColor }}
+            title={`Accent: ${t.accentColor}`}
+          />
+          <div
+            className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0"
+            style={{ backgroundColor: t.secondaryColor }}
+            title={`Secondary: ${t.secondaryColor}`}
+          />
+          <span className="text-[8.5px] font-tech text-cyan-400/50 ml-auto uppercase">
+            {t.category}
+          </span>
+        </div>
+      </button>
+    );
+  };
 
   const handleToggleReserveZones = (checked: boolean) => {
     setReserveZones(checked);
@@ -85,74 +156,90 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
           accents, and telemetry colors update instantly across all panes.
         </p>
 
-        {/* Theme Swatch Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 pt-1">
-          {THEME_LIST.map((t) => {
-            const isSelected = autoSync ? effectiveTheme === t.id : theme === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  if (autoSync) setAutoSync(false);
-                  setTheme(t.id);
-                }}
-                className={`relative p-2.5 rounded border text-left transition-all duration-150 flex flex-col justify-between cursor-pointer group ${
-                  isSelected
-                    ? "border-cyan-400 bg-cyan-900/30 ring-1 ring-cyan-400/50 shadow-[0_0_12px_rgba(0,229,255,0.25)]"
-                    : "border-cyan-500/20 hover:border-cyan-500/50 bg-black/40 hover:bg-cyan-950/20"
-                }`}
-                style={{
-                  borderColor: isSelected ? t.accentColor : undefined,
-                }}
-                aria-label={`Select theme ${t.name}`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span
-                      className="text-[11px] font-bold tracking-wider font-tech uppercase"
-                      style={{ color: t.accentColor }}
-                    >
-                      {t.name}
-                    </span>
-                    {isSelected && (
-                      <span
-                        className="w-4 h-4 rounded-full flex items-center justify-center text-black"
-                        style={{ backgroundColor: t.accentColor }}
-                      >
-                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[9.5px] line-clamp-2 text-cyan-200/60 leading-tight mb-2">
-                    {t.description}
-                  </p>
-                </div>
+        {/* Segmented Category Filter */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <div className="flex items-center gap-1 p-0.5 bg-black/40 rounded border border-cyan-500/20 text-[10px] font-tech">
+            <button
+              type="button"
+              onClick={() => setThemeCategoryFilter("all")}
+              className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer ${
+                themeCategoryFilter === "all"
+                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-bold"
+                  : "text-cyan-400/60 hover:text-cyan-300 border border-transparent"
+              }`}
+              aria-label="Filter all themes"
+            >
+              ALL ({THEME_LIST.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeCategoryFilter("dark")}
+              className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer ${
+                themeCategoryFilter === "dark"
+                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-bold"
+                  : "text-cyan-400/60 hover:text-cyan-300 border border-transparent"
+              }`}
+              aria-label="Filter dark themes"
+            >
+              <Moon className="w-3 h-3 text-cyan-400" />
+              DARK ({darkThemes.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeCategoryFilter("light")}
+              className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer ${
+                themeCategoryFilter === "light"
+                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-bold"
+                  : "text-cyan-400/60 hover:text-cyan-300 border border-transparent"
+              }`}
+              aria-label="Filter light themes"
+            >
+              <Sun className="w-3 h-3 text-amber-400" />
+              LIGHT ({lightThemes.length})
+            </button>
+          </div>
+          <span className="text-[10px] text-cyan-400/60 font-tech uppercase hidden sm:inline">
+            Categorized by Contrast
+          </span>
+        </div>
 
-                {/* Swatch color preview bar */}
-                <div className="flex items-center gap-1.5 mt-auto pt-1.5 border-t border-cyan-500/15">
-                  <div
-                    className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-inner shrink-0"
-                    style={{ backgroundColor: t.bgColor }}
-                    title={`Background: ${t.bgColor}`}
-                  />
-                  <div
-                    className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0"
-                    style={{ backgroundColor: t.accentColor }}
-                    title={`Accent: ${t.accentColor}`}
-                  />
-                  <div
-                    className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0"
-                    style={{ backgroundColor: t.secondaryColor }}
-                    title={`Secondary: ${t.secondaryColor}`}
-                  />
-                  <span className="text-[8.5px] font-tech text-cyan-400/50 ml-auto uppercase">
-                    {t.category}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+        {/* Grouped Theme Swatch Sections */}
+        <div className="space-y-4 pt-1">
+          {/* Dark Themes Group */}
+          {(themeCategoryFilter === "all" || themeCategoryFilter === "dark") && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[10.5px] font-tech font-bold text-cyan-300 uppercase tracking-wider pb-1 border-b border-cyan-500/20">
+                <span className="flex items-center gap-1.5">
+                  <Moon className="w-3 h-3 text-cyan-400" />
+                  DARK THEMES
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/70 text-cyan-400/70 border border-cyan-500/20">
+                  {darkThemes.length} OPTIONS
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {darkThemes.map(renderThemeCard)}
+              </div>
+            </div>
+          )}
+
+          {/* Light Themes Group */}
+          {(themeCategoryFilter === "all" || themeCategoryFilter === "light") && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[10.5px] font-tech font-bold text-cyan-300 uppercase tracking-wider pb-1 border-b border-cyan-500/20">
+                <span className="flex items-center gap-1.5">
+                  <Sun className="w-3 h-3 text-amber-400" />
+                  LIGHT THEMES (MUTED DAYLIGHT)
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/70 text-cyan-400/70 border border-cyan-500/20">
+                  {lightThemes.length} OPTIONS
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {lightThemes.map(renderThemeCard)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
