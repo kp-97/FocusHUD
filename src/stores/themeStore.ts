@@ -50,21 +50,21 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
     id: "light",
     name: "Lab Light",
     category: "light",
-    description: "Crisp daylight theme with frosted slate panels & high contrast.",
-    accentColor: "#0284c7",
-    secondaryColor: "#ea580c",
-    bgColor: "#f8fafc",
-    borderColor: "rgba(2, 132, 199, 0.25)",
+    description: "Muted slate daylight theme with soft matte panels & glare-free eye comfort.",
+    accentColor: "#0369a1",
+    secondaryColor: "#c2410c",
+    bgColor: "#e2e8f0",
+    borderColor: "rgba(3, 105, 161, 0.25)",
   },
   pink: {
     id: "pink",
     name: "Pastel Sakura",
     category: "light",
-    description: "Cute pastel pink aesthetic with rounded typography and soft white cards.",
-    accentColor: "#f43f5e",
-    secondaryColor: "#fb7185",
-    bgColor: "#fce7f3",
-    borderColor: "rgba(244, 63, 94, 0.3)",
+    description: "Subdued dusty-rose aesthetic with warm matte parchment tones for low eye strain.",
+    accentColor: "#be185d",
+    secondaryColor: "#c026d3",
+    bgColor: "#ebd7e0",
+    borderColor: "rgba(190, 24, 93, 0.28)",
   },
   amber: {
     id: "amber",
@@ -132,11 +132,13 @@ export const getSystemPrefersDark = (): boolean => {
 export const resolveEffectiveTheme = (theme: ThemeId, autoSync: boolean): ThemeId => {
   if (autoSync) {
     const isDark = getSystemPrefersDark();
+    const currentThemeCategory = THEMES[theme]?.category ?? "dark";
     if (!isDark) {
-      return "light";
+      // OS is light: preserve current light theme choice, or default to "light" if current is dark
+      return currentThemeCategory === "light" ? theme : "light";
     }
-    // If OS is dark and current theme was light, default to cyber; otherwise keep dark theme choice
-    return theme === "light" ? "cyber" : theme;
+    // OS is dark: preserve current dark theme choice, or default to "cyber" if current is light
+    return currentThemeCategory === "light" ? "cyber" : theme;
   }
   return theme;
 };

@@ -65,6 +65,9 @@ describe("themeStore", () => {
     }));
 
     expect(resolveEffectiveTheme("cyber", true)).toBe("light");
+    expect(resolveEffectiveTheme("dark", true)).toBe("light");
+    expect(resolveEffectiveTheme("pink", true)).toBe("pink");
+    expect(resolveEffectiveTheme("light", true)).toBe("light");
 
     // Mock matchMedia returning dark preference
     window.matchMedia = vi.fn().mockImplementation((query) => ({
@@ -78,8 +81,10 @@ describe("themeStore", () => {
       dispatchEvent: vi.fn(),
     }));
 
-    expect(resolveEffectiveTheme("pink", true)).toBe("pink");
+    expect(resolveEffectiveTheme("pink", true)).toBe("cyber");
     expect(resolveEffectiveTheme("light", true)).toBe("cyber");
+    expect(resolveEffectiveTheme("dark", true)).toBe("dark");
+    expect(resolveEffectiveTheme("amber", true)).toBe("amber");
   });
 
   it("broadcasts theme changes and updates localStorage", () => {

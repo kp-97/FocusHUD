@@ -13,6 +13,8 @@ describe("AppearanceTab", () => {
     render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
 
     expect(screen.getByText("HUD THEME & PALETTE")).toBeInTheDocument();
+    expect(screen.getByText("DARK THEMES")).toBeInTheDocument();
+    expect(screen.getByText("LIGHT THEMES (MUTED DAYLIGHT)")).toBeInTheDocument();
     expect(screen.getByText("Cyber HUD")).toBeInTheDocument();
     expect(screen.getByText("Stealth Dark")).toBeInTheDocument();
     expect(screen.getByText("Lab Light")).toBeInTheDocument();
@@ -20,6 +22,35 @@ describe("AppearanceTab", () => {
     expect(screen.getByText("Retro Terminal")).toBeInTheDocument();
     expect(screen.getByText("Arctic Slate")).toBeInTheDocument();
     expect(screen.getByText("Phosphor Matrix")).toBeInTheDocument();
+  });
+
+  it("filters themes using category segmented filter buttons", () => {
+    render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
+
+    // Filter to dark only
+    const darkFilterBtn = screen.getByRole("button", { name: /Filter dark themes/i });
+    fireEvent.click(darkFilterBtn);
+
+    expect(screen.getByText("Cyber HUD")).toBeInTheDocument();
+    expect(screen.getByText("Stealth Dark")).toBeInTheDocument();
+    expect(screen.queryByText("Lab Light")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pastel Sakura")).not.toBeInTheDocument();
+
+    // Filter to light only
+    const lightFilterBtn = screen.getByRole("button", { name: /Filter light themes/i });
+    fireEvent.click(lightFilterBtn);
+
+    expect(screen.getByText("Lab Light")).toBeInTheDocument();
+    expect(screen.getByText("Pastel Sakura")).toBeInTheDocument();
+    expect(screen.queryByText("Cyber HUD")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stealth Dark")).not.toBeInTheDocument();
+
+    // Return to all
+    const allFilterBtn = screen.getByRole("button", { name: /Filter all themes/i });
+    fireEvent.click(allFilterBtn);
+
+    expect(screen.getByText("Cyber HUD")).toBeInTheDocument();
+    expect(screen.getByText("Lab Light")).toBeInTheDocument();
   });
 
   it("switches theme when a swatch card is clicked", () => {
