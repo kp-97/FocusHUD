@@ -1,0 +1,81 @@
+name: Cut Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Semantic Version Level'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  create-release-pr:
+    name: Create & Auto-Merge Release PR
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Configure Git Bot Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Determine New Version & Create Branch
+        shell: bash
+        run: |
+          npm version ${{ github.event.inputs.bump_type }} --no-git-tag-version --allow-same-version
+          NEW_VER=$(node -p "require('./package.json').version")
+          echo "NEW_VERSION=$NEW_VER" >> $GITHUB_ENV
+          
+          git checkout package.json package-lock.json
+          git checkout -b "release/v$NEW_VER"
+
+      - name: Execute FocusHUD Bump Script
+        run: node scripts/bump-version.js ${{ github.event.inputs.bump_type }}
+
+      - name: Push Release Branch
+        run: |
+          git push -u origin "release/v${{ env.NEW_VERSION }}"
+
+      - name: Create & Enable Auto-Merge on Release PR
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "release/v${{ env.NEW_VERSION }}" \
+            --title "chore(release): bump version to ${{ env.NEW_VERSION }}" \
+            --body "Automated release bump to v${{ env.NEW_VERSION }}. Once CI status checks pass, this PR will be merged automatically."
+
+          gh pr merge "release/v${{ env.NEW_VERSION }}" --auto --merge
