@@ -20,6 +20,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout main
@@ -52,12 +55,11 @@ jobs:
         run: npm ci
 
       - name: Determine New Version & Create Branch
-        shell: bash
         run: |
           npm version ${{ github.event.inputs.bump_type }} --no-git-tag-version --allow-same-version
           NEW_VER=$(node -p "require('./package.json').version")
           echo "NEW_VERSION=$NEW_VER" >> $GITHUB_ENV
-          
+
           git checkout package.json package-lock.json
           git checkout -b "release/v$NEW_VER"
 
