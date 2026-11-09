@@ -61,23 +61,29 @@ jobs:
           echo "NEW_VERSION=$NEW_VER" >> $GITHUB_ENV
 
           git checkout package.json package-lock.json
-          git checkout -b "release/v$NEW_VER"
+          git checkout -B "release/v$NEW_VER"
 
       - name: Execute FocusHUD Bump Script
         run: node scripts/bump-version.js ${{ github.event.inputs.bump_type }}
 
       - name: Push Release Branch
         run: |
-          git push -u origin "release/v${{ env.NEW_VERSION }}"
+          git push --force-with-lease -u origin "release/v${{ env.NEW_VERSION }}"
 
       - name: Create & Enable Auto-Merge on Release PR
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
         run: |
-          gh pr create \
-            --base main \
-            --head "release/v${{ env.NEW_VERSION }}" \
-            --title "chore(release): bump version to ${{ env.NEW_VERSION }}" \
-            --body "Automated release bump to v${{ env.NEW_VERSION }}. Once CI status checks pass, this PR will be merged automatically."
+          EXISTING_PR=$(gh pr list --head "release/v${{ env.NEW_VERSION }}" --base main --state open --json number --jq '.[0].number')
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create \
+              --base main \
+              --head "release/v${{ env.NEW_VERSION }}" \
+              --title "chore(release): bump version to ${{ env.NEW_VERSION }}" \
+              --body "Automated release bump to v${{ env.NEW_VERSION }}. Once CI status checks pass, this PR will be merged automatically."
+          else
+            echo "Release PR #$EXISTING_PR already exists for release/v${{ env.NEW_VERSION }}."
+          fi
 
-          gh pr merge "release/v${{ env.NEW_VERSION }}" --auto --merge
+          gh pr merge "release/v${{ env.NEW_VERSION }}" --auto --merge || \
+            gh pr merge "release/v${{ env.NEW_VERSION }}" --merge
