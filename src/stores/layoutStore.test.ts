@@ -21,6 +21,8 @@ import {
   subscribeLayoutAction,
   LayoutAction,
   DEFAULT_NAV_CONFIG,
+  getNavItemRail,
+  reorderNavConfig,
   loadNavConfig,
   saveNavConfig,
   resetNavConfig,
@@ -308,6 +310,17 @@ describe("layoutStore module", () => {
       const reset = resetNavConfig();
       expect(reset).toEqual(DEFAULT_NAV_CONFIG);
       expect(loadNavConfig()).toEqual(DEFAULT_NAV_CONFIG);
+    });
+
+    it("places AI Chat ('chat') on the right rail by default and supports drag-and-drop reordering", () => {
+      const chatItem = DEFAULT_NAV_CONFIG.find((i) => i.id === "chat")!;
+      const homeItem = DEFAULT_NAV_CONFIG.find((i) => i.id === "home")!;
+      expect(getNavItemRail(chatItem)).toBe("right");
+      expect(getNavItemRail(homeItem)).toBe("left");
+
+      const reordered = reorderNavConfig(DEFAULT_NAV_CONFIG, "calendar", "home", "left");
+      expect(reordered[0].id).toBe("calendar");
+      expect(reordered[1].id).toBe("home");
     });
   });
 

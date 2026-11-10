@@ -31,8 +31,17 @@ pub static LEFT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static LEFT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);
-pub static FULLSCREEN_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static FULLSCREEN_ACTIVE: AtomicBool = AtomicBool::new(true);
 pub static PANES_RESERVE_ZONES: AtomicBool = AtomicBool::new(true);
+
+pub const WINDOW_STATE_WINDOWED: i32 = 0;
+pub const WINDOW_STATE_MAXIMISED: i32 = 1;
+pub const WINDOW_STATE_FULLSCREEN: i32 = 2;
+pub const WINDOW_STATE_MINIMISED: i32 = 3;
+pub const WINDOW_STATE_SPLIT: i32 = 4;
+
+pub static CURRENT_WINDOW_STATE: AtomicI32 = AtomicI32::new(WINDOW_STATE_WINDOWED);
+pub static PRIOR_FULLSCREEN_STATE: AtomicI32 = AtomicI32::new(WINDOW_STATE_WINDOWED);
 
 #[cfg(target_os = "windows")]
 pub static LEFT_DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -44,9 +53,9 @@ pub static MAIN_HWND: AtomicIsize = AtomicIsize::new(0);
 pub static SNAP_OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
 
 #[cfg(target_os = "windows")]
-static LAST_LEFT_REGION: AtomicI64 = AtomicI64::new(-1);
+pub static LAST_LEFT_REGION: AtomicI64 = AtomicI64::new(-1);
 #[cfg(target_os = "windows")]
-static LAST_RIGHT_REGION: AtomicI64 = AtomicI64::new(-1);
+pub static LAST_RIGHT_REGION: AtomicI64 = AtomicI64::new(-1);
 #[cfg(target_os = "windows")]
 static DOCK_LIVE_RESIZE_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "windows")]

@@ -9,30 +9,18 @@ pub mod platform;
 pub mod snap;
 
 use std::sync::atomic::Ordering;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+
+pub fn open_from_tray(app: &tauri::AppHandle, target_state: &str) {
+    if target_state == "fullscreen" {
+        dock::PRIOR_FULLSCREEN_STATE.store(dock::WINDOW_STATE_MINIMISED, Ordering::Relaxed);
+    }
+    let _ = platform::set_window_state(app, target_state);
+    let _ = app.emit("tray-window-state", target_state);
+}
 
 pub fn restore_from_tray(app: &tauri::AppHandle) {
-    if dock::FULLSCREEN_ACTIVE.load(Ordering::Relaxed) {
-        if let Some(w) = app.get_webview_window("main") {
-            let _ = w.show();
-            let _ = w.set_focus();
-        }
-        return;
-    }
-
-    let l_w = dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
-    let r_w = dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
-
-    platform::apply_dock_geometry(app, l_w, r_w);
-    platform::update_dock_work_area(app, l_w, r_w, true);
-
-    if let Some(w) = app.get_webview_window("left-dock") {
-        let _ = w.show();
-        let _ = w.set_focus();
-    }
-    if let Some(w) = app.get_webview_window("right-dock") {
-        let _ = w.show();
-    }
+    open_from_tray(app, "windowed");
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -81,6 +69,10 @@ pub fn run() {
             commands::sync_calendar_events,
             commands::migrate_legacy_data,
             commands::set_fullscreen_mode,
+            commands::set_window_state,
+            commands::get_window_state,
+            commands::start_resize_window,
+            commands::resize_window_by_delta,
             commands::set_panes_reserve_zones,
             commands::get_snap_overlay_state,
             commands::select_snap_assist_window,
@@ -94,17 +86,48 @@ pub fn run() {
             platform::configure_dock_windows(app.handle());
             platform::init_window_snapping(app.handle());
 
+            let open_item =
+                tauri::menu::MenuItem::with_id(app, "tray_open", "Open", true, None::<&str>)?;
+            let open_max_item = tauri::menu::MenuItem::with_id(
+                app,
+                "tray_open_maximised",
+                "Open Maximised",
+                true,
+                None::<&str>,
+            )?;
+            let open_fs_item = tauri::menu::MenuItem::with_id(
+                app,
+                "tray_open_fullscreen",
+                "Open in Fullscreen (Immersive)",
+                true,
+                None::<&str>,
+            )?;
+            let quit_item =
+                tauri::menu::MenuItem::with_id(app, "tray_quit", "Quit", true, None::<&str>)?;
+            let tray_menu = tauri::menu::Menu::with_items(
+                app,
+                &[&open_item, &open_max_item, &open_fs_item, &quit_item],
+            )?;
+
             let tray_builder = tauri::tray::TrayIconBuilder::new()
                 .tooltip("FocusHUD")
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "tray_open" => open_from_tray(app, "windowed"),
+                    "tray_open_maximised" => open_from_tray(app, "maximised"),
+                    "tray_open_fullscreen" => open_from_tray(app, "fullscreen"),
+                    "tray_quit" => commands::exit_app(app.clone()),
+                    _ => {}
+                })
                 .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click {
+                    if let tauri::tray::TrayIconEvent::DoubleClick {
                         button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
                         ..
                     } = event
                     {
                         let app = tray.app_handle();
-                        restore_from_tray(app);
+                        open_from_tray(app, "windowed");
                     }
                 });
 

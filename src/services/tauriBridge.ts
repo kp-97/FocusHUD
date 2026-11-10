@@ -5,6 +5,7 @@
  */
 
 import type { SystemDiagnostics } from "../types/diagnostics";
+import type { WindowModeState } from "../types/hud";
 import { invokeTauri, invokeTauriBool, isTauriEnvironment } from "./ipc";
 
 export type { SystemDiagnostics };
@@ -94,8 +95,28 @@ export async function moveWindowByDelta(deltaX: number, deltaY: number): Promise
   return invokeTauriBool("move_window_by_delta", { deltaX, deltaY });
 }
 
+export async function startResizeWindow(edge: string): Promise<boolean> {
+  return invokeTauriBool("start_resize_window", { edge });
+}
+
+export async function resizeWindowByDelta(
+  edge: string,
+  deltaX: number,
+  deltaY: number
+): Promise<boolean> {
+  return invokeTauriBool("resize_window_by_delta", { edge, deltaX, deltaY });
+}
+
 export async function setFullscreenMode(fullscreen: boolean): Promise<boolean> {
   return invokeTauriBool("set_fullscreen_mode", { fullscreen });
+}
+
+export async function setWindowState(state: WindowModeState): Promise<boolean> {
+  return invokeTauriBool("set_window_state", { state });
+}
+
+export async function getWindowState(): Promise<WindowModeState | null> {
+  return invokeTauri<WindowModeState>("get_window_state");
 }
 
 export async function setPanesReserveZonesMode(reserve: boolean): Promise<boolean> {

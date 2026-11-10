@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   updateDockSizes,
   restoreWorkArea,
   openSettingsWindow,
-  setFullscreenMode,
+  setWindowState as invokeSetWindowState,
+  getWindowState,
   setPanesReserveZonesMode,
+  minimizeToTray,
 } from "../services/tauriBridge";
 import {
   getRememberedLeftWidth,
@@ -19,6 +21,7 @@ import {
   getMaxRightWidth,
   getPanesReserveZones,
 } from "../stores/layoutStore";
+import { WindowModeState } from "../types/hud";
 import { runLegacyStorageMigrationIfNeeded } from "../services/storageMigration";
 import { checkForUpdates, AppUpdateInfo } from "../services/updaterService";
 
@@ -71,15 +74,64 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
   const [maxLeftWidth, setMaxLeftWidth] = useState<number>(() => getMaxLeftWidth());
   const [maxRightWidth, setMaxRightWidth] = useState<number>(() => getMaxRightWidth());
 
-  const [isAppMaximized, setIsAppMaximized] = useState<boolean>(() => {
+  const [windowState, setWindowState] = useState<WindowModeState>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("focushud_is_app_maximized");
-      if (saved !== null) return saved === "true";
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get("dock") === "full") return true;
+      if (dockWindowType === "left" || dockWindowType === "right") {
+        return "split";
+      }
+
+      const isUltrawide =
+        window.screen.width / Math.max(1, window.screen.height) > 16 / 9 + 0.01;
+      const bootState: WindowModeState = isUltrawide ? "split" : "maximised";
+
+      const hasBooted = sessionStorage.getItem("focushud_booted");
+      if (!hasBooted) {
+        sessionStorage.setItem("focushud_booted", "true");
+        localStorage.setItem("focushud_window_state", bootState);
+        localStorage.setItem(
+          "focushud_is_app_maximized",
+          String(bootState === "maximised")
+        );
+        return bootState;
+      }
+
+      const savedState = localStorage.getItem("focushud_window_state") as WindowModeState | null;
+      if (
+        savedState === "windowed" ||
+        savedState === "maximised" ||
+        savedState === "fullscreen" ||
+        savedState === "minimised" ||
+        savedState === "split"
+      ) {
+        return savedState;
+      }
+      return bootState;
     }
-    return false;
+    return "maximised";
   });
+
+  const [priorFullscreenState, setPriorFullscreenState] = useState<WindowModeState>(() => {
+    if (typeof window !== "undefined") {
+      const savedPrior = localStorage.getItem(
+        "focushud_prior_fullscreen_state"
+      ) as WindowModeState | null;
+      if (
+        savedPrior === "windowed" ||
+        savedPrior === "maximised" ||
+        savedPrior === "minimised" ||
+        savedPrior === "split"
+      ) {
+        return savedPrior;
+      }
+    }
+    return "windowed";
+  });
+
+  const isJoinedMode = windowState !== "split";
+  const isAppMaximized = windowState === "maximised";
+  const isFullscreen = windowState === "fullscreen";
+  const isMinimised = windowState === "minimised";
+
   const preMaximizedLayoutRef = useRef<{ left: number; right: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -93,6 +145,14 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
       .then((info) => {
         if (info && info.available) {
           setUpdateInfo(info);
+        }
+      })
+      .catch(() => {});
+
+    getWindowState()
+      .then((st) => {
+        if (st) {
+          setWindowState(st);
         }
       })
       .catch(() => {});
@@ -157,17 +217,39 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
       const isRemote = Boolean(action.sender && action.sender !== dockWindowType);
 
       if (action.type === "MAXIMIZE_APP") {
-        setIsAppMaximized(true);
+        setWindowState("maximised");
         if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_window_state", "maximised");
           localStorage.setItem("focushud_is_app_maximized", "true");
         }
       } else if (action.type === "RESTORE_APP") {
-        setIsAppMaximized(false);
+        setWindowState("windowed");
         if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_window_state", "windowed");
           localStorage.setItem("focushud_is_app_maximized", "false");
         }
         setLeftWidth(action.leftWidth);
         setRightWidth(action.rightWidth);
+      } else if (action.type === "SET_WINDOW_STATE") {
+        setWindowState(action.state);
+        if (action.priorFullscreenState) {
+          setPriorFullscreenState(action.priorFullscreenState);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "focushud_prior_fullscreen_state",
+              action.priorFullscreenState
+            );
+          }
+        }
+        if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_window_state", action.state);
+          localStorage.setItem(
+            "focushud_is_app_maximized",
+            String(action.state === "maximised")
+          );
+        }
+        if (action.leftWidth !== undefined) setLeftWidth(action.leftWidth);
+        if (action.rightWidth !== undefined) setRightWidth(action.rightWidth);
       } else if (action.type === "SET_ACTIVE_NAV") {
         setActiveNavState(action.nav);
         if (typeof window !== "undefined") {
@@ -358,41 +440,252 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     }
   };
 
-  const handleToggleMaximizeApp = async () => {
-    if (!isAppMaximized) {
+  const handleClickMaximise = useCallback(async () => {
+    if (windowState === "split") {
       preMaximizedLayoutRef.current = { left: leftWidth, right: rightWidth };
-      setIsAppMaximized(true);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("focushud_is_app_maximized", "true");
-      }
-      broadcastLayoutAction({
-        type: "MAXIMIZE_APP",
-        sender: dockWindowType,
-      });
-      await setFullscreenMode(true);
+    }
+    setWindowState("maximised");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", "maximised");
+      localStorage.setItem("focushud_is_app_maximized", "true");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "maximised",
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("maximised");
+  }, [windowState, leftWidth, rightWidth, dockWindowType]);
+
+  const handleClickRestoreDown = useCallback(async () => {
+    setWindowState("windowed");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", "windowed");
+      localStorage.setItem("focushud_is_app_maximized", "false");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "windowed",
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("windowed");
+  }, [dockWindowType]);
+
+  const handleClickFullscreen = useCallback(async () => {
+    if (windowState === "split") {
+      preMaximizedLayoutRef.current = { left: leftWidth, right: rightWidth };
+    }
+    const prior: WindowModeState =
+      windowState === "maximised"
+        ? "maximised"
+        : windowState === "minimised"
+        ? "minimised"
+        : windowState === "split"
+        ? "split"
+        : "windowed";
+    setPriorFullscreenState(prior);
+    setWindowState("fullscreen");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_prior_fullscreen_state", prior);
+      localStorage.setItem("focushud_window_state", "fullscreen");
+      localStorage.setItem("focushud_is_app_maximized", "false");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "fullscreen",
+      priorFullscreenState: prior,
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("fullscreen");
+  }, [windowState, leftWidth, rightWidth, dockWindowType]);
+
+  const handleClickSplit = useCallback(async () => {
+    const restored = preMaximizedLayoutRef.current || {
+      left: getRememberedLeftWidth(),
+      right: getRememberedRightWidth(),
+    };
+    setWindowState("split");
+    setLeftWidth(restored.left);
+    setRightWidth(restored.right);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", "split");
+      localStorage.setItem("focushud_is_app_maximized", "false");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "split",
+      leftWidth: restored.left,
+      rightWidth: restored.right,
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("split");
+    if (getPanesReserveZones() && (dockWindowType !== "full" || desktopDockActive)) {
+      await updateDockSizes(restored.left, restored.right, true);
+    }
+  }, [dockWindowType, desktopDockActive]);
+
+  const handleClickExitFullscreen = useCallback(async () => {
+    const target: WindowModeState = priorFullscreenState || "windowed";
+    if (target === "split") {
+      await handleClickSplit();
+      return;
+    }
+    setWindowState(target);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", target);
+      localStorage.setItem(
+        "focushud_is_app_maximized",
+        String(target === "maximised")
+      );
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: target,
+      sender: dockWindowType,
+    });
+    if (target === "minimised") {
+      await minimizeToTray();
+      await invokeSetWindowState("minimised");
     } else {
-      setIsAppMaximized(false);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("focushud_is_app_maximized", "false");
-      }
-      const restored = preMaximizedLayoutRef.current || {
-        left: getRememberedLeftWidth(),
-        right: getRememberedRightWidth(),
-      };
-      setLeftWidth(restored.left);
-      setRightWidth(restored.right);
-      broadcastLayoutAction({
-        type: "RESTORE_APP",
-        leftWidth: restored.left,
-        rightWidth: restored.right,
-        sender: dockWindowType,
-      });
-      await setFullscreenMode(false);
-      if (getPanesReserveZones() && (dockWindowType !== "full" || desktopDockActive)) {
-        await updateDockSizes(restored.left, restored.right, true);
-      }
+      await invokeSetWindowState(target);
+    }
+  }, [priorFullscreenState, dockWindowType, handleClickSplit]);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    if (windowState === "fullscreen") {
+      await handleClickExitFullscreen();
+    } else if (
+      windowState === "windowed" ||
+      windowState === "maximised" ||
+      windowState === "split"
+    ) {
+      await handleClickFullscreen();
+    }
+  }, [windowState, handleClickExitFullscreen, handleClickFullscreen]);
+
+  const handleClickJoin = handleClickMaximise;
+
+  const handleClickMinimise = useCallback(async () => {
+    setWindowState("minimised");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", "minimised");
+      localStorage.setItem("focushud_is_app_maximized", "false");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "minimised",
+      sender: dockWindowType,
+    });
+    await minimizeToTray();
+    await invokeSetWindowState("minimised");
+  }, [dockWindowType]);
+
+  const handleTrayOpenWindowed = useCallback(async () => {
+    setWindowState("windowed");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", "windowed");
+      localStorage.setItem("focushud_is_app_maximized", "false");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "windowed",
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("windowed");
+  }, [dockWindowType]);
+
+  const handleTrayOpenMaximised = useCallback(async () => {
+    setWindowState("maximised");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_window_state", "maximised");
+      localStorage.setItem("focushud_is_app_maximized", "true");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "maximised",
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("maximised");
+  }, [dockWindowType]);
+
+  const handleTrayOpenFullscreen = useCallback(async () => {
+    setPriorFullscreenState("minimised");
+    setWindowState("fullscreen");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_prior_fullscreen_state", "minimised");
+      localStorage.setItem("focushud_window_state", "fullscreen");
+      localStorage.setItem("focushud_is_app_maximized", "false");
+    }
+    broadcastLayoutAction({
+      type: "SET_WINDOW_STATE",
+      state: "fullscreen",
+      priorFullscreenState: "minimised",
+      sender: dockWindowType,
+    });
+    await invokeSetWindowState("fullscreen");
+  }, [dockWindowType]);
+
+  const handleToggleMaximizeApp = async () => {
+    if (windowState === "maximised" || windowState === "fullscreen") {
+      await handleClickRestoreDown();
+    } else {
+      await handleClickMaximise();
     }
   };
+
+  // F11 shortcut for toggling Fullscreen from Windowed, Maximised, or Split
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        if (windowState === "fullscreen") {
+          void handleClickExitFullscreen();
+        } else if (
+          windowState === "windowed" ||
+          windowState === "maximised" ||
+          windowState === "split"
+        ) {
+          void handleClickFullscreen();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [windowState, handleClickExitFullscreen, handleClickFullscreen]);
+
+  // Listen for system tray restore events (Open, Open Maximised, Open in Fullscreen)
+  useEffect(() => {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    let unlisten: (() => void) | undefined;
+    let mounted = true;
+    import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen<string>("tray-window-state", (event) => {
+          if (!mounted) return;
+          const target = event.payload;
+          if (target === "windowed") {
+            void handleTrayOpenWindowed();
+          } else if (target === "maximised") {
+            void handleTrayOpenMaximised();
+          } else if (target === "fullscreen") {
+            void handleTrayOpenFullscreen();
+          }
+        })
+      )
+      .then((fn) => {
+        if (mounted) {
+          unlisten = fn;
+        } else {
+          fn();
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+      if (unlisten) unlisten();
+    };
+  }, [handleTrayOpenWindowed, handleTrayOpenMaximised, handleTrayOpenFullscreen]);
 
   // Drag handlers for Right Bar
   const handleRightDragChange = (newWidth: number) => {
@@ -519,7 +812,24 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     handleToggleRightPane,
     handleToggleBothPanes,
     handleMaximizePanes,
+    windowState,
+    setWindowState,
+    priorFullscreenState,
+    isJoinedMode,
     isAppMaximized,
+    isFullscreen,
+    isMinimised,
+    handleClickMaximise,
+    handleClickRestoreDown,
+    handleClickFullscreen,
+    handleClickExitFullscreen,
+    handleToggleFullscreen,
+    handleClickSplit,
+    handleClickJoin,
+    handleClickMinimise,
+    handleTrayOpenWindowed,
+    handleTrayOpenMaximised,
+    handleTrayOpenFullscreen,
     handleToggleMaximizeApp,
     handleResetWidths,
     handleApplyPreset,

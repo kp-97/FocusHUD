@@ -28,10 +28,11 @@ describe("RightSidebar component", () => {
     vi.useRealTimers();
   });
 
-  it("renders standard view when expanded (width >= 120)", () => {
+  it("renders standard view when expanded (width >= 120) with AI Chat on right rail by default", () => {
     render(<RightSidebar width={280} activeNav="home" />);
     expect(screen.getByLabelText(/Close FocusHUD/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/POMODORO TIMER/i).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("right-rail-nav-chat")).toBeInTheDocument();
+    expect(screen.getByText(/AI AGENT CHAT/i)).toBeInTheDocument();
   });
 
   it("renders window controls in expanded header and triggers actions", () => {
@@ -66,28 +67,29 @@ describe("RightSidebar component", () => {
   it("renders compact mini HUD rail when snapped (width < 120)", () => {
     render(<RightSidebar width={68} activeNav="home" />);
     // In compact mode, the full header is hidden and the mini rail is rendered
-    expect(screen.queryByText(/VIEW: HOME/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/VIEW: CHAT/i)).not.toBeInTheDocument();
     expect(screen.getByText(/CYCLES/i)).toBeInTheDocument();
     expect(screen.getByTitle(/Start Focus Timer/i)).toBeInTheDocument();
   });
 
-  it("renders compact controls in compact mini HUD rail with window controls and stats", () => {
+  it("renders compact controls in compact mini HUD rail with window controls, AI Chat view button, and stats (no right pane toggle)", () => {
     render(<RightSidebar width={68} activeNav="home" />);
 
     // Minimize, Restore/Maximize, and Exit buttons ARE rendered vertically in compact rail
     const exitBtn = screen.getByLabelText(/Close FocusHUD/i);
     const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
     const minBtn = screen.getByLabelText(/Minimize FocusHUD to Tray/i);
-    const rightToggle = screen.getByTestId("sidebar-toggle-right");
+    const chatBtn = screen.getByTestId("right-rail-nav-chat");
     expect(exitBtn).toBeInTheDocument();
     expect(maxBtn).toBeInTheDocument();
     expect(minBtn).toBeInTheDocument();
-    expect(rightToggle).toBeInTheDocument();
+    expect(chatBtn).toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-toggle-right")).not.toBeInTheDocument();
 
-    // Verify vertical order in DOM: Exit is before Maximize, Maximize before Minimize, and Minimize before Right Toggle
+    // Verify vertical order in DOM: Exit is before Maximize, Maximize before Minimize, and Minimize before Right Rail Nav
     expect(exitBtn.compareDocumentPosition(maxBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(maxBtn.compareDocumentPosition(minBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(minBtn.compareDocumentPosition(rightToggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(minBtn.compareDocumentPosition(chatBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     // System stats section is rendered
     expect(screen.getByText("STATS")).toBeInTheDocument();
@@ -167,24 +169,54 @@ describe("RightSidebar component", () => {
   it("allows selecting a view from the right pane dropdown independently of the left pane", () => {
     render(<RightSidebar width={280} activeNav="home" />);
 
-    // Initially displays Home view (VIEW: HOME)
+    // Initially displays AI Chat view by default (VIEW: CHAT)
     const dropdownBtn = screen.getByTestId("right-pane-view-dropdown-button");
     expect(dropdownBtn).toBeInTheDocument();
-    expect(dropdownBtn).toHaveTextContent(/VIEW: HOME/i);
+    expect(dropdownBtn).toHaveTextContent(/VIEW: CHAT/i);
 
     // Open dropdown
     fireEvent.click(dropdownBtn);
     const menu = screen.getByRole("menu", { name: /Right Pane Views/i });
     expect(menu).toBeInTheDocument();
 
-    // Select AI CHAT from dropdown
-    const chatOption = within(menu).getByRole("menuitem", { name: /AI CHAT/i });
-    fireEvent.click(chatOption);
+    // Select CALENDAR from dropdown
+    const calOption = within(menu).getByRole("menuitem", { name: /CALENDAR/i });
+    fireEvent.click(calOption);
 
-    // Dropdown closes and right pane updates to AI AGENT CHAT
+    // Dropdown closes and right pane updates to CALENDAR
     expect(screen.queryByRole("menu", { name: /Right Pane Views/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId("right-pane-view-dropdown-button")).toHaveTextContent(/VIEW: CHAT/i);
-    expect(screen.getByText(/AI AGENT CHAT/i)).toBeInTheDocument();
+    expect(screen.getByTestId("right-pane-view-dropdown-button")).toHaveTextContent(/VIEW: CALENDAR/i);
+  });
+
+  it("opens view on first click and closes (collapses) right pane on clicking the same active view button in Split mode", () => {
+    const handleToggleRightPane = vi.fn();
+    const { rerender } = render(
+      <RightSidebar
+        width={68}
+        activeNav="home"
+        windowState="split"
+        isJoinedMode={false}
+        onToggleRightPane={handleToggleRightPane}
+      />
+    );
+
+    // When collapsed (width=68), clicking AI Chat button opens the right pane
+    fireEvent.click(screen.getByTestId("right-rail-nav-chat"));
+    expect(handleToggleRightPane).toHaveBeenCalledTimes(1);
+
+    // When expanded (width=280) with AI Chat active, clicking AI Chat button again closes the right pane
+    handleToggleRightPane.mockClear();
+    rerender(
+      <RightSidebar
+        width={280}
+        activeNav="home"
+        windowState="split"
+        isJoinedMode={false}
+        onToggleRightPane={handleToggleRightPane}
+      />
+    );
+    fireEvent.click(screen.getByTestId("right-rail-nav-chat"));
+    expect(handleToggleRightPane).toHaveBeenCalledTimes(1);
   });
 
   it("always displays window controls vertically (Exit -> Maximise/Restore -> Minimize) in both expanded and compact states", () => {
@@ -254,6 +286,22 @@ describe("RightSidebar component", () => {
     expect(restoreBtn).toBeInTheDocument();
     fireEvent.click(restoreBtn);
     expect(handleToggleMaximizeApp).toHaveBeenCalledTimes(2);
+
+    // When in fullscreen immersive state, Restore FocusHUD button is ALSO present
+    const handleRestoreDown = vi.fn();
+    rerender(
+      <RightSidebar
+        width={68}
+        activeNav="home"
+        windowState="fullscreen"
+        isJoinedMode={true}
+        onClickRestoreDown={handleRestoreDown}
+      />
+    );
+    const restoreInFullscreenBtn = screen.getByTestId("window-btn-restore-down");
+    expect(restoreInFullscreenBtn).toBeInTheDocument();
+    fireEvent.click(restoreInFullscreenBtn);
+    expect(handleRestoreDown).toHaveBeenCalledTimes(1);
   });
 
   it("places timer components closer together on right rail and allows adjusting vertical position without swapping", () => {

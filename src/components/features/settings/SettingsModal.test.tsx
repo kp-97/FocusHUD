@@ -218,4 +218,40 @@ describe("SettingsModal component", () => {
     // Ensure transform remains unset (no inner DOM dragging)
     expect(modalContent.style.transform).toBe("");
   });
+
+  it("sets default popup height to 80% of the viewport and enables scrolling on the body", () => {
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const modalContent = screen.getByTestId("settings-modal-content");
+    expect(modalContent.style.height).toBe("80vh");
+
+    const scrollBody = screen.getByTestId("settings-scroll-body");
+    expect(scrollBody.className).toContain("overflow-y-auto");
+    expect(scrollBody.className).toContain("min-h-0");
+  });
+
+  it("allows resizing the popup settings window via the resize handle", () => {
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const modalContent = screen.getByTestId("settings-modal-content");
+    vi.spyOn(modalContent, "getBoundingClientRect").mockReturnValue({
+      width: 620,
+      height: 600,
+      top: 50,
+      left: 50,
+      right: 670,
+      bottom: 650,
+      x: 50,
+      y: 50,
+      toJSON: () => ({}),
+    });
+
+    const resizeHandle = screen.getByTestId("settings-modal-resize-handle");
+    fireEvent.pointerDown(resizeHandle, { clientX: 670, clientY: 650, pointerId: 1 });
+    fireEvent.pointerMove(resizeHandle, { clientX: 750, clientY: 720, pointerId: 1 });
+    fireEvent.pointerUp(resizeHandle, { clientX: 750, clientY: 720, pointerId: 1 });
+
+    expect(modalContent.style.width).toBe("700px");
+    expect(modalContent.style.height).toBe("670px");
+  });
 });

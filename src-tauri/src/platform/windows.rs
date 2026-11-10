@@ -48,22 +48,18 @@ pub fn configure_dock_windows(app: &tauri::AppHandle) {
         crate::monitor::init_original_work_area(orig_work);
         crate::monitor::spawn_watchdog(orig_work);
 
-        let left_w = crate::dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
-        let right_w = crate::dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
-
-        crate::dock::apply_dock_geometry(app, left_w, right_w);
-
-        let (phys_left, phys_right) = get_physical_dock_widths(app, left_w, right_w);
-        if crate::dock::PANES_RESERVE_ZONES.load(Ordering::Relaxed) {
-            crate::dock::update_dock_work_area(orig_work, phys_left, phys_right, true);
-        }
-
         if let Some(snap_win) = app.get_webview_window("snap-overlay") {
             if let Ok(hwnd) = snap_win.hwnd() {
                 let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
                 crate::dock::SNAP_OVERLAY_HWND.store(h as isize, Ordering::Relaxed);
             }
         }
+
+        let mon_w = (rc_monitor.right - rc_monitor.left) as f64;
+        let mon_h = (rc_monitor.bottom - rc_monitor.top) as f64;
+        let is_ultrawide = mon_h > 0.0 && (mon_w / mon_h) > (16.0 / 9.0 + 0.01);
+        let boot_state = if is_ultrawide { "split" } else { "maximised" };
+        let _ = set_window_state(app, boot_state);
     }
 }
 
@@ -123,6 +119,260 @@ pub fn set_panes_reserve_zones(app: &tauri::AppHandle, reserve: bool) -> Result<
     Ok(())
 }
 
+unsafe fn set_window_resizable_win32(h: windows_sys::Win32::Foundation::HWND, resizable: bool) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GWL_STYLE, GetWindowLongW, SetWindowLongW, WS_MAXIMIZEBOX, WS_THICKFRAME,
+    };
+    let style = unsafe { GetWindowLongW(h, GWL_STYLE) } as u32;
+    let new_style = if resizable {
+        style | WS_THICKFRAME
+    } else {
+        style & !(WS_THICKFRAME | WS_MAXIMIZEBOX)
+    };
+    if new_style != style {
+        unsafe {
+            SetWindowLongW(h, GWL_STYLE, new_style as i32);
+        }
+    }
+}
+
+pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), String> {
+    let prev = crate::dock::CURRENT_WINDOW_STATE.load(Ordering::Relaxed);
+    let was_split = prev == crate::dock::WINDOW_STATE_SPLIT;
+
+    match state {
+        "windowed" => {
+            crate::dock::CURRENT_WINDOW_STATE
+                .store(crate::dock::WINDOW_STATE_WINDOWED, Ordering::Relaxed);
+            crate::dock::FULLSCREEN_ACTIVE.store(true, Ordering::Relaxed);
+            crate::snap::hide_snap_overlay();
+
+            if was_split {
+                if let Some(w) = app.get_webview_window("left-dock") {
+                    let _ = w.hide();
+                }
+                if let Some(w) = app.get_webview_window("right-dock") {
+                    let _ = w.hide();
+                }
+                let _ = crate::monitor::restore_work_area();
+            }
+
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_always_on_top(false);
+                let _ = w.set_skip_taskbar(false);
+                let _ = w.set_resizable(true);
+                unsafe {
+                    let (_, rc_work) = crate::monitor::get_primary_monitor_rects();
+                    let work_w = rc_work.right - rc_work.left;
+                    let work_h = rc_work.bottom - rc_work.top;
+                    let win_w = ((work_w as f64) * 0.82).round() as i32;
+                    let win_h = ((work_h as f64) * 0.85).round() as i32;
+                    let win_x = rc_work.left + (work_w - win_w) / 2;
+                    let win_y = rc_work.top + (work_h - win_h) / 2;
+
+                    if let Ok(hwnd) = w.hwnd() {
+                        let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                        crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
+                        set_window_resizable_win32(h, true);
+                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                            h,
+                            windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
+                            win_x,
+                            win_y,
+                            win_w,
+                            win_h,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
+                        );
+                    } else {
+                        let _ = w.set_position(tauri::PhysicalPosition::new(win_x, win_y));
+                        let _ = w.set_size(tauri::PhysicalSize::new(win_w as u32, win_h as u32));
+                    }
+                }
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+        "maximised" => {
+            crate::dock::CURRENT_WINDOW_STATE
+                .store(crate::dock::WINDOW_STATE_MAXIMISED, Ordering::Relaxed);
+            crate::dock::FULLSCREEN_ACTIVE.store(true, Ordering::Relaxed);
+            crate::snap::hide_snap_overlay();
+
+            if was_split {
+                if let Some(w) = app.get_webview_window("left-dock") {
+                    let _ = w.hide();
+                }
+                if let Some(w) = app.get_webview_window("right-dock") {
+                    let _ = w.hide();
+                }
+                let _ = crate::monitor::restore_work_area();
+            }
+
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_always_on_top(false);
+                let _ = w.set_skip_taskbar(false);
+                let _ = w.set_resizable(false);
+                unsafe {
+                    let (_, rc_work) = crate::monitor::get_primary_monitor_rects();
+                    let work_left = rc_work.left;
+                    let work_top = rc_work.top;
+                    let work_width = rc_work.right - rc_work.left;
+                    let work_height = rc_work.bottom - rc_work.top;
+
+                    if let Ok(hwnd) = w.hwnd() {
+                        let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                        crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
+                        set_window_resizable_win32(h, false);
+                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                            h,
+                            windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
+                            work_left,
+                            work_top,
+                            work_width,
+                            work_height,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
+                        );
+                    } else {
+                        let _ = w.set_position(tauri::PhysicalPosition::new(work_left, work_top));
+                        let _ = w.set_size(tauri::PhysicalSize::new(
+                            work_width as u32,
+                            work_height as u32,
+                        ));
+                    }
+                }
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+        "fullscreen" => {
+            if prev != crate::dock::WINDOW_STATE_FULLSCREEN {
+                crate::dock::PRIOR_FULLSCREEN_STATE.store(prev, Ordering::Relaxed);
+            }
+            crate::dock::CURRENT_WINDOW_STATE
+                .store(crate::dock::WINDOW_STATE_FULLSCREEN, Ordering::Relaxed);
+            crate::dock::FULLSCREEN_ACTIVE.store(true, Ordering::Relaxed);
+            crate::snap::hide_snap_overlay();
+
+            if was_split {
+                if let Some(w) = app.get_webview_window("left-dock") {
+                    let _ = w.hide();
+                }
+                if let Some(w) = app.get_webview_window("right-dock") {
+                    let _ = w.hide();
+                }
+                let _ = crate::monitor::restore_work_area();
+            }
+
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_always_on_top(false);
+                let _ = w.set_skip_taskbar(false);
+                let _ = w.set_resizable(false);
+                unsafe {
+                    let (rc_monitor, _) = crate::monitor::get_primary_monitor_rects();
+                    let mon_left = rc_monitor.left;
+                    let mon_top = rc_monitor.top;
+                    let mon_width = rc_monitor.right - rc_monitor.left;
+                    let mon_height = rc_monitor.bottom - rc_monitor.top;
+
+                    if let Ok(hwnd) = w.hwnd() {
+                        let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                        crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
+                        set_window_resizable_win32(h, false);
+                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                            h,
+                            windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
+                            mon_left,
+                            mon_top,
+                            mon_width,
+                            mon_height,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
+                        );
+                    } else {
+                        let _ = w.set_position(tauri::PhysicalPosition::new(mon_left, mon_top));
+                        let _ = w.set_size(tauri::PhysicalSize::new(
+                            mon_width as u32,
+                            mon_height as u32,
+                        ));
+                    }
+                }
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+        "minimised" => {
+            crate::dock::CURRENT_WINDOW_STATE
+                .store(crate::dock::WINDOW_STATE_MINIMISED, Ordering::Relaxed);
+            crate::snap::hide_snap_overlay();
+
+            if let Some(w) = app.get_webview_window("left-dock") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("right-dock") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.hide();
+            }
+            let _ = crate::monitor::restore_work_area();
+        }
+        "split" => {
+            crate::dock::CURRENT_WINDOW_STATE
+                .store(crate::dock::WINDOW_STATE_SPLIT, Ordering::Relaxed);
+            crate::dock::FULLSCREEN_ACTIVE.store(false, Ordering::Relaxed);
+            crate::dock::MAIN_HWND.store(0, Ordering::Relaxed);
+            crate::snap::hide_snap_overlay();
+
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.hide();
+                if let Ok(hwnd) = w.hwnd() {
+                    let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                    unsafe {
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                            HWND_BOTTOM, SW_HIDE, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE,
+                            SWP_NOSIZE, SWP_NOZORDER, SetWindowPos, ShowWindow,
+                        };
+                        ShowWindow(h, SW_HIDE);
+                        SetWindowPos(
+                            h,
+                            HWND_BOTTOM,
+                            -32000,
+                            -32000,
+                            0,
+                            0,
+                            SWP_HIDEWINDOW
+                                | SWP_NOACTIVATE
+                                | SWP_NOMOVE
+                                | SWP_NOSIZE
+                                | SWP_NOZORDER,
+                        );
+                    }
+                }
+            }
+
+            // Invalidate cached clip regions so SetWindowRgn is guaranteed fresh on split
+            crate::dock::LAST_LEFT_REGION.store(-1, Ordering::Relaxed);
+            crate::dock::LAST_RIGHT_REGION.store(-1, Ordering::Relaxed);
+
+            if let Some(w) = app.get_webview_window("left-dock") {
+                let _ = w.show();
+            }
+            if let Some(w) = app.get_webview_window("right-dock") {
+                let _ = w.show();
+            }
+
+            let l_w = crate::dock::CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
+            let r_w = crate::dock::CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
+            crate::dock::apply_dock_geometry(app, l_w, r_w);
+            update_dock_work_area(app, l_w, r_w, true);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(), String> {
     crate::dock::FULLSCREEN_ACTIVE.store(fullscreen, Ordering::Relaxed);
     if fullscreen {
@@ -131,6 +381,8 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
 
     if fullscreen {
         if let Some(w) = app.get_webview_window("main") {
+            let _ = w.set_always_on_top(false);
+            let _ = w.set_skip_taskbar(false);
             unsafe {
                 let (rc_monitor, _) = crate::monitor::get_primary_monitor_rects();
                 let mon_left = rc_monitor.left;
@@ -143,7 +395,7 @@ pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(
                     crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
                     windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
                         h,
-                        windows_sys::Win32::UI::WindowsAndMessaging::HWND_TOPMOST,
+                        windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
                         mon_left,
                         mon_top,
                         mon_width,

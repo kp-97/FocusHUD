@@ -22,6 +22,10 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
     handleToggleRightPane,
     handleToggleBothPanes,
     handleLeftToggleCollapse,
+    handleClickFullscreen,
+    handleClickExitFullscreen,
+    handleClickSplit,
+    handleClickJoin,
     handleOpenSettings,
     handleLeftDragChange,
     handleLeftDragEnd,
@@ -34,11 +38,11 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
   return (
     <div
       data-testid="left-dock-app"
-      className="w-screen h-screen flex justify-start overflow-visible bg-transparent text-cyan-200 select-none relative font-hud"
+      className="w-screen h-screen flex justify-start overflow-visible bg-transparent text-cyan-200 select-none relative font-hud pointer-events-none"
     >
       <div
         style={{ width: `${leftWidth}px` }}
-        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0"
+        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0 pointer-events-auto"
       >
         <LeftSidebar
           width={leftWidth}
@@ -48,10 +52,16 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
           onSelectNav={setActiveNav}
           isCompact={leftWidth < 220}
           isDockMode={true}
+          isJoinedMode={false}
+          windowState="split"
           onToggleCollapse={handleLeftToggleCollapse}
           onToggleLeftPane={handleToggleLeftPane}
           onToggleRightPane={handleToggleRightPane}
           onToggleBothPanes={handleToggleBothPanes}
+          onClickFullscreen={handleClickFullscreen}
+          onClickExitFullscreen={handleClickExitFullscreen}
+          onClickSplit={handleClickSplit}
+          onClickJoin={handleClickJoin}
           onOpenSettings={handleOpenSettings}
         />
         <div className="absolute top-0 bottom-0 right-0 w-2.5 z-50">

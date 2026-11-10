@@ -13,6 +13,7 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
     leftWidth,
     rightWidth,
     activeNav,
+    setActiveNav,
     magneticSnap,
     isSettingsOpen,
     settingsTab,
@@ -23,6 +24,8 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
     handleRightToggleCollapse,
     handleMaximizePanes,
     isAppMaximized,
+    handleClickMaximise,
+    handleClickMinimise,
     handleToggleMaximizeApp,
     handleOpenSettings,
     handleRightDragChange,
@@ -36,11 +39,11 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
   return (
     <div
       data-testid="right-dock-app"
-      className="w-screen h-screen flex justify-end overflow-visible bg-transparent text-cyan-200 select-none relative font-hud"
+      className="w-screen h-screen flex justify-end overflow-visible bg-transparent text-cyan-200 select-none relative font-hud pointer-events-none"
     >
       <div
         style={{ width: `${rightWidth}px` }}
-        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0"
+        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0 pointer-events-auto"
       >
         <div className="absolute top-0 bottom-0 left-0 w-2.5 z-50">
           <ResizeHandle
@@ -59,8 +62,11 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
           width={rightWidth}
           leftWidth={leftWidth}
           activeNav={activeNav}
+          onSelectNav={setActiveNav}
           isCompact={rightWidth < 220}
           isDockMode={true}
+          isJoinedMode={false}
+          windowState="split"
           isAppMaximized={isAppMaximized}
           onExpand={handleRightToggleCollapse}
           onCollapse={handleRightToggleCollapse}
@@ -68,6 +74,8 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
           onToggleRightPane={handleToggleRightPane}
           onToggleBothPanes={handleToggleBothPanes}
           onToggleMaximizeApp={handleToggleMaximizeApp}
+          onClickMaximise={handleClickMaximise}
+          onClickMinimise={handleClickMinimise}
           onMaximizePanes={handleMaximizePanes}
           onOpenSettings={handleOpenSettings}
         />

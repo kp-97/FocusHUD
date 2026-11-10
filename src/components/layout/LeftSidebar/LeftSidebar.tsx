@@ -11,13 +11,22 @@ import {
   Menu,
   Settings,
   FileText,
+  Maximize2,
+  Minimize2,
+  Columns2,
+  Combine,
 } from "lucide-react";
 import { HudBrackets } from "../../ui/HudBrackets";
-import { SidebarToggleIcon } from "../../ui/SidebarToggleIcon";
 import { getSystemDiagnostics, setDockPopoutMode } from "../../../services/tauriBridge";
 import type { SystemDiagnostics } from "../../../types/diagnostics";
-import { broadcastNavChange, loadNavConfig, subscribeLayoutAction } from "../../../stores/layoutStore";
-import { NavViewId, NavItemConfig } from "../../../types/hud";
+import {
+  broadcastNavChange,
+  loadNavConfig,
+  reorderNavConfig,
+  getNavItemRail,
+  subscribeLayoutAction,
+} from "../../../stores/layoutStore";
+import { NavViewId, NavItemConfig, WindowModeState } from "../../../types/hud";
 import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
 import { useTheme } from "../../../stores/themeStore";
@@ -33,7 +42,7 @@ import { KanbanView } from "../../views/KanbanView";
 import { ActionPlansView } from "../../views/ActionPlansView";
 import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
 
-const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
+export const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,
   chat: MessageSquare,
   calendar: Calendar,
@@ -51,12 +60,18 @@ interface LeftSidebarProps {
   onSelectNav: (id: string) => void;
   isCompact?: boolean;
   isDockMode?: boolean;
+  isJoinedMode?: boolean;
+  windowState?: WindowModeState;
   leftWidth?: number;
   rightWidth?: number;
   onToggleCollapse?: () => void;
   onToggleLeftPane?: () => void;
   onToggleRightPane?: () => void;
   onToggleBothPanes?: () => void;
+  onClickFullscreen?: () => void;
+  onClickExitFullscreen?: () => void;
+  onClickSplit?: () => void;
+  onClickJoin?: () => void;
   onOpenSettings?: (tab?: string) => void;
 }
 
@@ -65,12 +80,18 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   activeNav,
   onSelectNav,
   isDockMode = false,
+  isJoinedMode = false,
+  windowState,
   leftWidth,
   rightWidth: _rightWidth,
   onToggleCollapse,
   onToggleLeftPane,
   onToggleRightPane: _onToggleRightPane,
   onToggleBothPanes: _onToggleBothPanes,
+  onClickFullscreen,
+  onClickExitFullscreen,
+  onClickSplit,
+  onClickJoin,
   onOpenSettings,
 }) => {
   const { themeConfig } = useTheme();
@@ -146,6 +167,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   }, []);
 
   const [navItems, setNavItems] = useState<NavItemConfig[]>(() => loadNavConfig());
+  const [draggedNavId, setDraggedNavId] = useState<NavViewId | null>(null);
+  const [dragOverNavId, setDragOverNavId] = useState<NavViewId | null>(null);
+  const draggedNavIdRef = useRef<NavViewId | null>(null);
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -175,6 +199,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     const unsub = subscribeLayoutAction((action) => {
       if (action.type === "SET_ACTIVE_NAV" && action.nav !== activeNav) {
         onSelectNav(action.nav);
+      } else if (action.type === "NAV_CONFIG_CHANGE") {
+        setNavItems(action.config);
       }
     });
     return () => unsub();
@@ -261,8 +287,65 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   };
 
   const handleNavClick = (id: string) => {
-    onSelectNav(id);
-    broadcastNavChange(id as NavViewId);
+    if (isJoinedMode) {
+      onSelectNav(id);
+      broadcastNavChange(id as NavViewId);
+      return;
+    }
+
+    const hasToggle = Boolean(onToggleLeftPane || onToggleCollapse);
+    if (isLeftCollapsed) {
+      onSelectNav(id);
+      broadcastNavChange(id as NavViewId);
+      if (hasToggle) {
+        handleToggleLeft();
+      }
+    } else if (activeNav === id && hasToggle) {
+      handleToggleLeft();
+    } else {
+      onSelectNav(id);
+      broadcastNavChange(id as NavViewId);
+    }
+  };
+
+  const handleNavDragStart = (e: React.DragEvent, id: NavViewId) => {
+    draggedNavIdRef.current = id;
+    setDraggedNavId(id);
+    try {
+      e.dataTransfer.setData("text/plain", id);
+      e.dataTransfer.effectAllowed = "move";
+    } catch {}
+  };
+
+  const handleNavDragOver = (e: React.DragEvent, targetId?: NavViewId) => {
+    e.preventDefault();
+    if (targetId && targetId !== dragOverNavId) {
+      setDragOverNavId(targetId);
+    }
+  };
+
+  const handleNavDrop = (e: React.DragEvent, targetId?: NavViewId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    let sourceId = draggedNavIdRef.current;
+    if (!sourceId) {
+      try {
+        const transferred = e.dataTransfer.getData("text/plain") as NavViewId;
+        if (transferred) sourceId = transferred;
+      } catch {}
+    }
+    setDraggedNavId(null);
+    setDragOverNavId(null);
+    draggedNavIdRef.current = null;
+    if (!sourceId) return;
+    const next = reorderNavConfig(navItems, sourceId, targetId ?? null, "left");
+    setNavItems(next);
+  };
+
+  const handleNavDragEnd = () => {
+    setDraggedNavId(null);
+    setDragOverNavId(null);
+    draggedNavIdRef.current = null;
   };
 
   return (
@@ -295,9 +378,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <div className="absolute -bottom-[2px] -right-[2px] w-3 h-3 border-b-2 border-r-2 border-cyan-400 pointer-events-none z-20" />
           <div className="absolute bottom-1 right-1 w-1 h-1 bg-cyan-400/80 pointer-events-none z-20" />
 
-          {/* Top Rail Header: Fixed Hamburger Menu + Toggles underneath */}
+          {/* Top Rail Header: Fixed Hamburger Menu -> Fullscreen / Exit Fullscreen -> Split / Join */}
           <div className="shrink-0 flex flex-col items-center w-full border-b border-cyan-500/30 pb-1.5 mb-1 gap-1">
-            {/* 1. Hamburger Menu replacing old toggle, fixed at top of rail */}
             <Tooltip content="System Menu" side="right" theme="cyan" disabled={isMenuOpen}>
               <button
                 ref={menuBtnRef}
@@ -316,15 +398,77 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               </button>
             </Tooltip>
 
-            {/* 2. Left Pane Toggle fixed underneath hamburger */}
-            <div className="flex flex-col items-center gap-1 w-full pt-0.5">
-              <SidebarToggleIcon
-                side="left"
-                isCollapsed={isLeftCollapsed}
-                onToggle={handleToggleLeft}
-                theme="cyan"
-              />
-            </div>
+            {/* Fullscreen / Exit Fullscreen (fixed directly underneath Hamburger) */}
+            <Tooltip
+              content={
+                windowState === "fullscreen"
+                  ? "Exit Fullscreen (F11)"
+                  : "Fullscreen (F11)"
+              }
+              side="right"
+              theme="cyan"
+            >
+              <button
+                onClick={
+                  windowState === "fullscreen"
+                    ? onClickExitFullscreen
+                    : onClickFullscreen
+                }
+                data-testid={
+                  windowState === "fullscreen"
+                    ? "window-btn-exit-fullscreen"
+                    : "window-btn-fullscreen"
+                }
+                aria-label={
+                  windowState === "fullscreen"
+                    ? "Exit Fullscreen"
+                    : "Fullscreen"
+                }
+                className="w-8 h-8 flex items-center justify-center rounded text-cyan-400/70 hover:text-cyan-200 hover:bg-cyan-500/10 hover:scale-110 transition cursor-pointer"
+              >
+                {windowState === "fullscreen" ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </button>
+            </Tooltip>
+
+            {/* Split / Join (fixed directly underneath Fullscreen / Exit Fullscreen) */}
+            <Tooltip
+              content={
+                isJoinedMode || (windowState && windowState !== "split")
+                  ? "Split Mode"
+                  : "Join Mode"
+              }
+              side="right"
+              theme="cyan"
+            >
+              <button
+                onClick={
+                  isJoinedMode || (windowState && windowState !== "split")
+                    ? onClickSplit
+                    : onClickJoin
+                }
+                data-testid={
+                  isJoinedMode || (windowState && windowState !== "split")
+                    ? "window-btn-split"
+                    : "window-btn-join"
+                }
+                aria-label={
+                  isJoinedMode || (windowState && windowState !== "split")
+                    ? "Split FocusHUD"
+                    : "Join FocusHUD"
+                }
+                className="w-8 h-8 flex items-center justify-center rounded text-cyan-400/70 hover:text-cyan-200 hover:bg-cyan-500/10 hover:scale-110 transition cursor-pointer"
+              >
+                {isJoinedMode || (windowState && windowState !== "split") ? (
+                  <Columns2 className="w-4 h-4" />
+                ) : (
+                  <Combine className="w-4 h-4" />
+                )}
+              </button>
+            </Tooltip>
           </div>
 
           {/* Hamburger Popout Menu */}
@@ -335,23 +479,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             onOpenSettings={onOpenSettings}
           />
 
-          {/* Center Navigation Icons (Vertically fixed, icon-only, located under the line) */}
-          <div className="flex-1 flex flex-col gap-1 items-center justify-start w-full min-h-0 pt-0.5 pb-1 overflow-y-auto overflow-x-hidden">
+          {/* Center Navigation Icons (Draggable to reorder, icon-only, located under the line) */}
+          <div
+            data-testid="left-rail-nav-list"
+            onDragOver={(e) => handleNavDragOver(e)}
+            onDrop={(e) => handleNavDrop(e)}
+            className="flex-1 flex flex-col gap-1 items-center justify-start w-full min-h-0 pt-0.5 pb-1 overflow-y-auto overflow-x-hidden"
+          >
             {navItems
-              .filter((item) => item.visible)
+              .filter((item) => item.visible && getNavItemRail(item) === "left")
               .map((item) => {
                 const IconComponent = NAV_ICON_MAP[item.id] || Home;
-                const isActive = activeNav === item.id;
+                const isActive = isJoinedMode
+                  ? activeNav === item.id
+                  : !isLeftCollapsed && activeNav === item.id;
+                const isDragging = draggedNavId === item.id;
+                const isDragOver = dragOverNavId === item.id && draggedNavId !== item.id;
                 return (
                   <Tooltip key={item.id} content={item.label} side="right" theme="cyan">
                     <button
+                      draggable={true}
+                      onDragStart={(e) => handleNavDragStart(e, item.id)}
+                      onDragOver={(e) => handleNavDragOver(e, item.id)}
+                      onDrop={(e) => handleNavDrop(e, item.id)}
+                      onDragEnd={handleNavDragEnd}
                       onClick={() => handleNavClick(item.id)}
                       data-testid={`left-rail-nav-${item.id}`}
                       aria-label={item.label}
-                      className={`w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer ${
+                      className={`w-8 h-8 flex items-center justify-center rounded transition-all cursor-grab active:cursor-grabbing ${
                         isActive
                           ? "bg-cyan-500/20 text-cyan-200 border border-cyan-400 shadow-[0_0_8px_rgba(0,229,255,0.4)]"
                           : "text-cyan-400/60 hover:text-cyan-200 hover:bg-cyan-500/10"
+                      } ${isDragging ? "opacity-50 scale-95" : ""} ${
+                        isDragOver ? "border-t-2 border-cyan-300" : ""
                       }`}
                     >
                       <IconComponent className="w-4 h-4" />
