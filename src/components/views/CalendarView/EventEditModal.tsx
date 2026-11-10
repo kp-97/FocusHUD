@@ -1,7 +1,12 @@
-import React, { useState, useRef, useEffect } from "react";
-import { X, Trash2, Clock, MapPin, AlignLeft, FileText, Plus, Check, RotateCw, ChevronDown, Search } from "lucide-react";
+import React, { useState } from "react";
+import { X, Trash2, Clock, MapPin, AlignLeft, RotateCw, ChevronDown } from "lucide-react";
 import { CalendarEvent, NoteItem } from "../../../types/hud";
 import { formatTime12 } from "../../../utils/calendarFormatters";
+import { formatDateToISO } from "../../../utils/formatters";
+import { EventNotesSection } from "./EventNotesSection";
+import { EventCustomRecurrenceModal, CustomRecurrenceConfig } from "./EventCustomRecurrenceModal";
+
+export type { CustomRecurrenceConfig };
 
 interface EventEditModalProps {
   initialEvent?: Partial<CalendarEvent>;
@@ -13,16 +18,6 @@ interface EventEditModalProps {
   onNavigateToNote?: (noteId: string) => void;
 }
 
-export interface CustomRecurrenceConfig {
-  interval: number;
-  unit: "day" | "week" | "month" | "year";
-  daysOfWeek: number[]; // 0 = Mon, 6 = Sun
-  endType: "never" | "on" | "after";
-  endDate?: string;
-  occurrences?: number;
-}
-
-const DAYS_SHORT = ["M", "T", "W", "T", "F", "S", "S"];
 
 export const EventEditModal: React.FC<EventEditModalProps> = ({
   initialEvent,
@@ -36,7 +31,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
   const isEditing = Boolean(initialEvent?.id);
 
   const [title, setTitle] = useState(initialEvent?.title || "");
-  const [date, setDate] = useState(initialEvent?.date || new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(initialEvent?.date || formatDateToISO());
   const [startTime, setStartTime] = useState(initialEvent?.startTime || "09:00");
   const [endTime, setEndTime] = useState(initialEvent?.endTime || "10:00");
   const [isAllDay, setIsAllDay] = useState(Boolean(initialEvent?.isAllDay));
@@ -57,7 +52,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
   const [endDate, setEndDate] = useState<string>(() => {
     const d = new Date(date);
     d.setMonth(d.getMonth() + 3);
-    return d.toISOString().split("T")[0];
+    return formatDateToISO(d);
   });
   const [occurrences, setOccurrences] = useState<number>(13);
 
@@ -69,23 +64,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
       .map((n) => n.id);
   });
 
-  // Note search & combobox dropdown state
-  const [noteSearchQuery, setNoteSearchQuery] = useState("");
-  const [isNoteDropdownOpen, setIsNoteDropdownOpen] = useState(false);
-  const noteSearchContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        noteSearchContainerRef.current &&
-        !noteSearchContainerRef.current.contains(e.target as Node)
-      ) {
-        setIsNoteDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, []);
 
   // Get dynamic recurrence label for the current date
   const eventDateObj = new Date(date + "T00:00:00");
@@ -132,27 +110,11 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
     onSave(eventToSave, selectedNoteIds);
   };
 
-  const handleCreateAndAttachNote = (titleToCreate?: string) => {
-    const rawTitle = titleToCreate ?? noteSearchQuery;
-    if (!rawTitle.trim() || !onCreateNote) return;
-    const created = onCreateNote(rawTitle.trim(), initialEvent?.id);
-    setSelectedNoteIds((prev) => [...prev, created.id]);
-    setNoteSearchQuery("");
-    setIsNoteDropdownOpen(false);
-  };
-
   const toggleAttachNote = (noteId: string) => {
     setSelectedNoteIds((prev) =>
       prev.includes(noteId) ? prev.filter((id) => id !== noteId) : [...prev, noteId]
     );
   };
-
-  const filteredNotes = availableNotes.filter((n) =>
-    n.title.toLowerCase().includes(noteSearchQuery.trim().toLowerCase())
-  );
-  const exactMatchExists = availableNotes.some(
-    (n) => n.title.trim().toLowerCase() === noteSearchQuery.trim().toLowerCase()
-  );
 
   const handleApplyCustomRecurrence = () => {
     const config: CustomRecurrenceConfig = {
@@ -381,162 +343,15 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
             </div>
           </div>
 
-          {/* Linked Notes Section (Approach C: Combined Search + Instant Quick Create Dropdown) */}
-          <div className="border-t border-cyan-500/15 pt-2 flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-cyan-400 font-medium">
-              <FileText className="w-3.5 h-3.5" />
-              <span>Attached Notes</span>
-              {selectedNoteIds.length > 0 && (
-                <span className="text-[10px] text-cyan-500/70 font-mono">
-                  ({selectedNoteIds.length})
-                </span>
-              )}
-            </div>
-
-            {/* Attached Notes Chips List */}
-            {selectedNoteIds.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto py-0.5">
-                {selectedNoteIds.map((id) => {
-                  const note = availableNotes.find((n) => n.id === id);
-                  const titleDisplay = note ? note.title : "Untitled Note";
-                  return (
-                    <div
-                      key={id}
-                      data-testid={`attached-note-chip-${id}`}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-[11px] font-tech text-cyan-200 shadow-[0_0_6px_rgba(0,229,255,0.15)] group"
-                    >
-                      <span
-                        className={`truncate max-w-[130px] ${
-                          onNavigateToNote ? "cursor-pointer hover:underline text-cyan-100" : ""
-                        }`}
-                        title={onNavigateToNote ? "Click to jump to note" : undefined}
-                        onClick={() => onNavigateToNote && onNavigateToNote(id)}
-                      >
-                        {titleDisplay}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => toggleAttachNote(id)}
-                        title="Remove note"
-                        data-testid={`remove-attached-note-${id}`}
-                        className="p-0.5 rounded-full hover:bg-cyan-500/30 text-cyan-400 hover:text-cyan-100 cursor-pointer transition"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Search Box with Live Dropdown & Instant Quick-Create */}
-            <div ref={noteSearchContainerRef} className="relative">
-              <div className="flex items-center gap-1.5 bg-[#03070d] border border-cyan-500/30 focus-within:border-cyan-400 rounded px-2 py-1.5 text-xs text-cyan-200 transition">
-                <Search className="w-3.5 h-3.5 text-cyan-500/60 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search existing notes or type to create..."
-                  data-testid="note-search-input"
-                  value={noteSearchQuery}
-                  onFocus={() => setIsNoteDropdownOpen(true)}
-                  onChange={(e) => {
-                    setNoteSearchQuery(e.target.value);
-                    setIsNoteDropdownOpen(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      if (noteSearchQuery.trim()) {
-                        // If exact match exists, toggle it; otherwise create new note
-                        const match = availableNotes.find(
-                          (n) => n.title.trim().toLowerCase() === noteSearchQuery.trim().toLowerCase()
-                        );
-                        if (match) {
-                          toggleAttachNote(match.id);
-                          setNoteSearchQuery("");
-                          setIsNoteDropdownOpen(false);
-                        } else {
-                          handleCreateAndAttachNote();
-                        }
-                      }
-                    } else if (e.key === "Escape") {
-                      setIsNoteDropdownOpen(false);
-                    }
-                  }}
-                  className="flex-1 bg-transparent outline-none placeholder:text-cyan-500/40 text-xs"
-                />
-                {noteSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setNoteSearchQuery("")}
-                    className="p-0.5 rounded hover:bg-cyan-500/20 text-cyan-500/60 hover:text-cyan-300 cursor-pointer"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-
-              {/* Dropdown Menu below search input */}
-              {isNoteDropdownOpen && (
-                <div
-                  data-testid="note-search-dropdown"
-                  className="absolute left-0 right-0 top-full mt-1 z-30 max-h-48 overflow-y-auto rounded-lg bg-[#071322] border border-cyan-500/40 shadow-[0_12px_28px_rgba(0,0,0,0.85)] flex flex-col p-1 text-xs animate-in fade-in zoom-in-95 duration-100"
-                >
-                  {/* Quick-create row when typing a new note title */}
-                  {noteSearchQuery.trim() && !exactMatchExists && onCreateNote && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateAndAttachNote()}
-                      data-testid="note-quick-create-btn"
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded text-left font-tech text-cyan-200 hover:bg-cyan-500/20 transition cursor-pointer border-b border-cyan-500/20 mb-1"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span className="truncate">
-                        Create & attach <span className="font-semibold text-cyan-100">"{noteSearchQuery.trim()}"</span>
-                      </span>
-                    </button>
-                  )}
-
-                  {/* Filtered list of existing notes */}
-                  {filteredNotes.length > 0 ? (
-                    filteredNotes.map((note) => {
-                      const isAttached = selectedNoteIds.includes(note.id);
-                      return (
-                        <button
-                          key={note.id}
-                          type="button"
-                          onClick={() => {
-                            toggleAttachNote(note.id);
-                            setNoteSearchQuery("");
-                          }}
-                          data-testid={`attach-note-option-${note.id}`}
-                          className={`flex items-center justify-between px-2.5 py-1.5 rounded text-left transition cursor-pointer ${
-                            isAttached
-                              ? "bg-cyan-500/20 text-cyan-100 font-medium"
-                              : "text-cyan-300 hover:bg-cyan-500/10 hover:text-cyan-100"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <FileText className="w-3.5 h-3.5 text-cyan-400/70 shrink-0" />
-                            <span className="truncate">{note.title || "Untitled Note"}</span>
-                          </div>
-                          {isAttached && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-2" />}
-                        </button>
-                      );
-                    })
-                  ) : !noteSearchQuery.trim() ? (
-                    <div className="px-3 py-2 text-[11px] text-cyan-500/50 italic text-center">
-                      No notes available. Type above to create one.
-                    </div>
-                  ) : exactMatchExists ? null : (
-                    <div className="px-3 py-1.5 text-[11px] text-cyan-500/60 italic text-center">
-                      Press Enter to create this note.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Linked Notes Section */}
+          <EventNotesSection
+            availableNotes={availableNotes}
+            selectedNoteIds={selectedNoteIds}
+            onToggleAttachNote={toggleAttachNote}
+            onCreateNote={onCreateNote}
+            onNavigateToNote={onNavigateToNote}
+            calendarEventId={initialEvent?.id}
+          />
 
           {/* Form Action Buttons */}
           <div className="flex items-center justify-end gap-2 border-t border-cyan-500/20 pt-3 mt-1">
@@ -559,147 +374,23 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         </form>
 
         {/* Custom Recurrence Modal Overlay */}
-        {isCustomRecurrenceOpen && (
-          <div
-            data-testid="custom-recurrence-overlay"
-            className="absolute inset-0 z-50 rounded-xl bg-[#071322] border border-cyan-400/60 p-4 shadow-[0_12px_36px_rgba(0,0,0,0.9)] flex flex-col justify-between font-hud"
-          >
-            <div>
-              <h2 className="text-sm font-orbitron font-semibold text-cyan-100 mb-4 tracking-wide">
-                Custom recurrence
-              </h2>
-
-              {/* Repeat every N [unit] */}
-              <div className="flex items-center gap-2 mb-4 text-xs">
-                <span>Repeat every</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  data-testid="custom-interval-input"
-                  value={customInterval}
-                  onChange={(e) => setCustomInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="w-12 bg-[#03070d] border border-cyan-500/40 rounded px-2 py-1 text-center text-cyan-100"
-                />
-                <select
-                  data-testid="custom-unit-select"
-                  value={customUnit}
-                  onChange={(e) => setCustomUnit(e.target.value as any)}
-                  className="bg-[#03070d] border border-cyan-500/40 rounded px-2 py-1 text-cyan-200 outline-none"
-                >
-                  <option value="day">day{customInterval > 1 ? "s" : ""}</option>
-                  <option value="week">week{customInterval > 1 ? "s" : ""}</option>
-                  <option value="month">month{customInterval > 1 ? "s" : ""}</option>
-                  <option value="year">year{customInterval > 1 ? "s" : ""}</option>
-                </select>
-              </div>
-
-              {/* Repeat on (days of week) when unit is week */}
-              {customUnit === "week" && (
-                <div className="mb-4">
-                  <span className="block text-xs text-cyan-400/80 mb-2">Repeat on</span>
-                  <div className="flex items-center gap-1.5">
-                    {DAYS_SHORT.map((dayLabel, idx) => {
-                      const isSelected = customDays.includes(idx);
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => toggleCustomDay(idx)}
-                          data-testid={`custom-day-${idx}`}
-                          className={`w-7 h-7 rounded-full text-xs font-semibold flex items-center justify-center transition cursor-pointer ${
-                            isSelected
-                              ? "bg-cyan-500 text-black shadow-[0_0_8px_#00e5ff]"
-                              : "bg-[#03070d] text-cyan-400/60 border border-cyan-500/20 hover:text-cyan-200"
-                          }`}
-                        >
-                          {dayLabel}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Ends configuration */}
-              <div className="flex flex-col gap-2.5 text-xs">
-                <span className="text-cyan-400/80">Ends</span>
-
-                {/* Never */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="endType"
-                    checked={endType === "never"}
-                    onChange={() => setEndType("never")}
-                    className="text-cyan-500 focus:ring-0 bg-[#03070d]"
-                  />
-                  <span>Never</span>
-                </label>
-
-                {/* On [Date] */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="endType"
-                    checked={endType === "on"}
-                    onChange={() => setEndType("on")}
-                    className="text-cyan-500 focus:ring-0 bg-[#03070d]"
-                  />
-                  <span>On</span>
-                  <input
-                    type="date"
-                    disabled={endType !== "on"}
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="bg-[#03070d] border border-cyan-500/30 rounded px-2 py-0.5 text-cyan-200 outline-none disabled:opacity-40"
-                  />
-                </label>
-
-                {/* After N occurrences */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="endType"
-                    checked={endType === "after"}
-                    onChange={() => setEndType("after")}
-                    className="text-cyan-500 focus:ring-0 bg-[#03070d]"
-                  />
-                  <span>After</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={999}
-                    disabled={endType !== "after"}
-                    value={occurrences}
-                    onChange={(e) => setOccurrences(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-14 bg-[#03070d] border border-cyan-500/30 rounded px-2 py-0.5 text-center text-cyan-200 outline-none disabled:opacity-40"
-                  />
-                  <span>occurrences</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-cyan-500/20">
-              <button
-                type="button"
-                onClick={() => setIsCustomRecurrenceOpen(false)}
-                className="px-3 py-1 rounded-full text-xs text-cyan-400/80 hover:text-cyan-100 hover:bg-cyan-500/10 transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyCustomRecurrence}
-                data-testid="custom-recurrence-done-btn"
-                className="px-4 py-1 rounded-full text-xs font-semibold bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_12px_rgba(0,229,255,0.4)] transition cursor-pointer"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        )}
+        <EventCustomRecurrenceModal
+          isOpen={isCustomRecurrenceOpen}
+          interval={customInterval}
+          unit={customUnit}
+          daysOfWeek={customDays}
+          endType={endType}
+          endDate={endDate}
+          occurrences={occurrences}
+          onChangeInterval={setCustomInterval}
+          onChangeUnit={setCustomUnit}
+          onToggleDay={toggleCustomDay}
+          onChangeEndType={setEndType}
+          onChangeEndDate={setEndDate}
+          onChangeOccurrences={setOccurrences}
+          onCancel={() => setIsCustomRecurrenceOpen(false)}
+          onDone={handleApplyCustomRecurrence}
+        />
       </div>
     </div>
   );
