@@ -1,3 +1,7 @@
+import { flattenTreeTo3D } from "./tree3DLayout";
+import { project3DTo2D } from "./tree3DCamera";
+import { renderGrid, renderConnections, renderNodes } from "./tree3DDrawing";
+
 export interface TreeNode3D {
   id: string;
   title: string;
@@ -83,64 +87,7 @@ export class Tree3DRenderer {
    * Flatten nested tree nodes into 3D spatial cylindrical coordinates.
    */
   public static flattenTreeTo3D(nodes: TreeNode3D[]): SpatialNode[] {
-    const result: SpatialNode[] = [];
-
-    const traverse = (
-      itemList: TreeNode3D[],
-      parentId: string | null,
-      depth: number,
-      centerX: number,
-      centerY: number,
-      centerZ: number,
-      angleSpread: number,
-      startAngle: number
-    ) => {
-      const count = itemList.length;
-      if (count === 0) return;
-
-      const angleStep = count > 1 ? angleSpread / (count - 1) : 0;
-      const radius = 90 + depth * 35;
-
-      itemList.forEach((item, idx) => {
-        let x = centerX;
-        let y = centerY;
-        let z = centerZ;
-
-        if (depth === 0) {
-          // Place root nodes along circle
-          const a = (idx / Math.max(1, count)) * Math.PI * 2;
-          x = Math.cos(a) * 75;
-          z = Math.sin(a) * 75;
-          y = -40;
-        } else {
-          // Spread child nodes downward in cone
-          const a = startAngle + (idx - (count - 1) / 2) * (angleStep || 0.6);
-          x = centerX + Math.cos(a) * radius * 0.7;
-          z = centerZ + Math.sin(a) * radius * 0.7;
-          y = centerY + 55;
-        }
-
-        const spatial: SpatialNode = {
-          id: item.id,
-          title: item.title,
-          completed: !!item.completed,
-          x,
-          y,
-          z,
-          parentId,
-          depth,
-        };
-
-        result.push(spatial);
-
-        if (item.children && item.children.length > 0) {
-          traverse(item.children, item.id, depth + 1, x, y, z, Math.PI * 0.9, Math.atan2(z, x));
-        }
-      });
-    };
-
-    traverse(nodes, null, 0, 0, -40, 0, Math.PI * 2, 0);
-    return result;
+    return flattenTreeTo3D(nodes);
   }
 
   /**
@@ -294,34 +241,17 @@ export class Tree3DRenderer {
     width: number,
     height: number
   ): { px: number; py: number; scale: number; zOrder: number } | null {
-    const cx = width / 2;
-    const cy = height / 2 + 10;
-    const fov = 320 * this.zoom;
-    const camDist = 280;
-
-    // Rotate around Y axis (yaw: clockwise/anticlockwise)
-    const cosY = Math.cos(this.currentYaw);
-    const sinY = Math.sin(this.currentYaw);
-    const x1 = x * cosY - z * sinY;
-    const z1 = x * sinY + z * cosY;
-
-    // Rotate around X axis (pitch: vertical tilt) centered on focused node's level
-    const shiftedY = y - this.currentCamCenterY;
-    const cosP = Math.cos(this.pitch);
-    const sinP = Math.sin(this.pitch);
-    const y2 = shiftedY * cosP - z1 * sinP;
-    const z2 = shiftedY * sinP + z1 * cosP;
-
-    const distance = z2 + camDist;
-    if (distance <= 10) return null;
-
-    const scale = fov / distance;
-    return {
-      px: cx + x1 * scale,
-      py: cy + y2 * scale,
-      scale,
-      zOrder: distance,
-    };
+    return project3DTo2D(
+      x,
+      y,
+      z,
+      width,
+      height,
+      this.currentYaw,
+      this.pitch,
+      this.currentCamCenterY,
+      this.zoom
+    );
   }
 
   /**
@@ -485,194 +415,28 @@ export class Tree3DRenderer {
 
       ctx.clearRect(0, 0, width, height);
 
+      const projectFn = (x: number, y: number, z: number, w: number, h: number) =>
+        this.project(x, y, z, w, h);
+
       // Cyberpunk Wireframe Grid Floor
-      this.renderGrid(ctx, width, height);
+      renderGrid(ctx, width, height, projectFn);
 
       // Laser Connections
-      this.renderConnections(ctx, width, height);
+      renderConnections(ctx, width, height, this.spatialNodes, this.activeNodeId, projectFn);
 
       // Render 3D Nodes
-      this.renderNodes(ctx, width, height);
+      this.projectedNodes = renderNodes(
+        ctx,
+        width,
+        height,
+        this.spatialNodes,
+        this.activeNodeId,
+        this.hoveredNode,
+        this.accentColor,
+        projectFn
+      );
     }
 
     this.animId = requestAnimationFrame(this.renderLoop);
   };
-
-  private renderGrid(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    ctx.strokeStyle = "rgba(0, 229, 255, 0.08)";
-    ctx.lineWidth = 1;
-    const gridSize = 160;
-    const gridStep = 40;
-
-    for (let gx = -gridSize; gx <= gridSize; gx += gridStep) {
-      const p1 = this.project(gx, 110, -gridSize, width, height);
-      const p2 = this.project(gx, 110, gridSize, width, height);
-      if (p1 && p2) {
-        ctx.beginPath();
-        ctx.moveTo(p1.px, p1.py);
-        ctx.lineTo(p2.px, p2.py);
-        ctx.stroke();
-      }
-    }
-    for (let gz = -gridSize; gz <= gridSize; gz += gridStep) {
-      const p1 = this.project(-gridSize, 110, gz, width, height);
-      const p2 = this.project(gridSize, 110, gz, width, height);
-      if (p1 && p2) {
-        ctx.beginPath();
-        ctx.moveTo(p1.px, p1.py);
-        ctx.lineTo(p2.px, p2.py);
-        ctx.stroke();
-      }
-    }
-  }
-
-  private renderConnections(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number
-  ): void {
-    const nodeMap = new Map<string, SpatialNode>();
-    this.spatialNodes.forEach((n) => nodeMap.set(n.id, n));
-
-    this.spatialNodes.forEach((node) => {
-      if (!node.parentId) return;
-      const parent = nodeMap.get(node.parentId);
-      if (!parent) return;
-
-      const p1 = this.project(parent.x, parent.y, parent.z, width, height);
-      const p2 = this.project(node.x, node.y, node.z, width, height);
-
-      if (p1 && p2) {
-        const isLineActive =
-          this.activeNodeId === node.id || this.activeNodeId === parent.id;
-
-        ctx.beginPath();
-        ctx.moveTo(p1.px, p1.py);
-        ctx.lineTo(p2.px, p2.py);
-
-        // Glowing laser line
-        ctx.strokeStyle = isLineActive
-          ? "rgba(255, 179, 0, 0.65)"
-          : node.completed
-          ? "rgba(0, 230, 118, 0.45)"
-          : "rgba(0, 229, 255, 0.35)";
-        ctx.lineWidth = Math.max(1, (isLineActive ? 2.4 : 1.6) * p2.scale);
-        ctx.stroke();
-
-        // Animated pulses along lines
-        const pulseT = (Date.now() % 2000) / 2000;
-        const pulseX = p1.px + (p2.px - p1.px) * pulseT;
-        const pulseY = p1.py + (p2.py - p1.py) * pulseT;
-        ctx.fillStyle = isLineActive
-          ? "#ffb300"
-          : node.completed
-          ? "#00e676"
-          : "#00e5ff";
-        ctx.beginPath();
-        ctx.arc(pulseX, pulseY, 2.2 * p2.scale, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-  }
-
-  private renderNodes(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number
-  ): void {
-    const projectedList: ProjectedNode[] = [];
-
-    this.spatialNodes.forEach((node) => {
-      const p = this.project(node.x, node.y, node.z, width, height);
-      if (p) {
-        const radius = Math.max(3.5, 7.5 * p.scale);
-        projectedList.push({
-          node,
-          px: p.px,
-          py: p.py,
-          scale: p.scale,
-          radius,
-          zOrder: p.zOrder,
-        });
-      }
-    });
-
-    // Painter's algorithm
-    projectedList.sort((a, b) => b.zOrder - a.zOrder);
-    this.projectedNodes = projectedList;
-
-    projectedList.forEach(({ node, px, py, radius, scale }) => {
-      const isHovered = this.hoveredNode?.id === node.id;
-      const isSelected = this.activeNodeId === node.id;
-      const isCompleted = node.completed;
-
-      // Outer glow
-      const glowColor = isSelected
-        ? "rgba(255, 179, 0, 0.85)"
-        : isHovered
-        ? "rgba(255, 215, 0, 0.6)"
-        : isCompleted
-        ? "rgba(0, 230, 118, 0.4)"
-        : "rgba(0, 229, 255, 0.4)";
-
-      ctx.fillStyle = glowColor;
-      ctx.beginPath();
-      ctx.arc(
-        px,
-        py,
-        radius * (isSelected ? 2.8 : isHovered ? 2.2 : 1.6),
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-
-      // Pulsing selection brackets on focused node
-      if (isSelected) {
-        ctx.strokeStyle = "#ffb300";
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.arc(px, py, radius + 5, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Outer reticle corners
-        const bSize = radius + 9;
-        ctx.strokeStyle = "rgba(255, 179, 0, 0.7)";
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(px - bSize, py - bSize, bSize * 2, bSize * 2);
-      }
-
-      // Node circle
-      ctx.fillStyle = isSelected
-        ? "#ffb300"
-        : isHovered
-        ? "#ffd700"
-        : isCompleted
-        ? "#00e676"
-        : this.accentColor;
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Inner core
-      ctx.fillStyle = "#03070d";
-      ctx.beginPath();
-      ctx.arc(px, py, radius * 0.45, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Node label
-      if (scale > 0.6 || isHovered || isSelected) {
-        ctx.font = `${isSelected || isHovered ? "bold " : ""}9.5px Orbitron, monospace`;
-        ctx.fillStyle = isSelected
-          ? "#fef08a"
-          : isCompleted
-          ? "#a7f3d0"
-          : "#bae6fd";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        const label =
-          node.title.length > 20 ? node.title.slice(0, 18) + "…" : node.title;
-        ctx.fillText(label, px, py + radius + 4);
-      }
-    });
-  }
 }
