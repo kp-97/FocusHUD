@@ -22,6 +22,10 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
     handleToggleRightPane,
     handleToggleBothPanes,
     handleLeftToggleCollapse,
+    handleClickFullscreen,
+    handleClickExitFullscreen,
+    handleClickSplit,
+    handleClickJoin,
     handleOpenSettings,
     handleLeftDragChange,
     handleLeftDragEnd,
@@ -48,10 +52,16 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
           onSelectNav={setActiveNav}
           isCompact={leftWidth < 220}
           isDockMode={true}
+          isJoinedMode={false}
+          windowState="split"
           onToggleCollapse={handleLeftToggleCollapse}
           onToggleLeftPane={handleToggleLeftPane}
           onToggleRightPane={handleToggleRightPane}
           onToggleBothPanes={handleToggleBothPanes}
+          onClickFullscreen={handleClickFullscreen}
+          onClickExitFullscreen={handleClickExitFullscreen}
+          onClickSplit={handleClickSplit}
+          onClickJoin={handleClickJoin}
           onOpenSettings={handleOpenSettings}
         />
         <div className="absolute top-0 bottom-0 right-0 w-2.5 z-50">

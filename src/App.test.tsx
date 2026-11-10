@@ -11,8 +11,9 @@ vi.mock("./services/tauriBridge", () => ({
   getSystemDiagnostics: vi.fn().mockResolvedValue(null),
   setDockPopoutMode: vi.fn(),
   exitApp: vi.fn(),
-  minimizeToTray: vi.fn(),
+  minimizeToTray: vi.fn().mockResolvedValue(true),
   setFullscreenMode: vi.fn().mockResolvedValue(true),
+  setWindowState: vi.fn().mockResolvedValue(true),
   setPanesReserveZonesMode: vi.fn().mockResolvedValue(true),
   getSnapOverlayState: vi.fn().mockResolvedValue(null),
   selectSnapAssistWindow: vi.fn().mockResolvedValue(null),
@@ -85,33 +86,26 @@ describe("App root window dispatcher", () => {
     expect(screen.queryByTestId("full-layout-app")).not.toBeInTheDocument();
   });
 
-  it("switches to full screen mode when clicking maximise and returns to docked mode when clicking restore", async () => {
+  it("starts in Windowed State (Default Open) inside Joined mode and transitions through Maximised, Fullscreen, and Split states", async () => {
     setLocationSearch("");
     render(<App />);
 
-    // Initially in docked mode: Center workspace is present, full screen view container is not
-    expect(screen.getByTestId("center-preview-container")).toBeInTheDocument();
-    expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
-
-    const maxBtn = screen.getByLabelText(/Maximize FocusHUD/i);
-    expect(maxBtn).toBeInTheDocument();
-
-    // Click Maximise button
-    await act(async () => {
-      maxBtn.click();
-    });
-
-    // In full screen mode:
-    // 1. Center workspace is replaced by full-screen view container (merging left & right panes)
+    // Starts in Windowed State (Default Open) inside Joined mode:
+    // Whole canvas view container is rendered; left and right pane toggles are removed
     expect(screen.getByTestId("full-screen-view-container")).toBeInTheDocument();
+    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
+      "data-window-state",
+      "windowed"
+    );
     expect(screen.queryByTestId("center-preview-container")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-toggle-left")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-toggle-right")).not.toBeInTheDocument();
 
-    // 2. Left and right rails are still on the left and right
-    expect(screen.getByLabelText("System Menu")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-toggle-left")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-toggle-right")).toBeInTheDocument();
+    // AI Chat button is on the right rail by default
+    expect(screen.getByTestId("right-rail-nav-chat")).toBeInTheDocument();
+    expect(screen.queryByTestId("left-rail-nav-chat")).not.toBeInTheDocument();
 
-    // Clicking a view on the left rail displays its full view version in the center space
+    // Clicking a view button in Joined mode renders the whole canvas
     const calendarBtn = screen.getByTestId("left-rail-nav-calendar");
     await act(async () => {
       calendarBtn.click();
@@ -119,18 +113,68 @@ describe("App root window dispatcher", () => {
     expect(screen.getByText("CALENDAR")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Today/i })).toBeInTheDocument();
 
-    // 3. Maximise button switches to Restore button
-    const restoreBtn = screen.getByLabelText(/Restore FocusHUD/i);
-    expect(restoreBtn).toBeInTheDocument();
-
-    // Click Restore button
+    // Clicking AI Chat on the right rail in Joined mode renders AI Chat across the whole canvas
+    const chatBtn = screen.getByTestId("right-rail-nav-chat");
     await act(async () => {
-      restoreBtn.click();
+      chatBtn.click();
     });
+    expect(screen.getByText(/AI AGENT CHAT/i)).toBeInTheDocument();
 
-    // Returns to docked mode
+    // Click Maximise -> Maximised State (Full Screen)
+    const maxBtn = screen.getByTestId("window-btn-maximise");
+    await act(async () => {
+      maxBtn.click();
+    });
+    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
+      "data-window-state",
+      "maximised"
+    );
+    expect(screen.getByTestId("window-btn-restore-down")).toBeInTheDocument();
+
+    // Click Restore Down -> back to Windowed State
+    await act(async () => {
+      screen.getByTestId("window-btn-restore-down").click();
+    });
+    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
+      "data-window-state",
+      "windowed"
+    );
+
+    // Click Split -> transitions out of Joined into Split mode
+    const splitBtn = screen.getByTestId("window-btn-split");
+    await act(async () => {
+      splitBtn.click();
+    });
     expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
     expect(screen.getByTestId("center-preview-container")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Maximize FocusHUD/i)).toBeInTheDocument();
+
+    // In Split mode, user can enter Fullscreen directly from the left rail Fullscreen button
+    const fsBtn = screen.getByTestId("window-btn-fullscreen");
+    await act(async () => {
+      fsBtn.click();
+    });
+    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
+      "data-window-state",
+      "fullscreen"
+    );
+    // In Fullscreen Immersive state, the Restore Down button is present on the right rail
+    expect(screen.getByTestId("window-btn-restore-down")).toBeInTheDocument();
+
+    // Exiting Fullscreen returns to Split mode (its prior state)
+    const exitFsBtn = screen.getByTestId("window-btn-exit-fullscreen");
+    await act(async () => {
+      exitFsBtn.click();
+    });
+    expect(screen.getByTestId("center-preview-container")).toBeInTheDocument();
+
+    // In Split mode, clicking Join (or Maximise) transitions to Maximised State (Full Screen) inside Joined
+    await act(async () => {
+      screen.getByTestId("window-btn-join").click();
+    });
+    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
+      "data-window-state",
+      "maximised"
+    );
+    expect(screen.queryByTestId("center-preview-container")).not.toBeInTheDocument();
   });
 });

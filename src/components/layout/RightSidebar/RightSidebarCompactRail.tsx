@@ -1,21 +1,53 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Play, Pause, RotateCcw, Check, Square, X, Minus, Copy } from "lucide-react";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Check,
+  Square,
+  X,
+  Minus,
+  Copy,
+  MessageSquare,
+} from "lucide-react";
 import { usePomodoro } from "../../../stores/pomodoroStore";
 import { exitApp, minimizeToTray } from "../../../services/tauriBridge";
 import { useTheme } from "../../../stores/themeStore";
 import { RightRailSystemStats } from "./RightRailSystemStats";
-import { SidebarToggleIcon } from "../../ui/SidebarToggleIcon";
+import { NAV_ICON_MAP } from "../LeftSidebar/LeftSidebar";
+import {
+  loadNavConfig,
+  reorderNavConfig,
+  getNavItemRail,
+  broadcastNavChange,
+  subscribeLayoutAction,
+} from "../../../stores/layoutStore";
+import { NavItemConfig, NavViewId, WindowModeState } from "../../../types/hud";
+import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 
 interface RightSidebarCompactRailProps {
   leftWidth?: number;
   rightWidth?: number;
   isRightCollapsed?: boolean;
+  isJoinedMode?: boolean;
+  windowState?: WindowModeState;
   isAppMaximized?: boolean;
+  activeNav?: string;
+  currentRightNav?: NavViewId;
+  onSelectNav?: (id: string) => void;
+  onSelectRightNav?: (id: NavViewId) => void;
   onExpand?: () => void;
+  onCollapse?: () => void;
   onToggleLeftPane?: () => void;
   onToggleRightPane?: () => void;
   onToggleBothPanes?: () => void;
   onToggleMaximizeApp?: () => void;
+  onClickMaximise?: () => void;
+  onClickRestoreDown?: () => void;
+  onClickFullscreen?: () => void;
+  onClickExitFullscreen?: () => void;
+  onClickSplit?: () => void;
+  onClickMinimise?: () => void;
   onMaximizePanes?: () => void;
   onOpenSettings?: (tab?: string) => void;
 }
@@ -23,13 +55,130 @@ interface RightSidebarCompactRailProps {
 export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = ({
   rightWidth,
   isRightCollapsed,
+  isJoinedMode = false,
+  windowState,
   isAppMaximized = false,
+  activeNav = "home",
+  currentRightNav = "chat",
+  onSelectNav,
+  onSelectRightNav,
   onExpand,
+  onCollapse,
   onToggleRightPane,
   onToggleMaximizeApp,
+  onClickMaximise,
+  onClickRestoreDown,
+  onClickMinimise,
   onMaximizePanes,
 }) => {
   const { themeConfig } = useTheme();
+  const [navItems, setNavItems] = useState<NavItemConfig[]>(() => loadNavConfig());
+  const [draggedNavId, setDraggedNavId] = useState<NavViewId | null>(null);
+  const [dragOverNavId, setDragOverNavId] = useState<NavViewId | null>(null);
+  const draggedNavIdRef = useRef<NavViewId | null>(null);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "focushud_nav_config") {
+        setNavItems(loadNavConfig());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    const unsub = subscribeLayoutAction((action) => {
+      if (action.type === "NAV_CONFIG_CHANGE") {
+        setNavItems(action.config);
+      }
+    });
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      unsub();
+    };
+  }, []);
+
+  const effectiveWindowState: WindowModeState =
+    windowState ?? (isAppMaximized ? "maximised" : isJoinedMode ? "windowed" : "split");
+  const effectiveIsMaximised = effectiveWindowState === "maximised" || isAppMaximized;
+  const effectiveIsFullscreen = effectiveWindowState === "fullscreen";
+  const effectiveIsJoined =
+    isJoinedMode ||
+    effectiveWindowState === "windowed" ||
+    effectiveWindowState === "maximised" ||
+    effectiveWindowState === "fullscreen";
+  const collapsed = isRightCollapsed ?? (rightWidth ? rightWidth < 120 : true);
+
+  const handleToggleRight = () => {
+    if (onToggleRightPane) {
+      onToggleRightPane();
+    } else if (collapsed && onExpand) {
+      onExpand();
+    } else if (!collapsed && onCollapse) {
+      onCollapse();
+    }
+  };
+
+  const handleRightNavClick = (id: NavViewId) => {
+    if (effectiveIsJoined) {
+      if (onSelectNav) {
+        onSelectNav(id);
+      }
+      broadcastNavChange(id);
+      return;
+    }
+
+    const hasToggle = Boolean(onToggleRightPane || onExpand || onCollapse);
+    if (collapsed) {
+      if (onSelectRightNav) {
+        onSelectRightNav(id);
+      }
+      if (hasToggle) {
+        handleToggleRight();
+      }
+    } else if (currentRightNav === id && hasToggle) {
+      handleToggleRight();
+    } else if (onSelectRightNav) {
+      onSelectRightNav(id);
+    }
+  };
+
+  const handleNavDragStart = (e: React.DragEvent, id: NavViewId) => {
+    draggedNavIdRef.current = id;
+    setDraggedNavId(id);
+    try {
+      e.dataTransfer.setData("text/plain", id);
+      e.dataTransfer.effectAllowed = "move";
+    } catch {}
+  };
+
+  const handleNavDragOver = (e: React.DragEvent, targetId?: NavViewId) => {
+    e.preventDefault();
+    if (targetId && targetId !== dragOverNavId) {
+      setDragOverNavId(targetId);
+    }
+  };
+
+  const handleNavDrop = (e: React.DragEvent, targetId?: NavViewId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    let sourceId = draggedNavIdRef.current;
+    if (!sourceId) {
+      try {
+        const transferred = e.dataTransfer.getData("text/plain") as NavViewId;
+        if (transferred) sourceId = transferred;
+      } catch {}
+    }
+    setDraggedNavId(null);
+    setDragOverNavId(null);
+    draggedNavIdRef.current = null;
+    if (!sourceId) return;
+    const next = reorderNavConfig(navItems, sourceId, targetId ?? null, "right");
+    setNavItems(next);
+  };
+
+  const handleNavDragEnd = () => {
+    setDraggedNavId(null);
+    setDragOverNavId(null);
+    draggedNavIdRef.current = null;
+  };
 
   // Vertical position offsets for timer and stats along the right rail (in pixels)
   const [timerOffset, setTimerOffset] = useState<number>(() => {
@@ -349,79 +498,139 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   );
 
   return (
-    <div className="h-full w-full flex flex-col items-center overflow-y-auto overflow-x-hidden select-none px-1 py-1 gap-1">
-      {/* 1. Top Section: Window Controls (Always Vertical) */}
-      <div className="shrink-0 w-full flex flex-col items-center">
-        {/* Window controls: Exit -> Maximize/Restore -> Minimize */}
-        <div className="flex flex-col items-center gap-1 w-full pt-0.5">
-          {/* Top: Exit */}
-          <button
-            onClick={() => exitApp()}
-            title="Close FocusHUD (Restores Desktop)"
-            aria-label="Close FocusHUD"
-            className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+    <TooltipProvider>
+      <div className="h-full w-full flex flex-col items-center overflow-y-auto overflow-x-hidden select-none px-1 py-1 gap-1">
+        {/* 1. Top Section: Window Controls (Always Vertical) */}
+        <div className="shrink-0 w-full flex flex-col items-center">
+          {/* Window controls */}
+          <div className="flex flex-col items-center gap-1 w-full pt-0.5">
+            {/* Top: Exit */}
+            <button
+              onClick={() => exitApp()}
+              data-testid="window-btn-close"
+              title="Close FocusHUD (Restores Desktop)"
+              aria-label="Close FocusHUD"
+              className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
 
-          {/* Middle: Maximise/Restore */}
-          <button
-            onClick={onToggleMaximizeApp || handleMaximize}
-            title={isAppMaximized ? "Restore FocusHUD (Docked Layout)" : "Maximize FocusHUD (Full Screen)"}
-            aria-label={isAppMaximized ? "Restore FocusHUD" : "Maximize FocusHUD"}
-            className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-          >
-            {isAppMaximized ? (
-              <Copy className="w-3.5 h-3.5" />
-            ) : (
-              <Square className="w-3.5 h-3.5" />
-            )}
-          </button>
+            {/* Maximise / Restore Down (Always visible; shows Restore Down in Maximised or Fullscreen Immersive states) */}
+            <button
+              onClick={
+                effectiveIsMaximised || effectiveIsFullscreen
+                  ? onClickRestoreDown || onToggleMaximizeApp
+                  : onClickMaximise || onToggleMaximizeApp || handleMaximize
+              }
+              data-testid={
+                effectiveIsMaximised || effectiveIsFullscreen
+                  ? "window-btn-restore-down"
+                  : "window-btn-maximise"
+              }
+              title={
+                effectiveIsMaximised || effectiveIsFullscreen
+                  ? "Click Restore Down (Restore FocusHUD)"
+                  : "Click Maximise (Maximize FocusHUD)"
+              }
+              aria-label={
+                effectiveIsMaximised || effectiveIsFullscreen
+                  ? "Restore FocusHUD"
+                  : "Maximize FocusHUD"
+              }
+              className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+            >
+              {effectiveIsMaximised || effectiveIsFullscreen ? (
+                <Copy className="w-3.5 h-3.5" />
+              ) : (
+                <Square className="w-3.5 h-3.5" />
+              )}
+            </button>
 
-          {/* Bottom: Minimize */}
-          <button
-            onClick={() => minimizeToTray()}
-            title="Minimize FocusHUD to Tray (Frees Screen)"
-            aria-label="Minimize FocusHUD to Tray"
-            className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+            {/* Bottom: Minimize */}
+            <button
+              onClick={() => {
+                if (onClickMinimise) {
+                  onClickMinimise();
+                } else {
+                  minimizeToTray();
+                }
+              }}
+              data-testid="window-btn-minimise"
+              title="Click Minimise (Minimize FocusHUD to Tray)"
+              aria-label="Minimize FocusHUD to Tray"
+              className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Dividing Line below the window controls */}
+          <div className="w-full h-[1px] bg-amber-500/20 my-1.5" />
+
+          {/* Right Rail Navigation Views (AI Chat by default, draggable to reorder) */}
+          <div
+            data-testid="right-rail-nav-list"
+            onDragOver={(e) => handleNavDragOver(e)}
+            onDrop={(e) => handleNavDrop(e)}
+            className="flex flex-col items-center gap-1 w-full pb-0.5 min-h-[32px]"
           >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
+            {navItems
+              .filter((item) => item.visible && getNavItemRail(item) === "right")
+              .map((item) => {
+                const IconComponent = NAV_ICON_MAP[item.id] || MessageSquare;
+                const isActive = effectiveIsJoined
+                  ? activeNav === item.id
+                  : !collapsed && currentRightNav === item.id;
+                const isDragging = draggedNavId === item.id;
+                const isDragOver = dragOverNavId === item.id && draggedNavId !== item.id;
+                return (
+                  <Tooltip key={item.id} content={item.label} side="left" theme="amber">
+                    <button
+                      draggable={true}
+                      onDragStart={(e) => handleNavDragStart(e, item.id)}
+                      onDragOver={(e) => handleNavDragOver(e, item.id)}
+                      onDrop={(e) => handleNavDrop(e, item.id)}
+                      onDragEnd={handleNavDragEnd}
+                      onClick={() => handleRightNavClick(item.id)}
+                      data-testid={`right-rail-nav-${item.id}`}
+                      aria-label={item.label}
+                      className={`w-8 h-8 flex items-center justify-center rounded transition-all cursor-grab active:cursor-grabbing ${
+                        isActive
+                          ? "bg-amber-500/20 text-amber-200 border border-amber-400 shadow-[0_0_8px_rgba(255,145,0,0.4)]"
+                          : "text-amber-400/70 hover:text-amber-200 hover:bg-amber-500/10"
+                      } ${isDragging ? "opacity-50 scale-95" : ""} ${
+                        isDragOver ? "border-t-2 border-amber-300" : ""
+                      }`}
+                    >
+                      <IconComponent className="w-4 h-4" />
+                      <span className="sr-only">{item.label}</span>
+                    </button>
+                  </Tooltip>
+                );
+              })}
+          </div>
         </div>
 
-        {/* Dividing Line below the window controls */}
-        <div className="w-full h-[1px] bg-amber-500/20 my-1.5" />
+        {/* 2. Timer Section: Dividing Line + Timer components underneath (Fixed order: always above stats) */}
+        <div
+          className="w-full shrink-0 flex flex-col items-center transition-all duration-75"
+          style={{ marginTop: `${timerOffset}px` }}
+          data-testid="right-rail-timer-wrapper"
+        >
+          {renderDraggableLine("timer", "Timer")}
+          {renderTimerSection()}
+        </div>
 
-        {/* Below the line: Right Pane Toggle button */}
-        <div className="flex flex-col items-center w-full pb-0.5">
-          <SidebarToggleIcon
-            side="right"
-            isCollapsed={isRightCollapsed ?? (rightWidth ? rightWidth < 120 : true)}
-            onToggle={onToggleRightPane || onExpand || (() => {})}
-            theme="amber"
-          />
+        {/* 3. System Stats Section: Dividing Line + Stats components underneath (Fixed order: always below timer) */}
+        <div
+          className="w-full shrink-0 flex flex-col items-center transition-all duration-75"
+          style={{ marginTop: `${statsOffset}px` }}
+          data-testid="right-rail-stats-wrapper"
+        >
+          {renderDraggableLine("stats", "Stats")}
+          <RightRailSystemStats />
         </div>
       </div>
-
-      {/* 2. Timer Section: Dividing Line + Timer components underneath (Fixed order: always above stats) */}
-      <div
-        className="w-full shrink-0 flex flex-col items-center transition-all duration-75"
-        style={{ marginTop: `${timerOffset}px` }}
-        data-testid="right-rail-timer-wrapper"
-      >
-        {renderDraggableLine("timer", "Timer")}
-        {renderTimerSection()}
-      </div>
-
-      {/* 3. System Stats Section: Dividing Line + Stats components underneath (Fixed order: always below timer) */}
-      <div
-        className="w-full shrink-0 flex flex-col items-center transition-all duration-75"
-        style={{ marginTop: `${statsOffset}px` }}
-        data-testid="right-rail-stats-wrapper"
-      >
-        {renderDraggableLine("stats", "Stats")}
-        <RightRailSystemStats />
-      </div>
-    </div>
+    </TooltipProvider>
   );
 };

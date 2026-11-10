@@ -15,8 +15,7 @@ describe("LeftSidebar component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders branding and header controls in expanded mode (width >= 120)", () => {
-    const handleToggle = vi.fn();
+  it("renders branding and header controls in expanded mode (width >= 120) without left pane toggle", () => {
     const handleSettings = vi.fn();
 
     render(
@@ -24,18 +23,14 @@ describe("LeftSidebar component", () => {
         width={280}
         activeNav="home"
         onSelectNav={vi.fn()}
-        onToggleCollapse={handleToggle}
         onOpenSettings={handleSettings}
       />
     );
 
     expect(screen.getByText("FocusHUD")).toBeInTheDocument();
 
-    // 1. Left pane sidebar toggle button
-    const toggleBtn = screen.getByTestId("sidebar-toggle-left");
-    expect(toggleBtn).toBeInTheDocument();
-    fireEvent.click(toggleBtn);
-    expect(handleToggle).toHaveBeenCalledTimes(1);
+    // 1. Left pane sidebar toggle button is removed
+    expect(screen.queryByTestId("sidebar-toggle-left")).not.toBeInTheDocument();
 
     // 2. Settings button
     const settingsBtn = screen.getByLabelText("Settings");
@@ -171,15 +166,13 @@ describe("LeftSidebar component", () => {
     }
   });
 
-  it("renders compact mode with dual toggle button and bottom settings button when width < 120", () => {
-    const handleToggle = vi.fn();
+  it("renders compact mode with bottom settings button and no left pane toggle when width < 120", () => {
     const handleSettings = vi.fn();
     render(
       <LeftSidebar
         width={68}
         activeNav="home"
         onSelectNav={vi.fn()}
-        onToggleCollapse={handleToggle}
         onOpenSettings={handleSettings}
       />
     );
@@ -187,11 +180,8 @@ describe("LeftSidebar component", () => {
     // Text label hidden
     expect(screen.queryByText("FocusHUD")).not.toBeInTheDocument();
 
-    // Left toggle button exists and triggers onToggleCollapse
-    const toggleBtn = screen.getByTestId("sidebar-toggle-left");
-    expect(toggleBtn).toBeInTheDocument();
-    fireEvent.click(toggleBtn);
-    expect(handleToggle).toHaveBeenCalledTimes(1);
+    // Left toggle button is removed
+    expect(screen.queryByTestId("sidebar-toggle-left")).not.toBeInTheDocument();
 
     // Settings button appears at the bottom of the left pane
     const settingsBtn = screen.getByLabelText("Settings");
@@ -200,7 +190,7 @@ describe("LeftSidebar component", () => {
     expect(handleSettings).toHaveBeenCalledTimes(1);
   });
 
-  it("renders navigation items according to navConfig and hides invisible items", () => {
+  it("renders left-rail navigation items according to navConfig (excluding right-rail items like AI CHAT by default) and hides invisible items", () => {
     localStorage.setItem(
       "focushud_nav_config",
       JSON.stringify([
@@ -223,12 +213,13 @@ describe("LeftSidebar component", () => {
       />
     );
 
-    // Visible items
-    expect(screen.getByText("TIMER")).toBeInTheDocument();
-    expect(screen.getByText("HOME")).toBeInTheDocument();
-    expect(screen.getByText("AI CHAT")).toBeInTheDocument();
+    // Visible left-rail items
+    expect(screen.getByTestId("left-rail-nav-timer")).toBeInTheDocument();
+    expect(screen.getByTestId("left-rail-nav-home")).toBeInTheDocument();
+    // AI CHAT defaults to the right rail, so it is not on the left rail
+    expect(screen.queryByTestId("left-rail-nav-chat")).not.toBeInTheDocument();
     // Hidden item should not be rendered
-    expect(screen.queryByText("CALENDAR")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("left-rail-nav-calendar")).not.toBeInTheDocument();
   });
 
   it("falls back to home when activeNav is toggled to invisible", () => {
@@ -324,34 +315,69 @@ describe("LeftSidebar component", () => {
     expect(screen.getByRole("button", { name: /Today/i })).toBeInTheDocument();
   });
 
-  it("renders hamburger menu fixed at top and left pane toggle button vertically underneath", () => {
-    const handleToggleLeft = vi.fn();
+  it("renders hamburger menu fixed at top with Fullscreen/Exit Fullscreen underneath and Split/Join underneath Fullscreen", () => {
+    const handleFullscreen = vi.fn();
+    const handleExitFullscreen = vi.fn();
+    const handleSplit = vi.fn();
+    const handleJoin = vi.fn();
 
-    render(
+    const { rerender } = render(
       <LeftSidebar
         width={68}
         activeNav="home"
+        isJoinedMode={true}
+        windowState="windowed"
         onSelectNav={vi.fn()}
-        onToggleLeftPane={handleToggleLeft}
+        onClickFullscreen={handleFullscreen}
+        onClickExitFullscreen={handleExitFullscreen}
+        onClickSplit={handleSplit}
+        onClickJoin={handleJoin}
       />
     );
 
     const menuBtn = screen.getByLabelText("System Menu");
-    const toggleLeft = screen.getByTestId("sidebar-toggle-left");
+    const fsBtn = screen.getByTestId("window-btn-fullscreen");
+    const splitBtn = screen.getByTestId("window-btn-split");
+    const homeBtn = screen.getByTestId("left-rail-nav-home");
 
     expect(menuBtn).toBeInTheDocument();
-    expect(toggleLeft).toBeInTheDocument();
+    expect(fsBtn).toBeInTheDocument();
+    expect(splitBtn).toBeInTheDocument();
 
-    // Right and both toggles are removed from left rail
+    // Vertical DOM order: Hamburger -> Fullscreen -> Split -> Navigation buttons
+    expect(menuBtn.compareDocumentPosition(fsBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(fsBtn.compareDocumentPosition(splitBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(splitBtn.compareDocumentPosition(homeBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    fireEvent.click(fsBtn);
+    expect(handleFullscreen).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(splitBtn);
+    expect(handleSplit).toHaveBeenCalledTimes(1);
+
+    // In Fullscreen state, button switches to Exit Fullscreen; in Split state, button switches to Join
+    rerender(
+      <LeftSidebar
+        width={68}
+        activeNav="home"
+        isJoinedMode={false}
+        windowState="split"
+        onSelectNav={vi.fn()}
+        onClickFullscreen={handleFullscreen}
+        onClickExitFullscreen={handleExitFullscreen}
+        onClickSplit={handleSplit}
+        onClickJoin={handleJoin}
+      />
+    );
+    const joinBtn = screen.getByTestId("window-btn-join");
+    expect(joinBtn).toBeInTheDocument();
+    fireEvent.click(joinBtn);
+    expect(handleJoin).toHaveBeenCalledTimes(1);
+
+    // Left, right, and both toggles are removed from left rail
+    expect(screen.queryByTestId("sidebar-toggle-left")).not.toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-toggle-right")).not.toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-toggle-both")).not.toBeInTheDocument();
-
-    // Verify vertical order: Menu -> Toggle Left
-    expect(menuBtn.compareDocumentPosition(toggleLeft)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-
-    // Test clicking toggle
-    fireEvent.click(toggleLeft);
-    expect(handleToggleLeft).toHaveBeenCalledTimes(1);
   });
 
   it("fixes the top-right and bottom-right blue dots on the left rail so components do not move around", () => {
@@ -368,23 +394,69 @@ describe("LeftSidebar component", () => {
     expect(dots.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("locates navigation view buttons directly under the top header line", () => {
-    render(
+  it("locates navigation view buttons directly under the top header line and supports drag-and-drop reordering and Split mode toggle", () => {
+    const handleSelectNav = vi.fn();
+    const handleToggleLeft = vi.fn();
+
+    const { rerender } = render(
       <LeftSidebar
         width={68}
         activeNav="home"
-        onSelectNav={vi.fn()}
+        isJoinedMode={false}
+        onSelectNav={handleSelectNav}
+        onToggleLeftPane={handleToggleLeft}
       />
     );
 
-    const toggleLeft = screen.getByTestId("sidebar-toggle-left");
+    const menuBtn = screen.getByLabelText("System Menu");
     const homeBtn = screen.getByTestId("left-rail-nav-home");
+    const calendarBtn = screen.getByTestId("left-rail-nav-calendar");
 
     expect(homeBtn).toBeInTheDocument();
-    // Nav icons are located after the header toggle line
-    expect(toggleLeft.compareDocumentPosition(homeBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(menuBtn.compareDocumentPosition(homeBtn)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     const navContainer = homeBtn.parentElement!;
     expect(navContainer).toHaveClass("justify-start");
+
+    // In Split mode while collapsed (width=68), clicking a view button opens the pane
+    fireEvent.click(calendarBtn);
+    expect(handleSelectNav).toHaveBeenCalledWith("calendar");
+    expect(handleToggleLeft).toHaveBeenCalledTimes(1);
+
+    // In Split mode while expanded (width=280), clicking the SAME active view button closes the pane
+    handleToggleLeft.mockClear();
+    rerender(
+      <LeftSidebar
+        width={280}
+        activeNav="calendar"
+        isJoinedMode={false}
+        onSelectNav={handleSelectNav}
+        onToggleLeftPane={handleToggleLeft}
+      />
+    );
+    fireEvent.click(screen.getByTestId("left-rail-nav-calendar"));
+    expect(handleToggleLeft).toHaveBeenCalledTimes(1);
+
+    // Drag and reorder: drag "calendar" onto "home"
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(k: string, v: string) {
+        this.data[k] = v;
+      },
+      getData(k: string) {
+        return this.data[k] || "";
+      },
+      effectAllowed: "move",
+      dropEffect: "move",
+    };
+
+    fireEvent.dragStart(screen.getByTestId("left-rail-nav-calendar"), { dataTransfer });
+    fireEvent.dragOver(screen.getByTestId("left-rail-nav-home"), { dataTransfer });
+    fireEvent.drop(screen.getByTestId("left-rail-nav-home"), { dataTransfer });
+    fireEvent.dragEnd(screen.getByTestId("left-rail-nav-calendar"), { dataTransfer });
+
+    const buttons = within(screen.getByTestId("left-rail-nav-list")).getAllByRole("button");
+    expect(buttons[0]).toHaveAttribute("data-testid", "left-rail-nav-calendar");
+    expect(buttons[1]).toHaveAttribute("data-testid", "left-rail-nav-home");
   });
 });

@@ -48,7 +48,16 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     handleToggleRightPane,
     handleToggleBothPanes,
     handleMaximizePanes,
+    windowState,
+    isJoinedMode,
     isAppMaximized,
+    handleClickMaximise,
+    handleClickRestoreDown,
+    handleClickFullscreen,
+    handleClickExitFullscreen,
+    handleClickSplit,
+    handleClickJoin,
+    handleClickMinimise,
     handleToggleMaximizeApp,
     handleResetWidths,
     SNAP_POINTS,
@@ -83,35 +92,43 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
   return (
     <div
       data-testid="full-layout-app"
+      data-window-state={windowState}
       className="flex flex-col h-screen w-screen overflow-hidden bg-[#03070d] text-cyan-200 select-none relative font-hud"
     >
       {/* Subtle futuristic scanline overlay across whole UI */}
       <div className="absolute inset-0 scanlines pointer-events-none z-50" />
 
-      {/* Main Resizable 3-Column HUD Layout / Full Screen Merged Mode */}
+      {/* Main Resizable 3-Column HUD Layout / Joined Whole-Canvas Mode */}
       <div
         ref={containerRef}
         className="flex-1 flex flex-row overflow-hidden relative z-10"
       >
-        {/* Left Sidebar (fixed to compact rail 68px in full screen mode) */}
+        {/* Left Sidebar (fixed to compact rail 68px in Joined mode) */}
         <LeftSidebar
-          width={isAppMaximized ? 68 : leftWidth}
+          width={isJoinedMode ? 68 : leftWidth}
           leftWidth={leftWidth}
           rightWidth={rightWidth}
           activeNav={activeNav}
           onSelectNav={setActiveNav}
-          isCompact={isAppMaximized || leftWidth < 220}
+          isCompact={isJoinedMode || leftWidth < 220}
+          isJoinedMode={isJoinedMode}
+          windowState={windowState}
           onToggleCollapse={handleLeftToggleCollapse}
           onToggleLeftPane={handleToggleLeftPane}
           onToggleRightPane={handleToggleRightPane}
           onToggleBothPanes={handleToggleBothPanes}
+          onClickFullscreen={handleClickFullscreen}
+          onClickExitFullscreen={handleClickExitFullscreen}
+          onClickSplit={handleClickSplit}
+          onClickJoin={handleClickJoin}
           onOpenSettings={handleOpenSettings}
         />
 
-        {/* Center: In full screen mode, merges the left & right panes and displays the full view version of each view. In docked mode, displays resizers & center workspace. */}
-        {isAppMaximized ? (
+        {/* Center: In Joined mode, merges the left & right panes and displays the full view across the whole canvas. In Split mode, displays resizers & center workspace. */}
+        {isJoinedMode ? (
           <div
             data-testid="full-screen-view-container"
+            data-window-state={windowState}
             className="flex-1 h-full min-w-0 p-2 bg-[#03070d] text-cyan-200 overflow-hidden flex flex-col"
           >
             <HudBrackets variant="cyan" showTicks={false} className="h-full w-full flex flex-col overflow-hidden">
@@ -156,12 +173,15 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
           </>
         )}
 
-        {/* Right Sidebar (fixed to compact rail 68px in full screen mode) */}
+        {/* Right Sidebar (fixed to compact rail 68px in Joined mode) */}
         <RightSidebar
-          width={isAppMaximized ? 68 : rightWidth}
+          width={isJoinedMode ? 68 : rightWidth}
           leftWidth={leftWidth}
           activeNav={activeNav}
-          isCompact={isAppMaximized || rightWidth < 220}
+          onSelectNav={setActiveNav}
+          isCompact={isJoinedMode || rightWidth < 220}
+          isJoinedMode={isJoinedMode}
+          windowState={windowState}
           isAppMaximized={isAppMaximized}
           onExpand={handleRightToggleCollapse}
           onCollapse={handleRightToggleCollapse}
@@ -169,6 +189,12 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
           onToggleRightPane={handleToggleRightPane}
           onToggleBothPanes={handleToggleBothPanes}
           onToggleMaximizeApp={handleToggleMaximizeApp}
+          onClickMaximise={handleClickMaximise}
+          onClickRestoreDown={handleClickRestoreDown}
+          onClickFullscreen={handleClickFullscreen}
+          onClickExitFullscreen={handleClickExitFullscreen}
+          onClickSplit={handleClickSplit}
+          onClickMinimise={handleClickMinimise}
           onMaximizePanes={handleMaximizePanes}
           onOpenSettings={handleOpenSettings}
         />

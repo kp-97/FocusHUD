@@ -12,7 +12,7 @@ import {
   Timer,
   Columns3,
 } from "lucide-react";
-import { NavViewId } from "../../../types/hud";
+import { NavViewId, WindowModeState } from "../../../types/hud";
 import {
   getInitialRightNav,
   broadcastRightNavChange,
@@ -46,8 +46,11 @@ const AVAILABLE_RIGHT_VIEWS: Array<{ id: NavViewId; label: string; icon: React.C
 interface RightSidebarProps {
   width: number;
   activeNav?: string;
+  onSelectNav?: (id: string) => void;
   isCompact?: boolean;
   isDockMode?: boolean;
+  isJoinedMode?: boolean;
+  windowState?: WindowModeState;
   isAppMaximized?: boolean;
   leftWidth?: number;
   onExpand?: () => void;
@@ -56,6 +59,12 @@ interface RightSidebarProps {
   onToggleRightPane?: () => void;
   onToggleBothPanes?: () => void;
   onToggleMaximizeApp?: () => void;
+  onClickMaximise?: () => void;
+  onClickRestoreDown?: () => void;
+  onClickFullscreen?: () => void;
+  onClickExitFullscreen?: () => void;
+  onClickSplit?: () => void;
+  onClickMinimise?: () => void;
   onMaximizePanes?: () => void;
   onOpenSettings?: (tab?: string) => void;
 }
@@ -63,13 +72,23 @@ interface RightSidebarProps {
 export const RightSidebar: React.FC<RightSidebarProps> = ({
   width,
   leftWidth = 280,
+  activeNav,
+  onSelectNav,
+  isJoinedMode = false,
+  windowState,
   isAppMaximized = false,
   onExpand,
-  onCollapse: _onCollapse,
+  onCollapse,
   onToggleLeftPane,
   onToggleRightPane,
   onToggleBothPanes,
   onToggleMaximizeApp,
+  onClickMaximise,
+  onClickRestoreDown,
+  onClickFullscreen,
+  onClickExitFullscreen,
+  onClickSplit,
+  onClickMinimise,
   onMaximizePanes,
   onOpenSettings,
 }) => {
@@ -243,12 +262,25 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           leftWidth={leftWidth}
           rightWidth={width}
           isRightCollapsed={isIconOnly}
+          isJoinedMode={isJoinedMode}
+          windowState={windowState}
           isAppMaximized={isAppMaximized}
+          activeNav={activeNav}
+          currentRightNav={currentNav}
+          onSelectNav={onSelectNav}
+          onSelectRightNav={handleSelectNav}
           onExpand={onExpand || onToggleRightPane}
+          onCollapse={onCollapse || onToggleRightPane}
           onToggleLeftPane={onToggleLeftPane}
-          onToggleRightPane={onToggleRightPane || onExpand}
+          onToggleRightPane={onToggleRightPane || onExpand || onCollapse}
           onToggleBothPanes={onToggleBothPanes}
           onToggleMaximizeApp={onToggleMaximizeApp}
+          onClickMaximise={onClickMaximise}
+          onClickRestoreDown={onClickRestoreDown}
+          onClickFullscreen={onClickFullscreen}
+          onClickExitFullscreen={onClickExitFullscreen}
+          onClickSplit={onClickSplit}
+          onClickMinimise={onClickMinimise}
           onMaximizePanes={onMaximizePanes}
           onOpenSettings={onOpenSettings}
         />
