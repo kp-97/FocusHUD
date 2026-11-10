@@ -46,8 +46,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [maxRight, setMaxRight] = useState<number>(() => getMaxRightWidth());
 
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [modalSize, setModalSize] = useState<{ width: number; height: number } | null>(null);
+  const modalRef = React.useRef<HTMLDivElement | null>(null);
   const isDraggingModalRef = React.useRef(false);
   const isDraggingStandaloneRef = React.useRef(false);
+  const isResizingModalRef = React.useRef<false | "right" | "bottom" | "corner">(false);
+  const resizeStartRef = React.useRef<{
+    mouseX: number;
+    mouseY: number;
+    startW: number;
+    startH: number;
+  }>({ mouseX: 0, mouseY: 0, startW: 600, startH: 600 });
   const lastScreenPosRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragStartRef = React.useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
@@ -55,6 +64,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     startX: 0,
     startY: 0,
   });
+
+  const handleResizePointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    direction: "right" | "bottom" | "corner"
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = modalRef.current?.getBoundingClientRect();
+    const defaultH = typeof window !== "undefined" ? Math.round(window.innerHeight * 0.8) : 640;
+    isResizingModalRef.current = direction;
+    resizeStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startW: modalSize?.width ?? (rect ? Math.round(rect.width) : 620),
+      startH: modalSize?.height ?? (rect ? Math.round(rect.height) : defaultH),
+    };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const dir = isResizingModalRef.current;
+    if (!dir) return;
+    const maxW = typeof window !== "undefined" ? Math.max(420, window.innerWidth - 32) : 1400;
+    const maxH = typeof window !== "undefined" ? Math.max(360, window.innerHeight - 32) : 1000;
+    const dX = e.clientX - resizeStartRef.current.mouseX;
+    const dY = e.clientY - resizeStartRef.current.mouseY;
+    const nextW =
+      dir === "right" || dir === "corner"
+        ? Math.max(400, Math.min(maxW, resizeStartRef.current.startW + dX))
+        : resizeStartRef.current.startW;
+    const nextH =
+      dir === "bottom" || dir === "corner"
+        ? Math.max(340, Math.min(maxH, resizeStartRef.current.startH + dY))
+        : resizeStartRef.current.startH;
+    setModalSize({ width: Math.round(nextW), height: Math.round(nextH) });
+  };
+
+  const handleResizePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isResizingModalRef.current) return;
+    isResizingModalRef.current = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
 
   const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("button") || e.button !== 0) return;
@@ -197,20 +252,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const modalContent = (
     <div
+      ref={modalRef}
       data-testid="settings-modal-content"
-      style={{
-        transform: isStandalone ? undefined : `translate(${position.x}px, ${position.y}px)`,
-      }}
-      className={`w-full ${
+      style={
         isStandalone
-          ? "h-full max-w-none rounded-none border border-cyan-500/40 shadow-none"
-          : "max-w-xl rounded-lg border border-cyan-500/40 shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+          ? undefined
+          : {
+              transform: `translate(${position.x}px, ${position.y}px)`,
+              height: modalSize ? `${modalSize.height}px` : "80vh",
+              width: modalSize ? `${modalSize.width}px` : "620px",
+            }
+      }
+      className={`${
+        isStandalone
+          ? "w-full h-full max-w-none rounded-none border border-cyan-500/40 shadow-none"
+          : "max-w-[95vw] max-h-[95vh] min-w-[380px] min-h-[340px] rounded-lg border border-cyan-500/40 shadow-[0_0_30px_rgba(0,229,255,0.25)]"
       } bg-[#040d1a] overflow-hidden text-cyan-200 relative font-hud flex flex-col`}
     >
       <HudBrackets
         variant="cyan"
         showTicks={true}
-        className="p-5 flex flex-col h-full overflow-hidden"
+        className="p-5 flex-1 min-h-0 flex flex-col h-full overflow-hidden"
       >
         {/* Header (Draggable) */}
         <div
@@ -241,7 +303,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Category Filter Tabs */}
-        <div className="flex items-center gap-1.5 pb-2.5 mb-2 border-b border-cyan-500/20 overflow-x-auto shrink-0 select-none">
+        <div className="flex flex-wrap items-center gap-1.5 pb-2.5 mb-2 border-b border-cyan-500/20 shrink-0 select-none">
           {[
             { id: "all", label: "ALL" },
             { id: "appearance", label: "THEMES & PALETTE" },
@@ -254,7 +316,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`hud-btn px-2.5 py-1 rounded text-[10.5px] font-tech uppercase tracking-wider transition-all cursor-pointer ${
+              className={`hud-btn px-2.5 py-1 rounded text-[10.5px] font-tech uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === tab.id
                   ? "hud-btn-active text-cyan-100 border-cyan-400"
                   : "text-cyan-400/70 hover:text-cyan-200 border-cyan-500/30"
@@ -266,7 +328,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Scrollable Body Content with Tabs */}
-        <div className="space-y-4 text-xs font-tech overflow-y-auto flex-1 pr-1">
+        <div
+          data-testid="settings-scroll-body"
+          className="space-y-4 text-xs font-tech overflow-y-auto flex-1 min-h-0 pr-1 select-text"
+        >
           {/* Editor & Spellcheck Settings */}
           {(activeTab === "all" || activeTab === "editor") && <EditorTab />}
 
@@ -316,6 +381,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </HudBrackets>
+
+      {/* Interactive Resize Handles for Popup Settings Modal */}
+      {!isStandalone && (
+        <>
+          <div
+            data-testid="settings-modal-resize-right"
+            onPointerDown={(e) => handleResizePointerDown(e, "right")}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+            className="absolute top-0 bottom-4 right-0 w-2 cursor-ew-resize z-30"
+          />
+          <div
+            data-testid="settings-modal-resize-bottom"
+            onPointerDown={(e) => handleResizePointerDown(e, "bottom")}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+            className="absolute bottom-0 left-0 right-4 h-2 cursor-ns-resize z-30"
+          />
+          <div
+            data-testid="settings-modal-resize-handle"
+            aria-label="Resize Settings Modal"
+            onPointerDown={(e) => handleResizePointerDown(e, "corner")}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-40 flex items-end justify-end p-0.5 text-cyan-400/60 hover:text-cyan-200"
+          >
+            <div className="w-2 h-2 border-r-2 border-b-2 border-cyan-400/70" />
+          </div>
+        </>
+      )}
     </div>
   );
 
