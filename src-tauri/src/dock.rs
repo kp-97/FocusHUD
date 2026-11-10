@@ -1,8 +1,8 @@
 #[cfg(target_os = "windows")]
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicI32};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 #[cfg(target_os = "windows")]
-use std::sync::atomic::{AtomicI64, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicIsize};
 #[cfg(target_os = "windows")]
 use tauri::Manager;
 
@@ -27,6 +27,15 @@ pub const HANDLE_GUTTER_LOGICAL_PX: i32 = 0;
 pub static CURRENT_LEFT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static CURRENT_RIGHT_WIDTH: AtomicI32 = AtomicI32::new(280);
 pub static PRIMARY_SCALE_MILLI: AtomicI32 = AtomicI32::new(1000);
+
+pub fn get_primary_scale_factor() -> f64 {
+    let milli = PRIMARY_SCALE_MILLI.load(Ordering::Relaxed);
+    if milli > 100 {
+        (milli as f64) / 1000.0
+    } else {
+        1.0
+    }
+}
 pub static LEFT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static RIGHT_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static LEFT_POPOUT_ACTIVE: AtomicBool = AtomicBool::new(false);

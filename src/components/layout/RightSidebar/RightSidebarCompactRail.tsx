@@ -1,19 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Check,
-  Square,
-  X,
-  Minus,
-  Copy,
-  MessageSquare,
-} from "lucide-react";
-import { usePomodoro } from "../../../stores/pomodoroStore";
-import { exitApp, minimizeToTray } from "../../../services/tauriBridge";
-import { useTheme } from "../../../stores/themeStore";
+import { MessageSquare } from "lucide-react";
 import { RightRailSystemStats } from "./RightRailSystemStats";
+import { RailWindowControls } from "./RailWindowControls";
+import { RailTimerSection } from "./RailTimerSection";
 import { NAV_ICON_MAP } from "../LeftSidebar/LeftSidebar";
 import {
   loadNavConfig,
@@ -71,7 +60,6 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   onClickMinimise,
   onMaximizePanes,
 }) => {
-  const { themeConfig } = useTheme();
   const [navItems, setNavItems] = useState<NavItemConfig[]>(() => loadNavConfig());
   const [draggedNavId, setDraggedNavId] = useState<NavViewId | null>(null);
   const [dragOverNavId, setDragOverNavId] = useState<NavViewId | null>(null);
@@ -297,32 +285,6 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
     setDraggingSection(null);
   };
 
-  const {
-    cycle,
-    totalCycles,
-    timeLeft,
-    totalSeconds,
-    isRunning,
-    dailyStats,
-    toggleRun,
-    stop,
-    reset,
-  } = usePomodoro();
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-
-  const accent = themeConfig?.accentColor || "#ff9100";
-  const isLightOrPink = themeConfig?.category === "light";
-  const timerTextColor = isLightOrPink ? "var(--hud-text-primary)" : "#ffffff";
-
-  const radius = 16;
-  const strokeWidth = 2.5;
-  const circumference = 2 * Math.PI * radius;
-  const progress = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
-  const strokeDashoffset = circumference - progress * circumference;
-
   const handleMaximize = () => {
     if (onMaximizePanes) {
       onMaximizePanes();
@@ -362,207 +324,21 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
     );
   };
 
-  // Timer Section Components grouped tightly together
-  const renderTimerSection = () => (
-    <div
-      className="w-full flex flex-col items-center gap-1 py-0.5 shrink-0"
-      data-testid="right-rail-timer-section"
-    >
-      {/* 1. Mini Ring Gauge & Countdown */}
-      <div className="relative w-10 h-10 flex items-center justify-center">
-        <svg className="w-10 h-10 -rotate-90" viewBox="0 0 44 44">
-          <circle
-            cx="22"
-            cy="22"
-            r={radius}
-            stroke={accent}
-            strokeOpacity={0.18}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-          />
-          <circle
-            cx="22"
-            cy="22"
-            r={radius}
-            stroke={accent}
-            strokeWidth={strokeWidth + 0.5}
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            fill="transparent"
-            className="transition-all duration-300"
-            style={{ filter: `drop-shadow(0 0 4px ${accent})` }}
-          />
-        </svg>
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="font-tech text-[9px] font-bold tracking-tighter"
-            style={{ color: timerTextColor }}
-          >
-            {minutes}m
-          </span>
-        </div>
-      </div>
-
-      <div
-        className="text-[10px] font-tech font-bold tracking-tight"
-        style={{ color: timerTextColor }}
-      >
-        {timeFormatted}
-      </div>
-
-      {/* 2. Action Controls (tightly grouped) */}
-      <div className="flex flex-col items-center gap-1 w-full shrink-0 my-0.5">
-        {isRunning ? (
-          <>
-            <button
-              onClick={toggleRun}
-              title="Pause Timer"
-              aria-label="Pause Timer"
-              className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all hud-btn-active border-amber-400 bg-amber-500/25 shadow-[0_0_12px_rgba(255,145,0,0.4)] text-amber-100"
-            >
-              <Pause className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              onClick={stop}
-              title="Cancel Timer"
-              aria-label="Cancel Timer"
-              className="hud-btn w-6 h-6 flex items-center justify-center rounded cursor-pointer transition-all border-red-500/30 text-red-400/70 hover:text-red-200 hover:border-red-400"
-            >
-              <Square className="w-2.5 h-2.5 fill-red-400" />
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={toggleRun}
-              title="Start Focus Timer"
-              aria-label="Start Timer"
-              className="hud-btn w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/40 text-amber-300 hover:text-amber-100 hover:border-amber-400"
-            >
-              <Play className="w-3.5 h-3.5 ml-0.5" />
-            </button>
-
-            <button
-              onClick={reset}
-              title="Reset Timer"
-              aria-label="Reset Timer"
-              className="hud-btn w-6 h-6 flex items-center justify-center rounded cursor-pointer transition-all border-amber-500/30 text-amber-400/70 hover:text-amber-200 hover:border-amber-400"
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* 3. Session Cycles / Pips */}
-      <div className="flex flex-col items-center w-full shrink-0 mt-0.5">
-        <span className="text-[7px] font-tech uppercase tracking-widest text-amber-400/60 mb-0.5">
-          CYCLES
-        </span>
-        <div className="flex flex-col gap-1 items-center">
-          {Array.from({ length: totalCycles }).map((_, idx) => {
-            const isDone = cycle > idx + 1;
-            const isCurrent = cycle === idx + 1;
-            return (
-              <div
-                key={idx}
-                title={`Cycle ${idx + 1} of ${totalCycles}`}
-                className={`w-1.5 h-1.5 rotate-45 transition-all ${
-                  isDone
-                    ? "bg-amber-400 shadow-[0_0_5px_#ff9100]"
-                    : isCurrent
-                    ? "bg-amber-400/60 border border-amber-300 shadow-[0_0_3px_#ff9100]"
-                    : "bg-neutral-800 border border-amber-500/20"
-                }`}
-              />
-            );
-          })}
-        </div>
-        <span className="text-[7.5px] font-tech text-amber-300 font-semibold mt-0.5">
-          {cycle}/{totalCycles}
-        </span>
-      </div>
-
-      {/* 4. Completed Today Badge */}
-      <div
-        className="flex items-center gap-0.5 text-[8px] font-tech text-amber-300/90 pt-0.5"
-        title={`Completed today: ${dailyStats.completedPomodoros} sessions (${dailyStats.totalFocusMinutes}m)`}
-      >
-        <Check className="w-2.5 h-2.5 text-amber-400" />
-        <span>{dailyStats.completedPomodoros}</span>
-      </div>
-    </div>
-  );
-
   return (
     <TooltipProvider>
       <div className="h-full w-full flex flex-col items-center overflow-y-auto overflow-x-hidden select-none px-1 py-1 gap-1">
         {/* 1. Top Section: Window Controls (Always Vertical) */}
         <div className="shrink-0 w-full flex flex-col items-center">
           {/* Window controls */}
-          <div className="flex flex-col items-center gap-1 w-full pt-0.5">
-            {/* Top: Exit */}
-            <button
-              onClick={() => exitApp()}
-              data-testid="window-btn-close"
-              title="Close FocusHUD (Restores Desktop)"
-              aria-label="Close FocusHUD"
-              className="text-cyan-500/50 hover:text-red-400 hover:scale-110 transition p-1 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Maximise / Restore Down (Always visible; shows Restore Down in Maximised or Fullscreen Immersive states) */}
-            <button
-              onClick={
-                effectiveIsMaximised || effectiveIsFullscreen
-                  ? onClickRestoreDown || onToggleMaximizeApp
-                  : onClickMaximise || onToggleMaximizeApp || handleMaximize
-              }
-              data-testid={
-                effectiveIsMaximised || effectiveIsFullscreen
-                  ? "window-btn-restore-down"
-                  : "window-btn-maximise"
-              }
-              title={
-                effectiveIsMaximised || effectiveIsFullscreen
-                  ? "Click Restore Down (Restore FocusHUD)"
-                  : "Click Maximise (Maximize FocusHUD)"
-              }
-              aria-label={
-                effectiveIsMaximised || effectiveIsFullscreen
-                  ? "Restore FocusHUD"
-                  : "Maximize FocusHUD"
-              }
-              className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-            >
-              {effectiveIsMaximised || effectiveIsFullscreen ? (
-                <Copy className="w-3.5 h-3.5" />
-              ) : (
-                <Square className="w-3.5 h-3.5" />
-              )}
-            </button>
-
-            {/* Bottom: Minimize */}
-            <button
-              onClick={() => {
-                if (onClickMinimise) {
-                  onClickMinimise();
-                } else {
-                  minimizeToTray();
-                }
-              }}
-              data-testid="window-btn-minimise"
-              title="Click Minimise (Minimize FocusHUD to Tray)"
-              aria-label="Minimize FocusHUD to Tray"
-              className="text-cyan-400/70 hover:text-cyan-200 hover:scale-110 transition p-1 cursor-pointer"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <RailWindowControls
+            effectiveIsMaximised={effectiveIsMaximised}
+            effectiveIsFullscreen={effectiveIsFullscreen}
+            onClickRestoreDown={onClickRestoreDown}
+            onClickMaximise={onClickMaximise}
+            onToggleMaximizeApp={onToggleMaximizeApp}
+            handleMaximize={handleMaximize}
+            onClickMinimise={onClickMinimise}
+          />
 
           {/* Dividing Line below the window controls */}
           <div className="w-full h-[1px] bg-amber-500/20 my-1.5" />
@@ -618,7 +394,7 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
           data-testid="right-rail-timer-wrapper"
         >
           {renderDraggableLine("timer", "Timer")}
-          {renderTimerSection()}
+          <RailTimerSection />
         </div>
 
         {/* 3. System Stats Section: Dividing Line + Stats components underneath (Fixed order: always below timer) */}

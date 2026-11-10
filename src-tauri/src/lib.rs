@@ -7,6 +7,7 @@ pub mod dock;
 pub mod monitor;
 pub mod platform;
 pub mod snap;
+pub mod watchdog;
 
 use std::sync::atomic::Ordering;
 use tauri::{Emitter, Manager};

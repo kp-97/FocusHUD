@@ -1,45 +1,39 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
 use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
-    VK_CONTROL, VK_LBUTTON, VK_LEFT, VK_LWIN, VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT, VK_UP,
-};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART,
-    EnumWindows, GWL_EXSTYLE, GetCursorPos, GetForegroundWindow, GetMessageW, GetWindowLongW,
-    HHOOK, HWND_TOPMOST, IsIconic, IsWindow, IsWindowVisible, IsZoomed, KBDLLHOOKSTRUCT, MSG,
-    SW_HIDE, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_SHOWWINDOW,
-    SetWindowLongW, SetWindowPos, SetWindowsHookExW, ShowWindowAsync, TranslateMessage,
-    WH_KEYBOARD_LL, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_KEYDOWN, WM_SYSKEYDOWN,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
+    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GWL_EXSTYLE, GetCursorPos,
+    GetWindowLongW, HWND_TOPMOST, IsWindow, IsZoomed, SW_HIDE, SW_SHOWNA, SWP_ASYNCWINDOWPOS,
+    SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_SHOWWINDOW, SetWindowLongW, SetWindowPos,
+    ShowWindowAsync, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
 };
 
 use super::layout::{
-    CenterSnapLayoutState, LogicalRect, SnapLayoutTemplate, WindowMinMax, compute_top_bar_geometry,
-    hit_test_top_bar,
+    CenterSnapLayoutState, SnapLayoutTemplate, compute_top_bar_geometry, hit_test_top_bar,
 };
 use super::win32::{
-    enumerate_snap_assist_candidates, fit_window_to_visible_rect, fit_window_to_visible_rect_ex,
-    fit_windows_batch_fast, get_visible_window_rect, get_visible_window_rect_fast,
-    get_window_min_max_constraints, int_to_rect, is_snappable_app_window,
-    observe_window_min_size_if_clamped, rect_to_int, refresh_window_metrics_cache,
+    fit_windows_batch_fast, get_visible_window_rect, get_visible_window_rect_fast, int_to_rect,
+    is_snappable_app_window, rect_to_int, refresh_window_metrics_cache,
 };
 use super::{
     CENTER_SNAP_LAYOUT, LAST_ACTIVE_APP_HWND, OVERLAY_STATE, SnapOverlayMode, SnapOverlayState,
     SnapTargetKind, calculate_snap_rects, evaluate_boundary_drag_snap,
     get_snap_overlay_state_snapshot, is_rect_fitted,
 };
-use crate::dock::{PANES_RESERVE_ZONES, PRIMARY_SCALE_MILLI, SNAP_OVERLAY_HWND};
+use crate::dock::{PANES_RESERVE_ZONES, SNAP_OVERLAY_HWND, get_primary_scale_factor};
 use crate::monitor::get_current_work_area;
+
+pub use super::assist::*;
+pub use super::keyboard::*;
+pub use super::reflow::*;
 
 static SNAP_APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static DRAG_SESSION_ID: AtomicU64 = AtomicU64::new(0);
-static DOCK_DRAG_CAPTURED_WINDOWS: Mutex<Vec<(isize, SnapTargetKind)>> = Mutex::new(Vec::new());
-static LAST_FAST_REFLOW_INSTANT: Mutex<Option<Instant>> = Mutex::new(None);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct OverlayWindowConfig {
@@ -70,39 +64,6 @@ struct DragStartState {
 }
 
 static ACTIVE_DRAG_START: Mutex<Option<DragStartState>> = Mutex::new(None);
-
-fn get_primary_scale_factor() -> f64 {
-    let milli = PRIMARY_SCALE_MILLI.load(Ordering::Relaxed);
-    if milli > 100 {
-        (milli as f64) / 1000.0
-    } else {
-        1.0
-    }
-}
-
-fn collect_layout_constraints(layout: &CenterSnapLayoutState) -> Vec<Option<WindowMinMax>> {
-    layout
-        .zones
-        .iter()
-        .map(|opt_h| {
-            opt_h.and_then(|h_val| {
-                let h = h_val as HWND;
-                unsafe {
-                    (IsWindow(h) != 0 && IsWindowVisible(h) != 0 && IsIconic(h) == 0)
-                        .then(|| get_window_min_max_constraints(h))
-                }
-            })
-        })
-        .collect()
-}
-
-unsafe fn refresh_layout_window_caches() {
-    if let Some(layout) = CENTER_SNAP_LAYOUT.lock().ok().and_then(|l| l.clone()) {
-        for h_val in layout.zones.into_iter().flatten() {
-            unsafe { refresh_window_metrics_cache(h_val as HWND) };
-        }
-    }
-}
 
 fn resolve_snap_overlay_hwnd(app: &tauri::AppHandle) -> Option<HWND> {
     let cached = SNAP_OVERLAY_HWND.load(Ordering::Relaxed);
@@ -194,7 +155,7 @@ unsafe fn configure_and_sync_snap_overlay_window(state: &SnapOverlayState) {
     }
 }
 
-fn update_and_broadcast_overlay_state(new_state: SnapOverlayState) {
+pub(crate) fn update_and_broadcast_overlay_state(new_state: SnapOverlayState) {
     let changed = if let Ok(mut lock) = OVERLAY_STATE.lock() {
         let diff = lock.as_ref() != Some(&new_state);
         *lock = Some(new_state.clone());
@@ -222,334 +183,6 @@ pub fn hide_snap_overlay() {
         w_log,
         h_log,
     ));
-}
-
-pub unsafe fn apply_active_layout_windows(work_rect: RECT, skip_hwnd: Option<isize>) {
-    let Some(mut layout) = CENTER_SNAP_LAYOUT.lock().ok().and_then(|l| l.clone()) else {
-        return;
-    };
-    let constraints = collect_layout_constraints(&layout);
-    let work_int = rect_to_int(work_rect);
-    layout.clamp_splits(work_int, &constraints);
-    let zone_rects = layout.compute_zone_rects(work_int, &constraints);
-
-    if let Ok(mut lock) = CENTER_SNAP_LAYOUT.lock() {
-        *lock = Some(layout.clone());
-    }
-
-    let mut batch: Vec<(HWND, RECT)> = Vec::with_capacity(layout.zones.len());
-    for (idx, opt_hwnd) in layout.zones.iter().enumerate() {
-        if let (Some(h_val), Some(&z_int)) = (*opt_hwnd, zone_rects.get(idx)) {
-            if skip_hwnd != Some(h_val) {
-                let h = h_val as HWND;
-                unsafe {
-                    if IsWindow(h) != 0 && IsWindowVisible(h) != 0 && IsIconic(h) == 0 {
-                        batch.push((h, int_to_rect(z_int)));
-                    }
-                }
-            }
-        }
-    }
-    if !batch.is_empty() {
-        unsafe { fit_windows_batch_fast(&batch) };
-    }
-}
-
-/// Called once when the user starts dragging a FocusHUD dock border (`set_dock_drag_mode(..., true)`).
-/// Pre-caches DWM padding for all snapped/maximized windows so that live drag frames never run `EnumWindows`.
-pub unsafe fn prepare_for_dock_drag(work_rect: RECT) {
-    unsafe { refresh_layout_window_caches() };
-
-    let layout_hwnds: Vec<isize> = CENTER_SNAP_LAYOUT
-        .lock()
-        .ok()
-        .and_then(|l| {
-            l.as_ref()
-                .map(|s| s.zones.iter().filter_map(|&h| h).collect())
-        })
-        .unwrap_or_default();
-
-    struct PrepCtx {
-        work_rect: RECT,
-        layout_hwnds: Vec<isize>,
-        captured: Vec<(isize, SnapTargetKind)>,
-    }
-
-    unsafe extern "system" fn prep_cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
-        unsafe {
-            let ctx = &mut *(lparam as *mut PrepCtx);
-            let h_val = hwnd as isize;
-            if ctx.layout_hwnds.contains(&h_val) || !is_snappable_app_window(hwnd) {
-                return 1;
-            }
-            if IsZoomed(hwnd) != 0 {
-                refresh_window_metrics_cache(hwnd);
-                ctx.captured.push((h_val, SnapTargetKind::Full));
-                return 1;
-            }
-            let Some(vis) = get_visible_window_rect(hwnd) else {
-                return 1;
-            };
-            let (lh, rh) = calculate_snap_rects(ctx.work_rect);
-            let kind = if is_rect_fitted(vis, lh, 24) {
-                Some(SnapTargetKind::LeftHalf)
-            } else if is_rect_fitted(vis, rh, 24) {
-                Some(SnapTargetKind::RightHalf)
-            } else if is_rect_fitted(vis, ctx.work_rect, 24) {
-                Some(SnapTargetKind::Full)
-            } else {
-                None
-            };
-            if let Some(k) = kind {
-                refresh_window_metrics_cache(hwnd);
-                ctx.captured.push((h_val, k));
-            }
-        }
-        1
-    }
-
-    let mut ctx = PrepCtx {
-        work_rect,
-        layout_hwnds,
-        captured: Vec::new(),
-    };
-    unsafe { EnumWindows(Some(prep_cb), &mut ctx as *mut _ as LPARAM) };
-    if let Ok(mut lock) = DOCK_DRAG_CAPTURED_WINDOWS.lock() {
-        *lock = ctx.captured;
-    }
-}
-
-/// Fast non-blocking reflow executed during FocusHUD dock border dragging.
-/// Rate-limited to ~90 FPS (`11ms`) with `SWP_ASYNCWINDOWPOS` so external apps resize
-/// smoothly without blocking FocusHUD or building up a message backlog.
-pub unsafe fn reflow_snapped_windows_fast(new_rect: RECT) {
-    let now = Instant::now();
-    if let Ok(mut lock) = LAST_FAST_REFLOW_INSTANT.lock() {
-        if let Some(prev) = *lock {
-            if now.duration_since(prev) < Duration::from_millis(11) {
-                return;
-            }
-        }
-        *lock = Some(now);
-    }
-
-    unsafe { apply_active_layout_windows(new_rect, None) };
-
-    let captured = DOCK_DRAG_CAPTURED_WINDOWS
-        .lock()
-        .ok()
-        .map(|l| l.clone())
-        .unwrap_or_default();
-    if captured.is_empty() {
-        return;
-    }
-
-    let (new_l, new_r) = calculate_snap_rects(new_rect);
-    let mut batch: Vec<(HWND, RECT)> = Vec::with_capacity(captured.len());
-    for (h_val, kind) in captured {
-        let target = match kind {
-            SnapTargetKind::LeftHalf => new_l,
-            SnapTargetKind::RightHalf => new_r,
-            SnapTargetKind::Full => new_rect,
-        };
-        batch.push((h_val as HWND, target));
-    }
-    unsafe { fit_windows_batch_fast(&batch) };
-}
-
-pub unsafe fn advance_or_finish_snap_assist() {
-    let Some(work_rect) = get_current_work_area() else {
-        hide_snap_overlay();
-        return;
-    };
-    let Some(layout) = CENTER_SNAP_LAYOUT.lock().ok().and_then(|l| l.clone()) else {
-        hide_snap_overlay();
-        return;
-    };
-    let Some(next_idx) = layout.first_unassigned_zone() else {
-        hide_snap_overlay();
-        return;
-    };
-
-    let scale = get_primary_scale_factor();
-    let work_int = rect_to_int(work_rect);
-    let constraints = collect_layout_constraints(&layout);
-    let zone_rects = layout.compute_zone_rects(work_int, &constraints);
-    let Some(&target_int) = zone_rects.get(next_idx) else {
-        hide_snap_overlay();
-        return;
-    };
-
-    let assigned: Vec<isize> = layout.zones.iter().filter_map(|&h| h).collect();
-    let candidates = unsafe { enumerate_snap_assist_candidates(&assigned) };
-    let all_logical: Vec<LogicalRect> = zone_rects
-        .iter()
-        .map(|r| r.to_logical(work_rect.left, work_rect.top, scale))
-        .collect();
-    let filled: Vec<bool> = layout
-        .zones
-        .iter()
-        .enumerate()
-        .map(|(i, h)| h.is_some() || layout.skipped_zones.get(i).copied().unwrap_or(false))
-        .collect();
-
-    let (w_log, h_log) = (
-        (work_int.width() as f64) / scale,
-        (work_int.height() as f64) / scale,
-    );
-    let mut state = SnapOverlayState::with_bar(SnapOverlayMode::Assist, w_log, h_log);
-    state.active_template = Some(layout.template);
-    state.assist_zone_index = Some(next_idx);
-    state.assist_zone_rect = Some(target_int.to_logical(work_rect.left, work_rect.top, scale));
-    state.assist_all_zone_rects = all_logical;
-    state.assist_filled_zones = filled;
-    state.assist_candidates = candidates;
-    update_and_broadcast_overlay_state(state);
-}
-
-pub unsafe fn apply_snap_selection(hwnd: HWND, template: SnapLayoutTemplate, zone_index: usize) {
-    let Some(work_rect) = get_current_work_area() else {
-        return;
-    };
-    if !unsafe { is_snappable_app_window(hwnd) } {
-        return;
-    }
-
-    let mut layout = CenterSnapLayoutState::new(template);
-    let safe_idx = zone_index.min(layout.zones.len().saturating_sub(1));
-    layout.zones[safe_idx] = Some(hwnd as isize);
-
-    let constraints = collect_layout_constraints(&layout);
-    let work_int = rect_to_int(work_rect);
-    layout.clamp_splits(work_int, &constraints);
-    let zone_rects = layout.compute_zone_rects(work_int, &constraints);
-
-    if let Ok(mut lock) = CENTER_SNAP_LAYOUT.lock() {
-        *lock = Some(layout);
-    }
-
-    if let Some(&target_int) = zone_rects.get(safe_idx) {
-        let target_rect = int_to_rect(target_int);
-        unsafe { fit_window_to_visible_rect_ex(hwnd, target_rect, true, false) };
-        let hwnd_val = hwnd as isize;
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(35));
-            unsafe {
-                let h = hwnd_val as HWND;
-                if IsWindow(h) != 0 {
-                    observe_window_min_size_if_clamped(h, target_rect);
-                    apply_active_layout_windows(work_rect, Some(hwnd_val));
-                }
-            }
-        });
-    }
-
-    if template.zone_count() > 1 {
-        std::thread::spawn(|| unsafe {
-            advance_or_finish_snap_assist();
-        });
-    } else {
-        hide_snap_overlay();
-    }
-}
-
-pub fn select_snap_assist_window_win32(
-    hwnd_val: isize,
-    zone_index: usize,
-) -> Result<SnapOverlayState, String> {
-    let Some(work_rect) = get_current_work_area() else {
-        hide_snap_overlay();
-        return Ok(get_snap_overlay_state_snapshot());
-    };
-    let hwnd = hwnd_val as HWND;
-    if unsafe { !is_snappable_app_window(hwnd) } {
-        unsafe { advance_or_finish_snap_assist() };
-        return Ok(get_snap_overlay_state_snapshot());
-    }
-    if let Ok(mut lock) = CENTER_SNAP_LAYOUT.lock() {
-        if let Some(ref mut layout) = *lock {
-            if zone_index < layout.zones.len() {
-                layout.zones[zone_index] = Some(hwnd_val);
-            }
-        }
-    }
-    unsafe {
-        if let Some(layout) = CENTER_SNAP_LAYOUT.lock().ok().and_then(|l| l.clone()) {
-            let constraints = collect_layout_constraints(&layout);
-            let rects = layout.compute_zone_rects(rect_to_int(work_rect), &constraints);
-            if let Some(&target_int) = rects.get(zone_index) {
-                let target_rect = int_to_rect(target_int);
-                fit_window_to_visible_rect_ex(hwnd, target_rect, true, true);
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(35));
-                    let h = hwnd_val as HWND;
-                    if IsWindow(h) != 0 {
-                        observe_window_min_size_if_clamped(h, target_rect);
-                        apply_active_layout_windows(work_rect, None);
-                    }
-                });
-            }
-        }
-        apply_active_layout_windows(work_rect, Some(hwnd_val));
-        advance_or_finish_snap_assist();
-    }
-    Ok(get_snap_overlay_state_snapshot())
-}
-
-pub unsafe fn reflow_snapped_windows_on_boundary_change(prev_rect: RECT, new_rect: RECT) {
-    if let Ok(mut lock) = LAST_FAST_REFLOW_INSTANT.lock() {
-        *lock = None;
-    }
-    if let Ok(mut lock) = DOCK_DRAG_CAPTURED_WINDOWS.lock() {
-        lock.clear();
-    }
-    unsafe { apply_active_layout_windows(new_rect, None) };
-
-    #[repr(C)]
-    struct ReflowCtx {
-        prev_rect: RECT,
-        new_rect: RECT,
-    }
-
-    unsafe extern "system" fn reflow_cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
-        unsafe {
-            if !is_snappable_app_window(hwnd) {
-                return 1;
-            }
-            if CENTER_SNAP_LAYOUT
-                .lock()
-                .ok()
-                .and_then(|l| l.as_ref().map(|s| s.zones.contains(&Some(hwnd as isize))))
-                .unwrap_or(false)
-            {
-                return 1;
-            }
-            let ctx = &*(lparam as *const ReflowCtx);
-            if IsZoomed(hwnd) != 0 {
-                fit_windows_batch_fast(&[(hwnd, ctx.new_rect)]);
-                return 1;
-            }
-            let Some(vis) = get_visible_window_rect(hwnd) else {
-                return 1;
-            };
-            let (prev_l, prev_r) = calculate_snap_rects(ctx.prev_rect);
-            let (new_l, new_r) = calculate_snap_rects(ctx.new_rect);
-            if is_rect_fitted(vis, prev_l, 24) {
-                fit_window_to_visible_rect(hwnd, new_l);
-            } else if is_rect_fitted(vis, prev_r, 24) {
-                fit_window_to_visible_rect(hwnd, new_r);
-            } else if is_rect_fitted(vis, ctx.prev_rect, 24) {
-                fit_window_to_visible_rect(hwnd, ctx.new_rect);
-            }
-        }
-        1
-    }
-
-    let ctx = ReflowCtx {
-        prev_rect,
-        new_rect,
-    };
-    unsafe { EnumWindows(Some(reflow_cb), &ctx as *const _ as LPARAM) };
 }
 
 fn detect_initial_gesture(cursor: POINT, rect: RECT, was_zoomed: bool) -> DragGestureKind {
@@ -864,72 +497,6 @@ pub unsafe extern "system" fn win_event_hook_proc(
     }
 }
 
-unsafe fn suppress_start_menu_on_win_release() {
-    let make = |flags: u32| INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: 0xFF,
-                wScan: 0,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    let inputs = [make(0), make(KEYEVENTF_KEYUP)];
-    unsafe { SendInput(2, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
-}
-
-unsafe extern "system" fn keyboard_ll_hook_proc(
-    n_code: i32,
-    w_param: WPARAM,
-    l_param: LPARAM,
-) -> LRESULT {
-    if n_code >= 0
-        && (w_param == WM_KEYDOWN as usize || w_param == WM_SYSKEYDOWN as usize)
-        && PANES_RESERVE_ZONES.load(Ordering::Relaxed)
-        && !crate::dock::FULLSCREEN_ACTIVE.load(Ordering::Relaxed)
-    {
-        unsafe {
-            let vk = (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u16;
-            if matches!(vk, VK_LEFT | VK_RIGHT | VK_UP) {
-                let down = |k: u16| (GetAsyncKeyState(k as i32) as u16 & 0x8000) != 0;
-                if (down(VK_LWIN) || down(VK_RWIN))
-                    && !down(VK_SHIFT)
-                    && !down(VK_CONTROL)
-                    && !down(VK_MENU)
-                {
-                    let fg = GetForegroundWindow();
-                    let last = LAST_ACTIVE_APP_HWND.load(Ordering::Relaxed) as HWND;
-                    let target = if is_snappable_app_window(fg) {
-                        Some(fg)
-                    } else if is_snappable_app_window(last) {
-                        Some(last)
-                    } else {
-                        None
-                    };
-                    if let Some(hwnd) = target {
-                        let hwnd_val = hwnd as isize;
-                        suppress_start_menu_on_win_release();
-                        std::thread::spawn(move || {
-                            let h = hwnd_val as HWND;
-                            let (tpl, idx) = match vk {
-                                VK_LEFT => (SnapLayoutTemplate::Split50_50, 0),
-                                VK_RIGHT => (SnapLayoutTemplate::Split50_50, 1),
-                                _ => (SnapLayoutTemplate::SingleFull, 0),
-                            };
-                            apply_snap_selection(h, tpl, idx);
-                        });
-                        return 1;
-                    }
-                }
-            }
-        }
-    }
-    unsafe { CallNextHookEx(std::ptr::null_mut() as HHOOK, n_code, w_param, l_param) }
-}
-
 pub unsafe fn init_window_snap_hooks(app: &tauri::AppHandle) {
     let _ = SNAP_APP_HANDLE.set(app.clone());
     unsafe {
@@ -943,17 +510,5 @@ pub unsafe fn init_window_snap_hooks(app: &tauri::AppHandle) {
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
         );
     }
-    std::thread::spawn(|| unsafe {
-        let _hook = SetWindowsHookExW(
-            WH_KEYBOARD_LL,
-            Some(keyboard_ll_hook_proc),
-            std::ptr::null_mut(),
-            0,
-        );
-        let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-    });
+    start_keyboard_hook();
 }

@@ -31,37 +31,19 @@ export async function runLegacyStorageMigrationIfNeeded(): Promise<boolean> {
       return false;
     }
 
-    const rawGoals = localStorage.getItem("focushud_goals");
-    const rawTasks = localStorage.getItem("focushud_tasks");
-    const rawPlans = localStorage.getItem("focushud_action_plans");
-
-    let goals: LegacyGoalNode[] | undefined;
-    let tasks: LegacyTaskItem[] | undefined;
-    let actionPlans: LegacyActionPlanNode[] | undefined;
-
-    if (rawGoals) {
+    const safeParse = <T>(key: string): T | undefined => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return undefined;
       try {
-        goals = JSON.parse(rawGoals);
+        return JSON.parse(raw);
       } catch {
-        // Ignore JSON parse errors
+        return undefined;
       }
-    }
+    };
 
-    if (rawTasks) {
-      try {
-        tasks = JSON.parse(rawTasks);
-      } catch {
-        // Ignore JSON parse errors
-      }
-    }
-
-    if (rawPlans) {
-      try {
-        actionPlans = JSON.parse(rawPlans);
-      } catch {
-        // Ignore JSON parse errors
-      }
-    }
+    const goals = safeParse<LegacyGoalNode[]>("focushud_goals");
+    const tasks = safeParse<LegacyTaskItem[]>("focushud_tasks");
+    const actionPlans = safeParse<LegacyActionPlanNode[]>("focushud_action_plans");
 
     const payload: LegacyStorageData = {
       goals,

@@ -6,13 +6,18 @@
 import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NoteItem } from "../types/hud";
 import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans, syncNotes, syncCalendarEvents } from "../services/dbService";
 import { treeToGoalsFlat, treeToTasksFlat, treeToActionPlansFlat, appEventsToDb } from "../services/dbAdapters";
+import { getTodayDateString } from "../utils/formatters";
 
-export const getTodayString = (): string => {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+export const getTodayString = getTodayDateString;
+
+const loadEntity = <T>(key: string, fallback: T): T => {
+  const raw = localStorage.getItem(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
 };
 
 // Initial Goals
@@ -54,15 +59,7 @@ export const DEFAULT_GOALS: GoalNode[] = [
   },
 ];
 
-export const loadGoals = (): GoalNode[] => {
-  const raw = localStorage.getItem("focushud_goals");
-  if (!raw) return DEFAULT_GOALS;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_GOALS;
-  }
-};
+export const loadGoals = (): GoalNode[] => loadEntity("focushud_goals", DEFAULT_GOALS);
 
 export const saveGoals = (goals: GoalNode[]) => {
   localStorage.setItem("focushud_goals", JSON.stringify(goals));
@@ -125,15 +122,7 @@ export const DEFAULT_TASKS: TaskItem[] = [
   },
 ];
 
-export const loadTasks = (): TaskItem[] => {
-  const raw = localStorage.getItem("focushud_tasks");
-  if (!raw) return DEFAULT_TASKS;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_TASKS;
-  }
-};
+export const loadTasks = (): TaskItem[] => loadEntity("focushud_tasks", DEFAULT_TASKS);
 
 export const saveTasks = (tasks: TaskItem[]) => {
   localStorage.setItem("focushud_tasks", JSON.stringify(tasks));
@@ -177,15 +166,8 @@ export const DEFAULT_ACTION_PLANS: ActionPlanNode[] = [
   },
 ];
 
-export const loadActionPlans = (): ActionPlanNode[] => {
-  const raw = localStorage.getItem("focushud_action_plans");
-  if (!raw) return DEFAULT_ACTION_PLANS;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_ACTION_PLANS;
-  }
-};
+export const loadActionPlans = (): ActionPlanNode[] =>
+  loadEntity("focushud_action_plans", DEFAULT_ACTION_PLANS);
 
 export const saveActionPlans = (plans: ActionPlanNode[]) => {
   localStorage.setItem("focushud_action_plans", JSON.stringify(plans));
@@ -201,15 +183,7 @@ export const DEFAULT_EVENTS: CalendarEvent[] = [
   { id: "e3", title: "AI MODEL BENCHMARKING", date: getTodayString(), startTime: "15:30", endTime: "17:00", color: "#00e676" },
 ];
 
-export const loadEvents = (): CalendarEvent[] => {
-  const raw = localStorage.getItem("focushud_events");
-  if (!raw) return DEFAULT_EVENTS;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_EVENTS;
-  }
-};
+export const loadEvents = (): CalendarEvent[] => loadEntity("focushud_events", DEFAULT_EVENTS);
 
 export const saveEvents = (events: CalendarEvent[]) => {
   localStorage.setItem("focushud_events", JSON.stringify(events));
@@ -231,15 +205,7 @@ export const DEFAULT_NOTES: NoteItem[] = [
   },
 ];
 
-export const loadNotes = (): NoteItem[] => {
-  const raw = localStorage.getItem("focushud_notes");
-  if (!raw) return DEFAULT_NOTES;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_NOTES;
-  }
-};
+export const loadNotes = (): NoteItem[] => loadEntity("focushud_notes", DEFAULT_NOTES);
 
 export const saveNotes = (notes: NoteItem[]) => {
   localStorage.setItem("focushud_notes", JSON.stringify(notes));
