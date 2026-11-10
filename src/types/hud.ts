@@ -9,10 +9,16 @@ export type NavViewId =
   | "action_plans"
   | "timer";
 
+export type NavRailSide = "left" | "right";
+
+export type JoinedWindowState = "windowed" | "maximised" | "fullscreen" | "minimised";
+export type WindowModeState = JoinedWindowState | "split";
+
 export interface NavItemConfig {
   id: NavViewId;
   label: string;
   visible: boolean;
+  rail?: NavRailSide;
 }
 
 export interface NoteItem {

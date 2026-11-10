@@ -3,7 +3,12 @@
  * Manages dual-pane HUD layout widths, constraints, snapping, and cross-window commands.
  */
 
-import { NavItemConfig, NavViewId } from "../types/hud";
+import {
+  NavItemConfig,
+  NavViewId,
+  NavRailSide,
+  WindowModeState,
+} from "../types/hud";
 
 // Re-export entity store for full backwards compatibility
 export * from "./entityStore";
@@ -20,6 +25,13 @@ export const DEFAULT_NAV_CONFIG: NavItemConfig[] = [
   { id: "kanban", label: "KANBAN", visible: true },
 ];
 
+export const getNavItemRail = (item: NavItemConfig): NavRailSide => {
+  if (item.rail === "left" || item.rail === "right") {
+    return item.rail;
+  }
+  return item.id === "chat" ? "right" : "left";
+};
+
 export const loadNavConfig = (): NavItemConfig[] => {
   const raw = localStorage.getItem("focushud_nav_config");
   if (!raw) return DEFAULT_NAV_CONFIG;
@@ -35,11 +47,15 @@ export const loadNavConfig = (): NavItemConfig[] => {
       if (item && validIds.has(item.id) && !seen.has(item.id)) {
         seen.add(item.id);
         const defaultMatch = DEFAULT_NAV_CONFIG.find((d) => d.id === item.id);
-        result.push({
+        const entry: NavItemConfig = {
           id: item.id,
           label: item.label || defaultMatch?.label || item.id.toUpperCase(),
           visible: typeof item.visible === "boolean" ? item.visible : true,
-        });
+        };
+        if (item.rail === "left" || item.rail === "right") {
+          entry.rail = item.rail;
+        }
+        result.push(entry);
       }
     }
 
@@ -62,7 +78,7 @@ export const getInitialNav = (): NavViewId => {
 
 export const getInitialRightNav = (): NavViewId => {
   const saved = localStorage.getItem("focushud_active_right_nav");
-  return (saved as NavViewId) || "home";
+  return (saved as NavViewId) || "chat";
 };
 
 export const DEFAULT_LEFT_WIDTH = 360;
@@ -201,6 +217,13 @@ export type LayoutAction = (
   | { type: "MAXIMIZE_PANES" }
   | { type: "MAXIMIZE_APP" }
   | { type: "RESTORE_APP"; leftWidth: number; rightWidth: number }
+  | {
+      type: "SET_WINDOW_STATE";
+      state: WindowModeState;
+      priorFullscreenState?: WindowModeState;
+      leftWidth?: number;
+      rightWidth?: number;
+    }
   | { type: "SET_PANES_WIDTH"; leftWidth: number; rightWidth: number }
   | { type: "SET_LEFT_WIDTH"; width: number }
   | { type: "SET_RIGHT_WIDTH"; width: number }
@@ -223,6 +246,34 @@ export const broadcastLayoutAction = (action: LayoutAction) => {
 export const saveNavConfig = (config: NavItemConfig[]) => {
   localStorage.setItem("focushud_nav_config", JSON.stringify(config));
   broadcastLayoutAction({ type: "NAV_CONFIG_CHANGE", config });
+};
+
+export const reorderNavConfig = (
+  config: NavItemConfig[],
+  sourceId: NavViewId,
+  targetId?: NavViewId | null,
+  targetRail?: NavRailSide
+): NavItemConfig[] => {
+  const sourceIndex = config.findIndex((item) => item.id === sourceId);
+  if (sourceIndex === -1) return config;
+
+  const next = [...config];
+  const [moved] = next.splice(sourceIndex, 1);
+  const updatedItem: NavItemConfig = targetRail ? { ...moved, rail: targetRail } : { ...moved };
+
+  if (targetId && targetId !== sourceId) {
+    const targetIndex = next.findIndex((item) => item.id === targetId);
+    if (targetIndex !== -1) {
+      next.splice(targetIndex, 0, updatedItem);
+    } else {
+      next.push(updatedItem);
+    }
+  } else {
+    next.push(updatedItem);
+  }
+
+  saveNavConfig(next);
+  return next;
 };
 
 export const resetNavConfig = (): NavItemConfig[] => {
