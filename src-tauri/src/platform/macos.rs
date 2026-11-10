@@ -400,6 +400,49 @@ pub fn restore_work_area() -> Result<(), String> {
     Ok(())
 }
 
+pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), String> {
+    match state {
+        "windowed" | "maximised" | "fullscreen" => {
+            crate::dock::FULLSCREEN_ACTIVE.store(true, Ordering::Relaxed);
+            if let Some(w) = app.get_webview_window("left-dock") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("right-dock") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+        "minimised" => {
+            if let Some(w) = app.get_webview_window("left-dock") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("right-dock") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.hide();
+            }
+        }
+        "split" => {
+            crate::dock::FULLSCREEN_ACTIVE.store(false, Ordering::Relaxed);
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.hide();
+            }
+            if let Some(w) = app.get_webview_window("left-dock") {
+                let _ = w.show();
+            }
+            if let Some(w) = app.get_webview_window("right-dock") {
+                let _ = w.show();
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 pub fn set_fullscreen_mode(app: &tauri::AppHandle, fullscreen: bool) -> Result<(), String> {
     if fullscreen {
         if let Some(w) = app.get_webview_window("left-dock") {

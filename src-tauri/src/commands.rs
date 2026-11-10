@@ -87,6 +87,11 @@ pub fn set_fullscreen_mode(app: tauri::AppHandle, fullscreen: bool) -> Result<()
 }
 
 #[tauri::command]
+pub fn set_window_state(app: tauri::AppHandle, state: String) -> Result<(), String> {
+    platform::set_window_state(&app, &state)
+}
+
+#[tauri::command]
 pub fn set_panes_reserve_zones(app: tauri::AppHandle, reserve: bool) -> Result<(), String> {
     platform::set_panes_reserve_zones(&app, reserve)
 }

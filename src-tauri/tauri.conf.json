@@ -13,17 +13,17 @@
     "windows": [
       {
         "label": "main",
-        "title": "FocusHUD Full",
+        "title": "FocusHUD",
         "url": "index.html?dock=full",
         "width": 1920,
         "height": 1080,
         "decorations": false,
         "transparent": true,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "resizable": true,
         "shadow": false,
         "visible": false,
-        "skipTaskbar": true
+        "skipTaskbar": false
       },
       {
         "label": "left-dock",

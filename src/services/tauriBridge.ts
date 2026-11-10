@@ -5,6 +5,7 @@
  */
 
 import type { SystemDiagnostics } from "../types/diagnostics";
+import type { WindowModeState } from "../types/hud";
 import { invokeTauri, invokeTauriBool, isTauriEnvironment } from "./ipc";
 
 export type { SystemDiagnostics };
@@ -96,6 +97,10 @@ export async function moveWindowByDelta(deltaX: number, deltaY: number): Promise
 
 export async function setFullscreenMode(fullscreen: boolean): Promise<boolean> {
   return invokeTauriBool("set_fullscreen_mode", { fullscreen });
+}
+
+export async function setWindowState(state: WindowModeState): Promise<boolean> {
+  return invokeTauriBool("set_window_state", { state });
 }
 
 export async function setPanesReserveZonesMode(reserve: boolean): Promise<boolean> {
