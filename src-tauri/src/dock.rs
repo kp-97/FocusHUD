@@ -1,8 +1,8 @@
 #[cfg(target_os = "windows")]
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicI32};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 #[cfg(target_os = "windows")]
-use std::sync::atomic::{AtomicI64, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicIsize};
 #[cfg(target_os = "windows")]
 use tauri::Manager;
 

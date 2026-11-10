@@ -229,4 +229,3 @@ pub unsafe fn reflow_snapped_windows_on_boundary_change(prev_rect: RECT, new_rec
     };
     unsafe { EnumWindows(Some(reflow_cb), &ctx as *const _ as LPARAM) };
 }
-
