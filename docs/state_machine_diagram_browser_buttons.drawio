@@ -126,7 +126,7 @@
             <mxPoint x="750" y="340" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="qOEBZrx08R9U_kM8ge0c-72" value="Click Maximise" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" parent="qOEBZrx08R9U_kM8ge0c-71" vertex="1" connectable="0">
+        <mxCell id="qOEBZrx08R9U_kM8ge0c-72" value="Click Maximise&lt;div&gt;or Click Join&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" parent="qOEBZrx08R9U_kM8ge0c-71" vertex="1" connectable="0">
           <mxGeometry x="0.0201" y="-1" relative="1" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
