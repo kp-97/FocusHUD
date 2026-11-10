@@ -39,11 +39,11 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
   return (
     <div
       data-testid="right-dock-app"
-      className="w-screen h-screen flex justify-end overflow-visible bg-transparent text-cyan-200 select-none relative font-hud"
+      className="w-screen h-screen flex justify-end overflow-visible bg-transparent text-cyan-200 select-none relative font-hud pointer-events-none"
     >
       <div
         style={{ width: `${rightWidth}px` }}
-        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0"
+        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0 pointer-events-auto"
       >
         <div className="absolute top-0 bottom-0 left-0 w-2.5 z-50">
           <ResizeHandle

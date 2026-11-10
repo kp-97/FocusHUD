@@ -12,12 +12,18 @@ vi.mock("../services/tauriBridge", () => ({
   minimizeToTray: vi.fn().mockResolvedValue(true),
   setFullscreenMode: vi.fn().mockResolvedValue(true),
   setWindowState: vi.fn().mockResolvedValue(true),
+  getWindowState: vi.fn().mockResolvedValue(null),
+  startDraggingWindow: vi.fn().mockResolvedValue(true),
+  moveWindowByDelta: vi.fn().mockResolvedValue(true),
+  startResizeWindow: vi.fn().mockResolvedValue(true),
+  resizeWindowByDelta: vi.fn().mockResolvedValue(true),
   setPanesReserveZonesMode: vi.fn().mockResolvedValue(true),
 }));
 
 describe("useDockLayout hook", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -112,6 +118,8 @@ describe("useDockLayout hook", () => {
   });
 
   it("maximizes app freeing screen zones and restores back to docked state", async () => {
+    sessionStorage.setItem("focushud_booted", "true");
+    localStorage.setItem("focushud_window_state", "split");
     const { result } = renderHook(() => useDockLayout("full"));
 
     expect(result.current.isAppMaximized).toBe(false);
@@ -247,9 +255,15 @@ describe("useDockLayout hook", () => {
   it("implements the full window/layout state machine including Fullscreen prior-state guards and F11", async () => {
     const { result } = renderHook(() => useDockLayout("full"));
 
-    // 1. Default open is Windowed State inside Joined
-    expect(result.current.windowState).toBe("windowed");
+    // 1. Default boot on standard screen is Maximised State inside Joined
+    expect(result.current.windowState).toBe("maximised");
     expect(result.current.isJoinedMode).toBe(true);
+
+    // Click Restore Down -> Windowed
+    await act(async () => {
+      await result.current.handleClickRestoreDown();
+    });
+    expect(result.current.windowState).toBe("windowed");
 
     // 2. Enter Fullscreen from Windowed -> exiting Fullscreen returns to Windowed [if prior state = Windowed]
     await act(async () => {
@@ -331,5 +345,14 @@ describe("useDockLayout hook", () => {
     });
     expect(result.current.windowState).toBe("maximised");
     expect(result.current.isJoinedMode).toBe(true);
+  });
+
+  it("boots into split mode when screen is wider than widescreen (ultrawide)", () => {
+    Object.defineProperty(window.screen, "width", { value: 3440, configurable: true });
+    Object.defineProperty(window.screen, "height", { value: 1440, configurable: true });
+
+    const { result } = renderHook(() => useDockLayout("full"));
+    expect(result.current.windowState).toBe("split");
+    expect(result.current.isJoinedMode).toBe(false);
   });
 });

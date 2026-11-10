@@ -55,7 +55,11 @@ pub fn configure_dock_windows(app: &tauri::AppHandle) {
             }
         }
 
-        let _ = set_window_state(app, "windowed");
+        let mon_w = (rc_monitor.right - rc_monitor.left) as f64;
+        let mon_h = (rc_monitor.bottom - rc_monitor.top) as f64;
+        let is_ultrawide = mon_h > 0.0 && (mon_w / mon_h) > (16.0 / 9.0 + 0.01);
+        let boot_state = if is_ultrawide { "split" } else { "maximised" };
+        let _ = set_window_state(app, boot_state);
     }
 }
 
@@ -115,6 +119,23 @@ pub fn set_panes_reserve_zones(app: &tauri::AppHandle, reserve: bool) -> Result<
     Ok(())
 }
 
+unsafe fn set_window_resizable_win32(h: windows_sys::Win32::Foundation::HWND, resizable: bool) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GWL_STYLE, GetWindowLongW, SetWindowLongW, WS_MAXIMIZEBOX, WS_THICKFRAME,
+    };
+    let style = unsafe { GetWindowLongW(h, GWL_STYLE) } as u32;
+    let new_style = if resizable {
+        style | WS_THICKFRAME
+    } else {
+        style & !(WS_THICKFRAME | WS_MAXIMIZEBOX)
+    };
+    if new_style != style {
+        unsafe {
+            SetWindowLongW(h, GWL_STYLE, new_style as i32);
+        }
+    }
+}
+
 pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), String> {
     let prev = crate::dock::CURRENT_WINDOW_STATE.load(Ordering::Relaxed);
     let was_split = prev == crate::dock::WINDOW_STATE_SPLIT;
@@ -139,6 +160,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_always_on_top(false);
                 let _ = w.set_skip_taskbar(false);
+                let _ = w.set_resizable(true);
                 unsafe {
                     let (_, rc_work) = crate::monitor::get_primary_monitor_rects();
                     let work_w = rc_work.right - rc_work.left;
@@ -151,6 +173,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                     if let Ok(hwnd) = w.hwnd() {
                         let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
                         crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
+                        set_window_resizable_win32(h, true);
                         windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
                             h,
                             windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
@@ -158,7 +181,8 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                             win_y,
                             win_w,
                             win_h,
-                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
                         );
                     } else {
                         let _ = w.set_position(tauri::PhysicalPosition::new(win_x, win_y));
@@ -188,6 +212,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_always_on_top(false);
                 let _ = w.set_skip_taskbar(false);
+                let _ = w.set_resizable(false);
                 unsafe {
                     let (_, rc_work) = crate::monitor::get_primary_monitor_rects();
                     let work_left = rc_work.left;
@@ -198,6 +223,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                     if let Ok(hwnd) = w.hwnd() {
                         let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
                         crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
+                        set_window_resizable_win32(h, false);
                         windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
                             h,
                             windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
@@ -205,7 +231,8 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                             work_top,
                             work_width,
                             work_height,
-                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
                         );
                     } else {
                         let _ = w.set_position(tauri::PhysicalPosition::new(work_left, work_top));
@@ -241,6 +268,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_always_on_top(false);
                 let _ = w.set_skip_taskbar(false);
+                let _ = w.set_resizable(false);
                 unsafe {
                     let (rc_monitor, _) = crate::monitor::get_primary_monitor_rects();
                     let mon_left = rc_monitor.left;
@@ -251,6 +279,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                     if let Ok(hwnd) = w.hwnd() {
                         let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
                         crate::dock::MAIN_HWND.store(h as isize, Ordering::Relaxed);
+                        set_window_resizable_win32(h, false);
                         windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
                             h,
                             windows_sys::Win32::UI::WindowsAndMessaging::HWND_NOTOPMOST,
@@ -258,7 +287,8 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                             mon_top,
                             mon_width,
                             mon_height,
-                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_SHOWWINDOW
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
                         );
                     } else {
                         let _ = w.set_position(tauri::PhysicalPosition::new(mon_left, mon_top));
@@ -293,10 +323,39 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                 .store(crate::dock::WINDOW_STATE_SPLIT, Ordering::Relaxed);
             crate::dock::FULLSCREEN_ACTIVE.store(false, Ordering::Relaxed);
             crate::dock::MAIN_HWND.store(0, Ordering::Relaxed);
+            crate::snap::hide_snap_overlay();
 
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.hide();
+                if let Ok(hwnd) = w.hwnd() {
+                    let h = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+                    unsafe {
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                            HWND_BOTTOM, SW_HIDE, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE,
+                            SWP_NOSIZE, SWP_NOZORDER, SetWindowPos, ShowWindow,
+                        };
+                        ShowWindow(h, SW_HIDE);
+                        SetWindowPos(
+                            h,
+                            HWND_BOTTOM,
+                            -32000,
+                            -32000,
+                            0,
+                            0,
+                            SWP_HIDEWINDOW
+                                | SWP_NOACTIVATE
+                                | SWP_NOMOVE
+                                | SWP_NOSIZE
+                                | SWP_NOZORDER,
+                        );
+                    }
+                }
             }
+
+            // Invalidate cached clip regions so SetWindowRgn is guaranteed fresh on split
+            crate::dock::LAST_LEFT_REGION.store(-1, Ordering::Relaxed);
+            crate::dock::LAST_RIGHT_REGION.store(-1, Ordering::Relaxed);
+
             if let Some(w) = app.get_webview_window("left-dock") {
                 let _ = w.show();
             }

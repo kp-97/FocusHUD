@@ -4,6 +4,7 @@ import {
   restoreWorkArea,
   openSettingsWindow,
   setWindowState as invokeSetWindowState,
+  getWindowState,
   setPanesReserveZonesMode,
   minimizeToTray,
 } from "../services/tauriBridge";
@@ -75,6 +76,25 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
 
   const [windowState, setWindowState] = useState<WindowModeState>(() => {
     if (typeof window !== "undefined") {
+      if (dockWindowType === "left" || dockWindowType === "right") {
+        return "split";
+      }
+
+      const isUltrawide =
+        window.screen.width / Math.max(1, window.screen.height) > 16 / 9 + 0.01;
+      const bootState: WindowModeState = isUltrawide ? "split" : "maximised";
+
+      const hasBooted = sessionStorage.getItem("focushud_booted");
+      if (!hasBooted) {
+        sessionStorage.setItem("focushud_booted", "true");
+        localStorage.setItem("focushud_window_state", bootState);
+        localStorage.setItem(
+          "focushud_is_app_maximized",
+          String(bootState === "maximised")
+        );
+        return bootState;
+      }
+
       const savedState = localStorage.getItem("focushud_window_state") as WindowModeState | null;
       if (
         savedState === "windowed" ||
@@ -85,11 +105,9 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
       ) {
         return savedState;
       }
-      const savedMax = localStorage.getItem("focushud_is_app_maximized");
-      if (savedMax === "true") return "maximised";
-      if (dockWindowType === "left" || dockWindowType === "right") return "split";
+      return bootState;
     }
-    return "windowed";
+    return "maximised";
   });
 
   const [priorFullscreenState, setPriorFullscreenState] = useState<WindowModeState>(() => {
@@ -127,6 +145,14 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
       .then((info) => {
         if (info && info.available) {
           setUpdateInfo(info);
+        }
+      })
+      .catch(() => {});
+
+    getWindowState()
+      .then((st) => {
+        if (st) {
+          setWindowState(st);
         }
       })
       .catch(() => {});

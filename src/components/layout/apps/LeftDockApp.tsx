@@ -38,11 +38,11 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
   return (
     <div
       data-testid="left-dock-app"
-      className="w-screen h-screen flex justify-start overflow-visible bg-transparent text-cyan-200 select-none relative font-hud"
+      className="w-screen h-screen flex justify-start overflow-visible bg-transparent text-cyan-200 select-none relative font-hud pointer-events-none"
     >
       <div
         style={{ width: `${leftWidth}px` }}
-        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0"
+        className="relative h-full flex flex-row bg-[#03070d] overflow-visible shrink-0 pointer-events-auto"
       >
         <LeftSidebar
           width={leftWidth}

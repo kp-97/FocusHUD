@@ -53,9 +53,9 @@ pub static MAIN_HWND: AtomicIsize = AtomicIsize::new(0);
 pub static SNAP_OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
 
 #[cfg(target_os = "windows")]
-static LAST_LEFT_REGION: AtomicI64 = AtomicI64::new(-1);
+pub static LAST_LEFT_REGION: AtomicI64 = AtomicI64::new(-1);
 #[cfg(target_os = "windows")]
-static LAST_RIGHT_REGION: AtomicI64 = AtomicI64::new(-1);
+pub static LAST_RIGHT_REGION: AtomicI64 = AtomicI64::new(-1);
 #[cfg(target_os = "windows")]
 static DOCK_LIVE_RESIZE_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "windows")]

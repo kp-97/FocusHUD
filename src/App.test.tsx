@@ -14,6 +14,11 @@ vi.mock("./services/tauriBridge", () => ({
   minimizeToTray: vi.fn().mockResolvedValue(true),
   setFullscreenMode: vi.fn().mockResolvedValue(true),
   setWindowState: vi.fn().mockResolvedValue(true),
+  getWindowState: vi.fn().mockResolvedValue(null),
+  startDraggingWindow: vi.fn().mockResolvedValue(true),
+  moveWindowByDelta: vi.fn().mockResolvedValue(true),
+  startResizeWindow: vi.fn().mockResolvedValue(true),
+  resizeWindowByDelta: vi.fn().mockResolvedValue(true),
   setPanesReserveZonesMode: vi.fn().mockResolvedValue(true),
   getSnapOverlayState: vi.fn().mockResolvedValue(null),
   selectSnapAssistWindow: vi.fn().mockResolvedValue(null),
@@ -34,6 +39,7 @@ vi.mock("./services/updaterService", () => ({
 describe("App root window dispatcher", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -86,20 +92,22 @@ describe("App root window dispatcher", () => {
     expect(screen.queryByTestId("full-layout-app")).not.toBeInTheDocument();
   });
 
-  it("starts in Windowed State (Default Open) inside Joined mode and transitions through Maximised, Fullscreen, and Split states", async () => {
+  it("boots into Maximised Windowed mode on standard screens and allows dragging top and resizing when Restored Down", async () => {
     setLocationSearch("");
     render(<App />);
 
-    // Starts in Windowed State (Default Open) inside Joined mode:
+    // On standard (non-ultrawide) screens, boots into Maximised mode inside Joined:
     // Whole canvas view container is rendered; left and right pane toggles are removed
     expect(screen.getByTestId("full-screen-view-container")).toBeInTheDocument();
     expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
       "data-window-state",
-      "windowed"
+      "maximised"
     );
     expect(screen.queryByTestId("center-preview-container")).not.toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-toggle-left")).not.toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-toggle-right")).not.toBeInTheDocument();
+    // Top drag bar is hidden in Maximised
+    expect(screen.queryByTestId("windowed-top-drag-bar")).not.toBeInTheDocument();
 
     // AI Chat button is on the right rail by default
     expect(screen.getByTestId("right-rail-nav-chat")).toBeInTheDocument();
@@ -120,7 +128,39 @@ describe("App root window dispatcher", () => {
     });
     expect(screen.getByText(/AI AGENT CHAT/i)).toBeInTheDocument();
 
-    // Click Maximise -> Maximised State (Full Screen)
+    // Click Restore Down -> transitions to Windowed State (restored down)
+    const restoreBtn = screen.getByTestId("window-btn-restore-down");
+    await act(async () => {
+      restoreBtn.click();
+    });
+    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
+      "data-window-state",
+      "windowed"
+    );
+
+    // In Windowed State (restored down), draggable top bar and edge resize handles are rendered
+    const topBar = screen.getByTestId("windowed-top-drag-bar");
+    expect(topBar).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-top")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-bottom")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-left")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-right")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-top-left")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-top-right")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-bottom-left")).toBeInTheDocument();
+    expect(screen.getByTestId("window-resize-bottom-right")).toBeInTheDocument();
+
+    // User can drag top bar to move window
+    act(() => {
+      topBar.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 100, clientY: 10 }));
+    });
+
+    // User can drag resize handles
+    act(() => {
+      screen.getByTestId("window-resize-right").dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 500, clientY: 200 }));
+    });
+
+    // Click Maximise -> transitions back to Maximised State
     const maxBtn = screen.getByTestId("window-btn-maximise");
     await act(async () => {
       maxBtn.click();
@@ -129,16 +169,7 @@ describe("App root window dispatcher", () => {
       "data-window-state",
       "maximised"
     );
-    expect(screen.getByTestId("window-btn-restore-down")).toBeInTheDocument();
-
-    // Click Restore Down -> back to Windowed State
-    await act(async () => {
-      screen.getByTestId("window-btn-restore-down").click();
-    });
-    expect(screen.getByTestId("full-screen-view-container")).toHaveAttribute(
-      "data-window-state",
-      "windowed"
-    );
+    expect(screen.queryByTestId("windowed-top-drag-bar")).not.toBeInTheDocument();
 
     // Click Split -> transitions out of Joined into Split mode
     const splitBtn = screen.getByTestId("window-btn-split");
@@ -176,5 +207,15 @@ describe("App root window dispatcher", () => {
       "maximised"
     );
     expect(screen.queryByTestId("center-preview-container")).not.toBeInTheDocument();
+  });
+
+  it("boots into Split mode when the display is wider than widescreen (ultrawide)", () => {
+    // Ultrawide 3440 x 1440 (aspect ratio ~2.39 > 16/9)
+    Object.defineProperty(window.screen, "width", { value: 3440, configurable: true });
+    Object.defineProperty(window.screen, "height", { value: 1440, configurable: true });
+
+    render(<App />);
+    expect(screen.getByTestId("center-preview-container")).toBeInTheDocument();
+    expect(screen.queryByTestId("full-screen-view-container")).not.toBeInTheDocument();
   });
 });

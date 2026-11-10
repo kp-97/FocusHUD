@@ -27,7 +27,9 @@ pub fn get_screen_metrics(app: &tauri::AppHandle) -> Result<ScreenMetrics, Strin
     }
 }
 
-pub fn configure_dock_windows(_app: &tauri::AppHandle) {}
+pub fn configure_dock_windows(app: &tauri::AppHandle) {
+    let _ = set_window_state(app, "maximised");
+}
 
 pub fn configure_settings_window(_window: &tauri::WebviewWindow) {}
 
@@ -69,6 +71,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                 let _ = w.hide();
             }
             if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_resizable(state == "windowed");
                 let _ = w.show();
                 let _ = w.set_focus();
             }

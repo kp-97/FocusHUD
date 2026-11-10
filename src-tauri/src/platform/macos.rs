@@ -145,6 +145,20 @@ pub fn configure_dock_windows(app: &tauri::AppHandle) {
     let left_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
     let right_w = CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
     apply_dock_geometry(app, left_w, right_w);
+
+    let metrics = get_screen_metrics(app).unwrap_or(ScreenMetrics {
+        screen_width: 3440,
+        screen_height: 1440,
+        original_left: 0,
+        original_top: 28,
+        original_right: 3440,
+        original_bottom: 1440,
+    });
+    let mon_w = metrics.screen_width as f64;
+    let mon_h = metrics.screen_height as f64;
+    let is_ultrawide = mon_h > 0.0 && (mon_w / mon_h) > (16.0 / 9.0 + 0.01);
+    let boot_state = if is_ultrawide { "split" } else { "maximised" };
+    let _ = set_window_state(app, boot_state);
 }
 
 /// Configures centered settings window as a floating utility panel on macOS
@@ -411,6 +425,7 @@ pub fn set_window_state(app: &tauri::AppHandle, state: &str) -> Result<(), Strin
                 let _ = w.hide();
             }
             if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_resizable(state == "windowed");
                 let _ = w.show();
                 let _ = w.set_focus();
             }
@@ -474,6 +489,20 @@ pub fn init_window_snapping(app: &tauri::AppHandle) {
     let left_w = CURRENT_LEFT_WIDTH.load(Ordering::Relaxed);
     let right_w = CURRENT_RIGHT_WIDTH.load(Ordering::Relaxed);
     apply_dock_geometry(app, left_w, right_w);
+
+    let metrics = get_screen_metrics(app).unwrap_or(ScreenMetrics {
+        screen_width: 3440,
+        screen_height: 1440,
+        original_left: 0,
+        original_top: 28,
+        original_right: 3440,
+        original_bottom: 1440,
+    });
+    let mon_w = metrics.screen_width as f64;
+    let mon_h = metrics.screen_height as f64;
+    let is_ultrawide = mon_h > 0.0 && (mon_w / mon_h) > (16.0 / 9.0 + 0.01);
+    let boot_state = if is_ultrawide { "split" } else { "maximised" };
+    let _ = set_window_state(app, boot_state);
 }
 
 pub fn spawn_watchdog(_metrics: ScreenMetrics) {}
