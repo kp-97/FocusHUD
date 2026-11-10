@@ -1,6 +1,12 @@
 #[cfg(target_os = "windows")]
+pub mod assist;
+#[cfg(target_os = "windows")]
 pub mod hooks;
+#[cfg(target_os = "windows")]
+pub mod keyboard;
 pub mod layout;
+#[cfg(target_os = "windows")]
+pub mod reflow;
 #[cfg(target_os = "windows")]
 pub mod win32;
 
