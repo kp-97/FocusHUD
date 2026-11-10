@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
 import { playSessionCompleteSound } from "../services/audioService";
+import { getTodayDateString } from "../utils/formatters";
+import {
+  PomodoroSyncActionType,
+  PomodoroSyncPayload,
+  WINDOW_ID,
+  postPomodoroSync,
+  setupPomodoroSyncListeners,
+} from "./pomodoroSync";
+
+export type { PomodoroSyncActionType, PomodoroSyncPayload };
 
 export type PomodoroMode = "focus" | "short_break" | "long_break";
 
@@ -23,18 +33,18 @@ export interface PomodoroState {
   dailyStats: DailyStats;
 }
 
-const getTodayDateString = (): string => {
-  return new Date().toISOString().split("T")[0];
-};
-
-const getStoredNumber = (key: string, fallbackKey: string, defaultValue: number): number => {
-  const val = localStorage.getItem(key) || localStorage.getItem(fallbackKey);
+const getStoredPomodoroNumber = (suffix: string, defaultValue: number): number => {
+  const val =
+    localStorage.getItem(`focushud_pomodoro_${suffix}`) ||
+    localStorage.getItem(`focusdock_pomodoro_${suffix}`);
   return val ? parseInt(val, 10) : defaultValue;
 };
 
 const loadInitialDailyStats = (): DailyStats => {
   const today = getTodayDateString();
-  const raw = localStorage.getItem("focushud_pomodoro_daily") || localStorage.getItem("focusdock_pomodoro_daily");
+  const raw =
+    localStorage.getItem("focushud_pomodoro_daily") ||
+    localStorage.getItem("focusdock_pomodoro_daily");
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as DailyStats;
@@ -53,10 +63,10 @@ const loadInitialDailyStats = (): DailyStats => {
   return { date: today, completedPomodoros: 0, totalFocusMinutes: 0, focusSecondsElapsed: 0 };
 };
 
-const initialFocusMinutes = getStoredNumber("focushud_pomodoro_focus_min", "focusdock_pomodoro_focus_min", 25);
-const initialShortBreak = getStoredNumber("focushud_pomodoro_short_min", "focusdock_pomodoro_short_min", 5);
-const initialLongBreak = getStoredNumber("focushud_pomodoro_long_min", "focusdock_pomodoro_long_min", 15);
-const initialTotalCycles = getStoredNumber("focushud_pomodoro_total_cycles", "focusdock_pomodoro_total_cycles", 4);
+const initialFocusMinutes = getStoredPomodoroNumber("focus_min", 25);
+const initialShortBreak = getStoredPomodoroNumber("short_min", 5);
+const initialLongBreak = getStoredPomodoroNumber("long_min", 15);
+const initialTotalCycles = getStoredPomodoroNumber("total_cycles", 4);
 
 let state: PomodoroState = {
   mode: "focus",
@@ -77,56 +87,8 @@ const listeners = new Set<Listener>();
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let isLocalTicker = false;
 
-// Cross-window Pomodoro synchronization via BroadcastChannel
-const POMODORO_CHANNEL_NAME = "focushud_pomodoro_channel";
-const pomodoroChannel =
-  typeof BroadcastChannel !== "undefined"
-    ? new BroadcastChannel(POMODORO_CHANNEL_NAME)
-    : null;
-
-const WINDOW_ID =
-  typeof window !== "undefined"
-    ? `win_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`
-    : "win_node";
-
-export type PomodoroSyncActionType =
-  | "START"
-  | "PAUSE"
-  | "STOP"
-  | "TICK"
-  | "COMPLETE"
-  | "SWITCH_MODE"
-  | "RESET"
-  | "SKIP_PHASE"
-  | "ADJUST"
-  | "SETTINGS_CHANGE"
-  | "STATS_UPDATE"
-  | "REQUEST_SYNC";
-
-export interface PomodoroSyncPayload {
-  type: PomodoroSyncActionType;
-  state: PomodoroState;
-  senderId: string;
-  timestamp: number;
-}
-
 export const broadcastPomodoroSync = (type: PomodoroSyncActionType) => {
-  const payload: PomodoroSyncPayload = {
-    type,
-    state: { ...state, dailyStats: { ...state.dailyStats } },
-    senderId: WINDOW_ID,
-    timestamp: Date.now(),
-  };
-
-  if (pomodoroChannel) {
-    pomodoroChannel.postMessage(payload);
-  }
-
-  try {
-    localStorage.setItem("focushud_last_pomodoro_sync", JSON.stringify(payload));
-  } catch {
-    // Ignore storage quota or disabled storage
-  }
+  postPomodoroSync(type, state);
 };
 
 const handleIncomingSync = (payload: PomodoroSyncPayload) => {
@@ -175,37 +137,7 @@ const handleIncomingSync = (payload: PomodoroSyncPayload) => {
   }
 };
 
-if (pomodoroChannel) {
-  pomodoroChannel.addEventListener("message", (e: MessageEvent) => {
-    if (e.data && e.data.type) {
-      handleIncomingSync(e.data as PomodoroSyncPayload);
-    }
-  });
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (e: StorageEvent) => {
-    if (e.key === "focushud_last_pomodoro_sync" && e.newValue) {
-      try {
-        const parsed = JSON.parse(e.newValue);
-        if (parsed && parsed.type) {
-          handleIncomingSync(parsed as PomodoroSyncPayload);
-        }
-      } catch {}
-    }
-  });
-
-  try {
-    if (pomodoroChannel) {
-      pomodoroChannel.postMessage({
-        type: "REQUEST_SYNC",
-        state: { ...state },
-        senderId: WINDOW_ID,
-        timestamp: Date.now(),
-      });
-    }
-  } catch {}
-}
+setupPomodoroSyncListeners(handleIncomingSync, () => state);
 
 const notify = () => {
   listeners.forEach((l) => l({ ...state }));
