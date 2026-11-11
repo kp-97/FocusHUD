@@ -5,6 +5,7 @@ pub mod db;
 pub mod diagnostics;
 pub mod dock;
 pub mod monitor;
+pub mod notes_storage;
 pub mod platform;
 pub mod snap;
 pub mod watchdog;
@@ -78,10 +79,26 @@ pub fn run() {
             commands::get_snap_overlay_state,
             commands::select_snap_assist_window,
             commands::skip_snap_assist_zone,
-            commands::dismiss_snap_assist
+            commands::dismiss_snap_assist,
+            commands::get_notes_dir,
+            commands::set_notes_dir,
+            commands::pick_notes_dir,
+            commands::list_note_folders,
+            commands::create_note_folder,
+            commands::rename_note_folder,
+            commands::delete_note_folder,
+            commands::move_note_to_folder,
+            commands::read_note_file
         ])
         .setup(|app| {
             let conn = db::init_db(app.handle())?;
+            let notes_dir = notes_storage::get_configured_notes_dir(app.handle(), &conn);
+            let _ = notes_storage::migrate_sqlite_to_disk(&conn, &notes_dir);
+            let _ = notes_storage::scan_and_index_directory(&conn, &notes_dir);
+            let watcher = notes_storage::start_notes_watcher(app.handle().clone(), notes_dir);
+            app.manage(notes_storage::NotesWatcherState(std::sync::Arc::new(
+                std::sync::Mutex::new(watcher.ok()),
+            )));
             app.manage(db::DbState(std::sync::Mutex::new(conn)));
 
             platform::configure_dock_windows(app.handle());
