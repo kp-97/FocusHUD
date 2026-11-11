@@ -33,7 +33,6 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     containerRef,
     containerWidth,
     middleWidth,
-    magneticSnap,
     activeNav,
     setActiveNav,
     isSettingsOpen,
@@ -66,7 +65,8 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     handleClickMinimise,
     handleToggleMaximizeApp,
     handleResetWidths,
-    SNAP_POINTS,
+    centerLineWidth,
+    snapPoints,
     MIN_LEFT_WIDTH,
   } = layout;
 
@@ -306,8 +306,8 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
               side="left"
               currentWidth={leftWidth}
               minWidth={MIN_LEFT_WIDTH}
-              maxWidth={containerWidth - MIN_LEFT_WIDTH}
-              snapPoints={magneticSnap ? SNAP_POINTS : []}
+              maxWidth={centerLineWidth || (containerWidth - MIN_LEFT_WIDTH)}
+              snapPoints={snapPoints}
               onDragChange={handleLeftDragChange}
               onDragEnd={handleLeftDragEnd}
               onDoubleClick={handleLeftDoubleClick}
@@ -327,8 +327,8 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
               side="right"
               currentWidth={rightWidth}
               minWidth={MIN_LEFT_WIDTH}
-              maxWidth={containerWidth - MIN_LEFT_WIDTH}
-              snapPoints={magneticSnap ? SNAP_POINTS : []}
+              maxWidth={centerLineWidth || (containerWidth - MIN_LEFT_WIDTH)}
+              snapPoints={snapPoints}
               onDragChange={handleRightDragChange}
               onDragEnd={handleRightDragEnd}
               onDoubleClick={handleRightDoubleClick}

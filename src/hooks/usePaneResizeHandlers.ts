@@ -11,6 +11,7 @@ import {
   DEFAULT_RIGHT_WIDTH,
   broadcastLayoutAction,
 } from "../stores/layoutStore";
+import type { WindowModeState } from "../types/hud";
 import type { DockWindowType } from "./useDockLayout";
 
 export interface PaneResizeHandlersParams {
@@ -22,6 +23,9 @@ export interface PaneResizeHandlersParams {
   desktopDockActive: boolean;
   setDesktopDockActive: (active: boolean) => void;
   setMagneticSnap: (snap: boolean) => void;
+  windowState?: WindowModeState;
+  onJoin?: () => Promise<void> | void;
+  centerLineWidth?: number;
 }
 
 export function usePaneResizeHandlers({
@@ -33,6 +37,9 @@ export function usePaneResizeHandlers({
   desktopDockActive,
   setDesktopDockActive,
   setMagneticSnap,
+  windowState,
+  onJoin,
+  centerLineWidth,
 }: PaneResizeHandlersParams) {
   // Drag handlers for Left Bar
   const handleLeftDragChange = (newWidth: number) => {
@@ -43,13 +50,23 @@ export function usePaneResizeHandlers({
   };
 
   const handleLeftDragEnd = (finalWidth: number) => {
+    const isJoining = Boolean(
+      centerLineWidth &&
+        finalWidth >= centerLineWidth - 14 &&
+        onJoin &&
+        (windowState === "split" || dockWindowType === "left" || dockWindowType === "right")
+    );
+
     setLeftWidth(finalWidth);
-    if (finalWidth >= 120) {
+    if (finalWidth >= 120 && !isJoining) {
       setRememberedLeftWidth(finalWidth);
     }
     broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: finalWidth, sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(finalWidth, null, true);
+    }
+    if (isJoining && onJoin) {
+      onJoin();
     }
   };
 
@@ -80,13 +97,23 @@ export function usePaneResizeHandlers({
   };
 
   const handleRightDragEnd = (finalWidth: number) => {
+    const isJoining = Boolean(
+      centerLineWidth &&
+        finalWidth >= centerLineWidth - 14 &&
+        onJoin &&
+        (windowState === "split" || dockWindowType === "left" || dockWindowType === "right")
+    );
+
     setRightWidth(finalWidth);
-    if (finalWidth >= 120) {
+    if (finalWidth >= 120 && !isJoining) {
       setRememberedRightWidth(finalWidth);
     }
     broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: finalWidth, sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(null, finalWidth, true);
+    }
+    if (isJoining && onJoin) {
+      onJoin();
     }
   };
 

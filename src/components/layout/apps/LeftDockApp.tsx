@@ -14,7 +14,6 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
     rightWidth,
     activeNav,
     setActiveNav,
-    magneticSnap,
     isSettingsOpen,
     settingsTab,
     setIsSettingsOpen,
@@ -31,7 +30,8 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
     handleLeftDragEnd,
     handleLeftDoubleClick,
     handleResetWidths,
-    SNAP_POINTS,
+    centerLineWidth,
+    snapPoints,
     MIN_LEFT_WIDTH,
   } = layout;
 
@@ -69,8 +69,8 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
             side="left"
             currentWidth={leftWidth}
             minWidth={MIN_LEFT_WIDTH}
-            maxWidth={typeof window !== "undefined" ? window.innerWidth - MIN_LEFT_WIDTH : undefined}
-            snapPoints={magneticSnap ? SNAP_POINTS : []}
+            maxWidth={centerLineWidth}
+            snapPoints={snapPoints}
             className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
             onDragChange={handleLeftDragChange}
             onDragEnd={handleLeftDragEnd}

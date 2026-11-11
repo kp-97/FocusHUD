@@ -355,4 +355,55 @@ describe("useDockLayout hook", () => {
     expect(result.current.windowState).toBe("split");
     expect(result.current.isJoinedMode).toBe(false);
   });
+
+  it("triggers join when left pane is dragged to the center line in split mode", async () => {
+    sessionStorage.setItem("focushud_booted", "true");
+    localStorage.setItem("focushud_window_state", "split");
+
+    const { result } = renderHook(() => useDockLayout("full"));
+    expect(result.current.windowState).toBe("split");
+    expect(result.current.isJoinedMode).toBe(false);
+
+    const center = result.current.centerLineWidth;
+    expect(center).toBeGreaterThan(0);
+
+    // Initial remembered width is 280
+    expect(layoutStore.getRememberedLeftWidth()).toBe(280);
+
+    // Drag left pane to center line
+    await act(async () => {
+      await result.current.handleLeftDragEnd(center);
+    });
+
+    // Should transition to joined/maximised mode
+    expect(result.current.windowState).toBe("maximised");
+    expect(result.current.isJoinedMode).toBe(true);
+
+    // Remembered width should NOT be overwritten with the 50% width
+    expect(layoutStore.getRememberedLeftWidth()).toBe(280);
+  });
+
+  it("triggers join when right pane is dragged to the center line in split mode", async () => {
+    sessionStorage.setItem("focushud_booted", "true");
+    localStorage.setItem("focushud_window_state", "split");
+
+    const { result } = renderHook(() => useDockLayout("full"));
+    expect(result.current.windowState).toBe("split");
+    expect(result.current.isJoinedMode).toBe(false);
+
+    const center = result.current.centerLineWidth;
+    expect(center).toBeGreaterThan(0);
+
+    expect(layoutStore.getRememberedRightWidth()).toBe(280);
+
+    // Drag right pane to within magnetic threshold of center line
+    await act(async () => {
+      await result.current.handleRightDragEnd(center - 10);
+    });
+
+    expect(result.current.windowState).toBe("maximised");
+    expect(result.current.isJoinedMode).toBe(true);
+
+    expect(layoutStore.getRememberedRightWidth()).toBe(280);
+  });
 });

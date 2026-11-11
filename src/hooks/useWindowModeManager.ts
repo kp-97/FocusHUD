@@ -106,6 +106,8 @@ export function useWindowModeManager({
       type: "SET_WINDOW_STATE",
       state: "maximised",
       sender: dockWindowType,
+      leftWidth,
+      rightWidth,
     });
     await invokeSetWindowState("maximised");
   }, [windowState, leftWidth, rightWidth, dockWindowType, preMaximizedLayoutRef, setWindowState]);
@@ -257,6 +259,8 @@ export function useWindowModeManager({
       type: "SET_WINDOW_STATE",
       state: "maximised",
       sender: dockWindowType,
+      leftWidth,
+      rightWidth,
     });
     await invokeSetWindowState("maximised");
   }, [dockWindowType, setWindowState]);

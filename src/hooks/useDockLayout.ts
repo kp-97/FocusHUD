@@ -92,6 +92,15 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     typeof window !== "undefined" ? window.innerWidth : 1200
   );
 
+  const centerLineWidth =
+    typeof window !== "undefined"
+      ? Math.round(
+          (dockWindowType === "full"
+            ? containerWidth
+            : window.screen?.availWidth || window.screen?.width || window.innerWidth || 1920) / 2
+        )
+      : 960;
+
   // Check for updates on startup
   useEffect(() => {
     checkForUpdates(false)
@@ -133,20 +142,20 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     };
   }, []);
 
-  // Save widths to localStorage and remember expanded widths when >= 120px
+  // Save widths to localStorage and remember expanded widths when >= 120px (unless near center line joining)
   useEffect(() => {
     localStorage.setItem("hud_left_width", String(leftWidth));
-    if (leftWidth >= 120) {
+    if (leftWidth >= 120 && (!centerLineWidth || leftWidth < centerLineWidth - 14)) {
       setRememberedLeftWidth(leftWidth);
     }
-  }, [leftWidth]);
+  }, [leftWidth, centerLineWidth]);
 
   useEffect(() => {
     localStorage.setItem("hud_right_width", String(rightWidth));
-    if (rightWidth >= 120) {
+    if (rightWidth >= 120 && (!centerLineWidth || rightWidth < centerLineWidth - 14)) {
       setRememberedRightWidth(rightWidth);
     }
-  }, [rightWidth]);
+  }, [rightWidth, centerLineWidth]);
 
   // Initial sync of dock sizes and reserve-zones mode on startup
   useEffect(() => {
@@ -272,33 +281,6 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
   };
 
   const {
-    handleLeftDragChange,
-    handleLeftDragEnd,
-    handleLeftDoubleClick,
-    handleLeftToggleCollapse,
-    handleToggleLeftPane,
-    handleRightDragChange,
-    handleRightDragEnd,
-    handleRightDoubleClick,
-    handleRightToggleCollapse,
-    handleToggleRightPane,
-    handleToggleBothPanes,
-    handleMaximizePanes,
-    handleResetWidths,
-    handleApplyPreset,
-    handleReset,
-  } = usePaneResizeHandlers({
-    leftWidth,
-    setLeftWidth,
-    rightWidth,
-    setRightWidth,
-    dockWindowType,
-    desktopDockActive,
-    setDesktopDockActive,
-    setMagneticSnap,
-  });
-
-  const {
     handleClickMaximise,
     handleClickRestoreDown,
     handleClickFullscreen,
@@ -325,6 +307,43 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     preMaximizedLayoutRef,
   });
 
+  const {
+    handleLeftDragChange,
+    handleLeftDragEnd,
+    handleLeftDoubleClick,
+    handleLeftToggleCollapse,
+    handleToggleLeftPane,
+    handleRightDragChange,
+    handleRightDragEnd,
+    handleRightDoubleClick,
+    handleRightToggleCollapse,
+    handleToggleRightPane,
+    handleToggleBothPanes,
+    handleMaximizePanes,
+    handleResetWidths,
+    handleApplyPreset,
+    handleReset,
+  } = usePaneResizeHandlers({
+    leftWidth,
+    setLeftWidth,
+    rightWidth,
+    setRightWidth,
+    dockWindowType,
+    desktopDockActive,
+    setDesktopDockActive,
+    setMagneticSnap,
+    windowState,
+    onJoin: handleClickJoin,
+    centerLineWidth,
+  });
+
+  const snapPoints = magneticSnap
+    ? [
+        ...SNAP_POINTS,
+        { value: centerLineWidth, label: isJoinedMode ? "CENTER (50%)" : "JOIN APP" },
+      ]
+    : [];
+
   const middleWidth = Math.max(
     MIN_MIDDLE_WIDTH,
     containerWidth - leftWidth - rightWidth
@@ -341,6 +360,7 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     containerRef,
     containerWidth,
     middleWidth,
+    centerLineWidth,
     magneticSnap,
     setMagneticSnap,
     desktopDockActive,
@@ -392,6 +412,7 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     handleApplyPreset,
     handleReset,
     SNAP_POINTS,
+    snapPoints,
     MIN_LEFT_WIDTH,
     MIN_MIDDLE_WIDTH,
   };
