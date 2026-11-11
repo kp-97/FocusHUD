@@ -4,6 +4,7 @@ import { RightSidebar } from "../RightSidebar/RightSidebar";
 import { ResizeHandle } from "../ResizeHandle";
 import { UpdateNotificationToast } from "../../ui/UpdateNotificationToast";
 import { SettingsModal } from "../../features/settings/SettingsModal";
+import { JointDualViewContainer } from "./JointDualViewContainer";
 import { UseDockLayoutReturn } from "../../../hooks/useDockLayout";
 import {
   startDraggingWindow,
@@ -20,7 +21,6 @@ import { NotesView } from "../../views/NotesView";
 import { KanbanView } from "../../views/KanbanView";
 import { ActionPlansView } from "../../views/ActionPlansView";
 import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
-import { HudBrackets } from "../../ui/HudBrackets";
 
 interface FullLayoutAppProps {
   layout: UseDockLayoutReturn;
@@ -67,6 +67,17 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     handleResetWidths,
     centerLineWidth,
     snapPoints,
+    leftMaxWidth,
+    leftSnapPoints,
+    rightMaxWidth,
+    rightSnapPoints,
+    isDualView,
+    jointLeftWidth,
+    currentRightNav,
+    setCurrentRightNav,
+    handleToggleJointDualView,
+    handleJointDividerChange,
+    handleJointDividerEnd,
     MIN_LEFT_WIDTH,
   } = layout;
 
@@ -287,18 +298,25 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
           onOpenSettings={handleOpenSettings}
         />
 
-        {/* Center: In Joined mode, merges the left & right panes and displays the full view across the whole canvas. In Split mode, displays resizers & center workspace. */}
+        {/* Center: In Joined mode, merges the left & right panes and displays the full view (or dual views) across the whole canvas. In Split mode, displays resizers & center workspace. */}
         {isJoinedMode ? (
           <div
             data-testid="full-screen-view-container"
             data-window-state={windowState}
             className="flex-1 h-full min-w-0 p-2 bg-[#03070d] text-cyan-200 overflow-hidden flex flex-col"
           >
-            <HudBrackets variant="cyan" showTicks={false} className="h-full w-full flex flex-col overflow-hidden">
-              <div className="flex-1 flex flex-col p-2 min-w-0 overflow-y-auto">
-                {renderFullScreenView(activeNav)}
-              </div>
-            </HudBrackets>
+            <JointDualViewContainer
+              isDualView={isDualView}
+              jointLeftWidth={jointLeftWidth}
+              activeNav={activeNav}
+              currentRightNav={currentRightNav}
+              containerWidth={containerWidth}
+              onSelectRightNav={setCurrentRightNav}
+              onToggleDualView={handleToggleJointDualView}
+              onDividerChange={handleJointDividerChange}
+              onDividerEnd={handleJointDividerEnd}
+              renderView={renderFullScreenView}
+            />
           </div>
         ) : (
           <>
@@ -306,8 +324,8 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
               side="left"
               currentWidth={leftWidth}
               minWidth={MIN_LEFT_WIDTH}
-              maxWidth={centerLineWidth || (containerWidth - MIN_LEFT_WIDTH)}
-              snapPoints={snapPoints}
+              maxWidth={leftMaxWidth || centerLineWidth || (containerWidth - MIN_LEFT_WIDTH)}
+              snapPoints={leftSnapPoints || snapPoints}
               onDragChange={handleLeftDragChange}
               onDragEnd={handleLeftDragEnd}
               onDoubleClick={handleLeftDoubleClick}
@@ -327,8 +345,8 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
               side="right"
               currentWidth={rightWidth}
               minWidth={MIN_LEFT_WIDTH}
-              maxWidth={centerLineWidth || (containerWidth - MIN_LEFT_WIDTH)}
-              snapPoints={snapPoints}
+              maxWidth={rightMaxWidth || centerLineWidth || (containerWidth - MIN_LEFT_WIDTH)}
+              snapPoints={rightSnapPoints || snapPoints}
               onDragChange={handleRightDragChange}
               onDragEnd={handleRightDragEnd}
               onDoubleClick={handleRightDoubleClick}

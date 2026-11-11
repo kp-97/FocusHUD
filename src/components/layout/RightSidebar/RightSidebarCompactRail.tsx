@@ -9,6 +9,7 @@ import {
   reorderNavConfig,
   getNavItemRail,
   broadcastNavChange,
+  broadcastRightNavChange,
   subscribeLayoutAction,
 } from "../../../stores/layoutStore";
 import { NavItemConfig, NavViewId, WindowModeState } from "../../../types/hud";
@@ -65,16 +66,30 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
   const [dragOverNavId, setDragOverNavId] = useState<NavViewId | null>(null);
   const draggedNavIdRef = useRef<NavViewId | null>(null);
 
+  const [isDualView, setIsDualView] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("focushud_joint_dual_view") === "true";
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "focushud_nav_config") {
         setNavItems(loadNavConfig());
+      } else if (e.key === "focushud_joint_dual_view") {
+        setIsDualView(e.newValue === "true");
       }
     };
     window.addEventListener("storage", handleStorage);
     const unsub = subscribeLayoutAction((action) => {
       if (action.type === "NAV_CONFIG_CHANGE") {
         setNavItems(action.config);
+      } else if (action.type === "SET_JOINT_DUAL_VIEW") {
+        setIsDualView(action.dual);
+      } else if (action.type === "SET_WINDOW_STATE" && action.isDualView !== undefined) {
+        setIsDualView(action.isDualView);
       }
     });
     return () => {
@@ -106,10 +121,17 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
 
   const handleRightNavClick = (id: NavViewId) => {
     if (effectiveIsJoined) {
-      if (onSelectNav) {
-        onSelectNav(id);
+      if (isDualView) {
+        if (onSelectRightNav) {
+          onSelectRightNav(id);
+        }
+        broadcastRightNavChange(id);
+      } else {
+        if (onSelectNav) {
+          onSelectNav(id);
+        }
+        broadcastNavChange(id);
       }
-      broadcastNavChange(id);
       return;
     }
 
@@ -355,7 +377,9 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
               .map((item) => {
                 const IconComponent = NAV_ICON_MAP[item.id] || MessageSquare;
                 const isActive = effectiveIsJoined
-                  ? activeNav === item.id
+                  ? isDualView
+                    ? currentRightNav === item.id
+                    : activeNav === item.id
                   : !collapsed && currentRightNav === item.id;
                 const isDragging = draggedNavId === item.id;
                 const isDragOver = dragOverNavId === item.id && draggedNavId !== item.id;

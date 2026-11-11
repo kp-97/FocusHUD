@@ -356,7 +356,7 @@ describe("useDockLayout hook", () => {
     expect(result.current.isJoinedMode).toBe(false);
   });
 
-  it("triggers join when left pane is dragged to the center line in split mode", async () => {
+  it("triggers joint mode in single view when left pane connects to right rail", async () => {
     sessionStorage.setItem("focushud_booted", "true");
     localStorage.setItem("focushud_window_state", "split");
 
@@ -364,26 +364,25 @@ describe("useDockLayout hook", () => {
     expect(result.current.windowState).toBe("split");
     expect(result.current.isJoinedMode).toBe(false);
 
-    const center = result.current.centerLineWidth;
-    expect(center).toBeGreaterThan(0);
-
-    // Initial remembered width is 280
-    expect(layoutStore.getRememberedLeftWidth()).toBe(280);
-
-    // Drag left pane to center line
-    await act(async () => {
-      await result.current.handleLeftDragEnd(center);
+    // Collapse right pane to 68px rail
+    act(() => {
+      result.current.setRightWidth(68);
     });
 
-    // Should transition to joined/maximised mode
+    const connectTarget = result.current.leftMaxWidth;
+    expect(connectTarget).toBeGreaterThan(0);
+
+    // Drag left pane to connect to right rail
+    await act(async () => {
+      await result.current.handleLeftDragEnd(connectTarget);
+    });
+
     expect(result.current.windowState).toBe("maximised");
     expect(result.current.isJoinedMode).toBe(true);
-
-    // Remembered width should NOT be overwritten with the 50% width
-    expect(layoutStore.getRememberedLeftWidth()).toBe(280);
+    expect(result.current.isDualView).toBe(false);
   });
 
-  it("triggers join when right pane is dragged to the center line in split mode", async () => {
+  it("triggers joint mode in single view when right pane connects to left rail", async () => {
     sessionStorage.setItem("focushud_booted", "true");
     localStorage.setItem("focushud_window_state", "split");
 
@@ -391,19 +390,64 @@ describe("useDockLayout hook", () => {
     expect(result.current.windowState).toBe("split");
     expect(result.current.isJoinedMode).toBe(false);
 
-    const center = result.current.centerLineWidth;
-    expect(center).toBeGreaterThan(0);
+    // Collapse left pane to 68px rail
+    act(() => {
+      result.current.setLeftWidth(68);
+    });
 
-    expect(layoutStore.getRememberedRightWidth()).toBe(280);
+    const connectTarget = result.current.rightMaxWidth;
+    expect(connectTarget).toBeGreaterThan(0);
 
-    // Drag right pane to within magnetic threshold of center line
+    // Drag right pane to connect to left rail
     await act(async () => {
-      await result.current.handleRightDragEnd(center - 10);
+      await result.current.handleRightDragEnd(connectTarget);
     });
 
     expect(result.current.windowState).toBe("maximised");
     expect(result.current.isJoinedMode).toBe(true);
+    expect(result.current.isDualView).toBe(false);
+  });
 
-    expect(layoutStore.getRememberedRightWidth()).toBe(280);
+  it("triggers joint mode with two views when left and right panes connect", async () => {
+    sessionStorage.setItem("focushud_booted", "true");
+    localStorage.setItem("focushud_window_state", "split");
+
+    const { result } = renderHook(() => useDockLayout("full"));
+    expect(result.current.windowState).toBe("split");
+    expect(result.current.isJoinedMode).toBe(false);
+
+    // Both panes expanded: left at 300, right at 350
+    act(() => {
+      result.current.setLeftWidth(300);
+      result.current.setRightWidth(350);
+    });
+
+    const connectWidth = result.current.leftMaxWidth;
+
+    // Drag left pane until it connects with right pane
+    await act(async () => {
+      await result.current.handleLeftDragEnd(connectWidth);
+    });
+
+    expect(result.current.windowState).toBe("maximised");
+    expect(result.current.isJoinedMode).toBe(true);
+    expect(result.current.isDualView).toBe(true);
+    expect(result.current.jointLeftWidth).toBe(connectWidth);
+  });
+
+  it("allows toggling two views on and off in joint mode", () => {
+    const { result } = renderHook(() => useDockLayout("full"));
+    expect(result.current.isDualView).toBe(false);
+
+    act(() => {
+      result.current.handleToggleJointDualView(true, 500);
+    });
+    expect(result.current.isDualView).toBe(true);
+    expect(result.current.jointLeftWidth).toBe(500);
+
+    act(() => {
+      result.current.handleToggleJointDualView(false);
+    });
+    expect(result.current.isDualView).toBe(false);
   });
 });

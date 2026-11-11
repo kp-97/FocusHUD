@@ -18,13 +18,19 @@ import {
   setRememberedLeftWidth,
   setRememberedRightWidth,
   getInitialNav,
+  getInitialRightNav,
+  broadcastRightNavChange,
+  getJointDualView,
+  setJointDualView,
+  getJointLeftWidth,
+  setJointLeftWidth,
   broadcastLayoutAction,
   subscribeLayoutAction,
   getMaxLeftWidth,
   getMaxRightWidth,
   getPanesReserveZones,
 } from "../stores/layoutStore";
-import { WindowModeState } from "../types/hud";
+import { WindowModeState, NavViewId } from "../types/hud";
 import { runLegacyStorageMigrationIfNeeded } from "../services/storageMigration";
 import { checkForUpdates, AppUpdateInfo } from "../services/updaterService";
 
@@ -92,14 +98,52 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     typeof window !== "undefined" ? window.innerWidth : 1200
   );
 
-  const centerLineWidth =
+  const [currentRightNav, setCurrentRightNavState] = useState<string>(() => getInitialRightNav());
+  const setCurrentRightNav = (nav: string) => {
+    if (nav === currentRightNav) return;
+    setCurrentRightNavState(nav);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focushud_active_right_nav", nav);
+    }
+    broadcastRightNavChange(nav as NavViewId);
+  };
+
+  const [isDualView, setIsDualView] = useState<boolean>(() => getJointDualView());
+  const [jointLeftWidth, setJointLeftWidthState] = useState<number>(() =>
+    getJointLeftWidth(Math.round((containerWidth - 136) / 2))
+  );
+
+  const handleToggleJointDualView = (dual: boolean, initialDividerWidth?: number) => {
+    setIsDualView(dual);
+    setJointDualView(dual);
+    if (typeof initialDividerWidth === "number") {
+      setJointLeftWidthState(initialDividerWidth);
+      setJointLeftWidth(initialDividerWidth);
+    }
+  };
+
+  const handleJointDividerChange = (newWidth: number) => {
+    setJointLeftWidthState(newWidth);
+  };
+
+  const handleJointDividerEnd = (finalWidth: number) => {
+    setJointLeftWidthState(finalWidth);
+    setJointLeftWidth(finalWidth);
+  };
+
+  const totalDisplayWidth =
     typeof window !== "undefined"
-      ? Math.round(
-          (dockWindowType === "full"
-            ? containerWidth
-            : window.screen?.availWidth || window.screen?.width || window.innerWidth || 1920) / 2
-        )
-      : 960;
+      ? (dockWindowType === "full"
+          ? containerWidth
+          : window.screen?.availWidth || window.screen?.width || window.innerWidth || 1920)
+      : 1920;
+
+  const centerLineWidth = Math.round(totalDisplayWidth / 2);
+
+  const isRightCollapsed = rightWidth <= 70;
+  const leftConnectWidth = isRightCollapsed ? totalDisplayWidth - 68 : totalDisplayWidth - rightWidth;
+  const isLeftCollapsed = leftWidth <= 70;
+  const rightConnectWidth = isLeftCollapsed ? totalDisplayWidth - 68 : totalDisplayWidth - leftWidth;
 
   // Check for updates on startup
   useEffect(() => {
@@ -142,20 +186,20 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     };
   }, []);
 
-  // Save widths to localStorage and remember expanded widths when >= 120px (unless near center line joining)
+  // Save widths to localStorage and remember expanded widths when >= 120px (unless near connect line joining)
   useEffect(() => {
     localStorage.setItem("hud_left_width", String(leftWidth));
-    if (leftWidth >= 120 && (!centerLineWidth || leftWidth < centerLineWidth - 14)) {
+    if (leftWidth >= 120 && leftWidth < leftConnectWidth - 14) {
       setRememberedLeftWidth(leftWidth);
     }
-  }, [leftWidth, centerLineWidth]);
+  }, [leftWidth, leftConnectWidth]);
 
   useEffect(() => {
     localStorage.setItem("hud_right_width", String(rightWidth));
-    if (rightWidth >= 120 && (!centerLineWidth || rightWidth < centerLineWidth - 14)) {
+    if (rightWidth >= 120 && rightWidth < rightConnectWidth - 14) {
       setRememberedRightWidth(rightWidth);
     }
-  }, [rightWidth, centerLineWidth]);
+  }, [rightWidth, rightConnectWidth]);
 
   // Initial sync of dock sizes and reserve-zones mode on startup
   useEffect(() => {
@@ -212,11 +256,23 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
         }
         if (action.leftWidth !== undefined) setLeftWidth(action.leftWidth);
         if (action.rightWidth !== undefined) setRightWidth(action.rightWidth);
+        if (action.isDualView !== undefined) setIsDualView(action.isDualView);
+        if (action.jointLeftWidth !== undefined) setJointLeftWidthState(action.jointLeftWidth);
       } else if (action.type === "SET_ACTIVE_NAV") {
         setActiveNavState(action.nav);
         if (typeof window !== "undefined") {
           localStorage.setItem("focushud_active_nav", action.nav);
         }
+      } else if (action.type === "SET_ACTIVE_RIGHT_NAV") {
+        setCurrentRightNavState(action.nav);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("focushud_active_right_nav", action.nav);
+        }
+      } else if (action.type === "SET_JOINT_DUAL_VIEW") {
+        setIsDualView(action.dual);
+        if (action.jointLeftWidth !== undefined) setJointLeftWidthState(action.jointLeftWidth);
+      } else if (action.type === "SET_JOINT_LEFT_WIDTH") {
+        setJointLeftWidthState(action.width);
       } else if (action.type === "MAXIMIZE_PANES") {
         const prevL = getRememberedLeftWidth();
         const prevR = getRememberedRightWidth();
@@ -305,6 +361,8 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     dockWindowType,
     desktopDockActive,
     preMaximizedLayoutRef,
+    setIsDualView,
+    setJointLeftWidth: setJointLeftWidthState,
   });
 
   const {
@@ -335,14 +393,34 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     windowState,
     onJoin: handleClickJoin,
     centerLineWidth,
+    containerWidth: totalDisplayWidth,
+    activeNav,
+    currentRightNav,
   });
 
-  const snapPoints = magneticSnap
+  const leftMaxWidth = Math.max(MIN_LEFT_WIDTH, leftConnectWidth);
+  const leftSnapPoints = magneticSnap
     ? [
         ...SNAP_POINTS,
-        { value: centerLineWidth, label: isJoinedMode ? "CENTER (50%)" : "JOIN APP" },
+        {
+          value: leftConnectWidth,
+          label: isRightCollapsed ? "JOIN (FULL VIEW)" : "JOIN (DUAL VIEW)",
+        },
       ]
     : [];
+
+  const rightMaxWidth = Math.max(MIN_LEFT_WIDTH, rightConnectWidth);
+  const rightSnapPoints = magneticSnap
+    ? [
+        ...SNAP_POINTS,
+        {
+          value: rightConnectWidth,
+          label: isLeftCollapsed ? "JOIN (FULL VIEW)" : "JOIN (DUAL VIEW)",
+        },
+      ]
+    : [];
+
+  const snapPoints = leftSnapPoints;
 
   const middleWidth = Math.max(
     MIN_MIDDLE_WIDTH,
@@ -357,6 +435,18 @@ export function useDockLayout(dockWindowType: DockWindowType = "full") {
     setRightWidth,
     maxLeftWidth,
     maxRightWidth,
+    leftMaxWidth,
+    leftSnapPoints,
+    rightMaxWidth,
+    rightSnapPoints,
+    isDualView,
+    setIsDualView,
+    jointLeftWidth,
+    currentRightNav,
+    setCurrentRightNav,
+    handleToggleJointDualView,
+    handleJointDividerChange,
+    handleJointDividerEnd,
     containerRef,
     containerWidth,
     middleWidth,

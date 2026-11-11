@@ -33,6 +33,8 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
     handleResetWidths,
     centerLineWidth,
     snapPoints,
+    rightMaxWidth,
+    rightSnapPoints,
     MIN_LEFT_WIDTH,
   } = layout;
 
@@ -50,8 +52,8 @@ export const RightDockApp: React.FC<DockAppProps> = ({ layout }) => {
             side="right"
             currentWidth={rightWidth}
             minWidth={MIN_LEFT_WIDTH}
-            maxWidth={centerLineWidth}
-            snapPoints={snapPoints}
+            maxWidth={rightMaxWidth || centerLineWidth}
+            snapPoints={rightSnapPoints || snapPoints}
             className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
             onDragChange={handleRightDragChange}
             onDragEnd={handleRightDragEnd}

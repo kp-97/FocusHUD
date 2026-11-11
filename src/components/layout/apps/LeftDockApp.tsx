@@ -32,6 +32,8 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
     handleResetWidths,
     centerLineWidth,
     snapPoints,
+    leftMaxWidth,
+    leftSnapPoints,
     MIN_LEFT_WIDTH,
   } = layout;
 
@@ -69,8 +71,8 @@ export const LeftDockApp: React.FC<DockAppProps> = ({ layout }) => {
             side="left"
             currentWidth={leftWidth}
             minWidth={MIN_LEFT_WIDTH}
-            maxWidth={centerLineWidth}
-            snapPoints={snapPoints}
+            maxWidth={leftMaxWidth || centerLineWidth}
+            snapPoints={leftSnapPoints || snapPoints}
             className="relative w-full h-full flex items-center justify-center cursor-col-resize select-none touch-none"
             onDragChange={handleLeftDragChange}
             onDragEnd={handleLeftDragEnd}

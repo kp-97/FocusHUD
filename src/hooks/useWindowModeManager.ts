@@ -78,6 +78,8 @@ export interface WindowModeManagerParams {
   dockWindowType: DockWindowType;
   desktopDockActive: boolean;
   preMaximizedLayoutRef: MutableRefObject<{ left: number; right: number } | null>;
+  setIsDualView?: (dual: boolean) => void;
+  setJointLeftWidth?: (width: number) => void;
 }
 
 export function useWindowModeManager({
@@ -92,6 +94,8 @@ export function useWindowModeManager({
   dockWindowType,
   desktopDockActive,
   preMaximizedLayoutRef,
+  setIsDualView,
+  setJointLeftWidth,
 }: WindowModeManagerParams) {
   const handleClickMaximise = useCallback(async () => {
     if (windowState === "split") {
@@ -218,7 +222,51 @@ export function useWindowModeManager({
     }
   }, [windowState, handleClickExitFullscreen, handleClickFullscreen]);
 
-  const handleClickJoin = handleClickMaximise;
+  const handleClickJoin = useCallback(
+    async (dual?: boolean, targetNav?: string, jointWidth?: number) => {
+      if (windowState === "split") {
+        preMaximizedLayoutRef.current = { left: leftWidth, right: rightWidth };
+      }
+      setWindowState("maximised");
+      if (typeof window !== "undefined") {
+        localStorage.setItem("focushud_window_state", "maximised");
+        localStorage.setItem("focushud_is_app_maximized", "true");
+        if (typeof dual === "boolean") {
+          localStorage.setItem("focushud_joint_dual_view", String(dual));
+        }
+        if (typeof jointWidth === "number") {
+          localStorage.setItem("focushud_joint_left_width", String(Math.round(jointWidth)));
+        }
+        if (targetNav) {
+          localStorage.setItem("focushud_active_nav", targetNav);
+        }
+      }
+      if (typeof dual === "boolean" && setIsDualView) {
+        setIsDualView(dual);
+      }
+      if (typeof jointWidth === "number" && setJointLeftWidth) {
+        setJointLeftWidth(jointWidth);
+      }
+      broadcastLayoutAction({
+        type: "SET_WINDOW_STATE",
+        state: "maximised",
+        sender: dockWindowType,
+        leftWidth,
+        rightWidth,
+        isDualView: dual,
+        jointLeftWidth: jointWidth,
+      });
+      if (targetNav) {
+        broadcastLayoutAction({
+          type: "SET_ACTIVE_NAV",
+          nav: targetNav,
+          sender: dockWindowType,
+        });
+      }
+      await invokeSetWindowState("maximised");
+    },
+    [windowState, leftWidth, rightWidth, dockWindowType, preMaximizedLayoutRef, setWindowState, setIsDualView, setJointLeftWidth]
+  );
 
   const handleClickMinimise = useCallback(async () => {
     setWindowState("minimised");

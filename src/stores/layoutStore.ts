@@ -81,6 +81,30 @@ export const getInitialRightNav = (): NavViewId => {
   return (saved as NavViewId) || "chat";
 };
 
+export const getJointDualView = (): boolean => {
+  const saved = localStorage.getItem("focushud_joint_dual_view");
+  return saved === "true";
+};
+
+export const setJointDualView = (dual: boolean) => {
+  localStorage.setItem("focushud_joint_dual_view", String(dual));
+  broadcastLayoutAction({ type: "SET_JOINT_DUAL_VIEW", dual });
+};
+
+export const getJointLeftWidth = (fallback: number = 480): number => {
+  const saved = localStorage.getItem("focushud_joint_left_width");
+  if (saved) {
+    const parsed = Math.round(Number(saved));
+    if (!isNaN(parsed) && parsed > 100) return parsed;
+  }
+  return fallback;
+};
+
+export const setJointLeftWidth = (width: number) => {
+  localStorage.setItem("focushud_joint_left_width", String(Math.round(width)));
+  broadcastLayoutAction({ type: "SET_JOINT_LEFT_WIDTH", width: Math.round(width) });
+};
+
 export const DEFAULT_LEFT_WIDTH = 360;
 export const DEFAULT_RIGHT_WIDTH = 280;
 
@@ -223,6 +247,8 @@ export type LayoutAction = (
       priorFullscreenState?: WindowModeState;
       leftWidth?: number;
       rightWidth?: number;
+      isDualView?: boolean;
+      jointLeftWidth?: number;
     }
   | { type: "SET_PANES_WIDTH"; leftWidth: number; rightWidth: number }
   | { type: "SET_LEFT_WIDTH"; width: number }
@@ -232,6 +258,8 @@ export type LayoutAction = (
   | { type: "SET_PANES_RESERVE_ZONES"; reserve: boolean }
   | { type: "SET_ACTIVE_NAV"; nav: string }
   | { type: "SET_ACTIVE_RIGHT_NAV"; nav: string }
+  | { type: "SET_JOINT_DUAL_VIEW"; dual: boolean; jointLeftWidth?: number }
+  | { type: "SET_JOINT_LEFT_WIDTH"; width: number }
 ) & { sender?: string };
 
 export const broadcastLayoutAction = (action: LayoutAction) => {

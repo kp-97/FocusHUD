@@ -31,7 +31,7 @@ import { ActionPlansView } from "../../views/ActionPlansView";
 import { NotesView } from "../../views/NotesView";
 import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
 
-const AVAILABLE_RIGHT_VIEWS: Array<{ id: NavViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+export const AVAILABLE_RIGHT_VIEWS: Array<{ id: NavViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "home", label: "HOME", icon: Home },
   { id: "chat", label: "AI CHAT", icon: MessageSquare },
   { id: "calendar", label: "CALENDAR", icon: Calendar },

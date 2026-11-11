@@ -107,11 +107,10 @@ pub fn calculate_canvas_width(scale: f64) -> i32 {
 }
 
 /// Calculates stationary physical canvas width for a dock considering monitor width and DPI scale.
-/// Ensures the dock window can physically span to at least the center line of the monitor.
+/// Ensures the dock window can physically span across the monitor to connect with the opposite rail.
 pub fn calculate_dock_canvas_width(mon_width: i32, scale: f64) -> i32 {
-    let half_mon = (mon_width + 1) / 2;
     let base_canvas = calculate_canvas_width(scale);
-    half_mon.max(base_canvas)
+    mon_width.max(base_canvas)
 }
 
 /// Calculates visible physical width for a dock considering dragging state and DPI scale
@@ -344,11 +343,11 @@ mod tests {
     }
 
     #[test]
-    fn test_dock_canvas_width_covers_center_line() {
-        assert_eq!(calculate_dock_canvas_width(1920, 1.0), 960);
-        assert_eq!(calculate_dock_canvas_width(2560, 1.0), 1280);
-        assert_eq!(calculate_dock_canvas_width(3840, 1.0), 1920);
-        assert_eq!(calculate_dock_canvas_width(1280, 1.0), 800);
+    fn test_dock_canvas_width_covers_full_monitor_span() {
+        assert_eq!(calculate_dock_canvas_width(1920, 1.0), 1920);
+        assert_eq!(calculate_dock_canvas_width(2560, 1.0), 2560);
+        assert_eq!(calculate_dock_canvas_width(3840, 1.0), 3840);
+        assert_eq!(calculate_dock_canvas_width(1280, 1.0), 1280);
     }
 
     #[test]

@@ -24,8 +24,11 @@ export interface PaneResizeHandlersParams {
   setDesktopDockActive: (active: boolean) => void;
   setMagneticSnap: (snap: boolean) => void;
   windowState?: WindowModeState;
-  onJoin?: () => Promise<void> | void;
+  onJoin?: (dual?: boolean, targetNav?: string, jointWidth?: number) => Promise<void> | void;
   centerLineWidth?: number;
+  containerWidth?: number;
+  activeNav?: string;
+  currentRightNav?: string;
 }
 
 export function usePaneResizeHandlers({
@@ -39,7 +42,9 @@ export function usePaneResizeHandlers({
   setMagneticSnap,
   windowState,
   onJoin,
-  centerLineWidth,
+  containerWidth,
+  activeNav,
+  currentRightNav,
 }: PaneResizeHandlersParams) {
   // Drag handlers for Left Bar
   const handleLeftDragChange = (newWidth: number) => {
@@ -50,23 +55,33 @@ export function usePaneResizeHandlers({
   };
 
   const handleLeftDragEnd = (finalWidth: number) => {
-    const isJoining = Boolean(
-      centerLineWidth &&
-        finalWidth >= centerLineWidth - 14 &&
-        onJoin &&
-        (windowState === "split" || dockWindowType === "left" || dockWindowType === "right")
-    );
+    const isSplit =
+      windowState === "split" || dockWindowType === "left" || dockWindowType === "right";
+    const totalWidth =
+      containerWidth ||
+      (typeof window !== "undefined"
+        ? window.screen?.availWidth || window.screen?.width || window.innerWidth || 1920
+        : 1920);
+
+    const isRightCollapsed = rightWidth <= 70;
+    const connectTargetWidth = isRightCollapsed ? totalWidth - 68 : totalWidth - rightWidth;
+    const isConnecting = Boolean(onJoin && isSplit && finalWidth >= connectTargetWidth - 14);
 
     setLeftWidth(finalWidth);
-    if (finalWidth >= 120 && !isJoining) {
+    if (finalWidth >= 120 && !isConnecting) {
       setRememberedLeftWidth(finalWidth);
     }
     broadcastLayoutAction({ type: "SET_LEFT_WIDTH", width: finalWidth, sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(finalWidth, null, true);
     }
-    if (isJoining && onJoin) {
-      onJoin();
+    if (isConnecting && onJoin) {
+      if (isRightCollapsed) {
+        onJoin(false, activeNav);
+      } else {
+        const dividerPos = Math.max(200, Math.min(totalWidth - 200, finalWidth));
+        onJoin(true, undefined, dividerPos);
+      }
     }
   };
 
@@ -97,23 +112,33 @@ export function usePaneResizeHandlers({
   };
 
   const handleRightDragEnd = (finalWidth: number) => {
-    const isJoining = Boolean(
-      centerLineWidth &&
-        finalWidth >= centerLineWidth - 14 &&
-        onJoin &&
-        (windowState === "split" || dockWindowType === "left" || dockWindowType === "right")
-    );
+    const isSplit =
+      windowState === "split" || dockWindowType === "left" || dockWindowType === "right";
+    const totalWidth =
+      containerWidth ||
+      (typeof window !== "undefined"
+        ? window.screen?.availWidth || window.screen?.width || window.innerWidth || 1920
+        : 1920);
+
+    const isLeftCollapsed = leftWidth <= 70;
+    const connectTargetWidth = isLeftCollapsed ? totalWidth - 68 : totalWidth - leftWidth;
+    const isConnecting = Boolean(onJoin && isSplit && finalWidth >= connectTargetWidth - 14);
 
     setRightWidth(finalWidth);
-    if (finalWidth >= 120 && !isJoining) {
+    if (finalWidth >= 120 && !isConnecting) {
       setRememberedRightWidth(finalWidth);
     }
     broadcastLayoutAction({ type: "SET_RIGHT_WIDTH", width: finalWidth, sender: dockWindowType });
     if (dockWindowType !== "full" || desktopDockActive) {
       updateDockSizes(null, finalWidth, true);
     }
-    if (isJoining && onJoin) {
-      onJoin();
+    if (isConnecting && onJoin) {
+      if (isLeftCollapsed) {
+        onJoin(false, currentRightNav);
+      } else {
+        const dividerPos = Math.max(200, Math.min(totalWidth - 200, totalWidth - finalWidth));
+        onJoin(true, undefined, dividerPos);
+      }
     }
   };
 
