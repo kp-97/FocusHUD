@@ -61,6 +61,14 @@ export interface DbNote {
   sortOrder?: number;
   createdAt?: number;
   updatedAt?: number;
+  filePath?: string | null;
+  relativePath?: string | null;
+}
+
+export interface NoteFolder {
+  name: string;
+  relativePath: string;
+  children: NoteFolder[];
 }
 
 export interface DbCalendarEvent {
@@ -201,6 +209,45 @@ export async function removeNote(id: string): Promise<boolean> {
 
 export async function syncNotes(notes: DbNote[]): Promise<boolean> {
   return invokeTauriBool("sync_notes", { notes });
+}
+
+export async function fetchNotesDir(): Promise<string> {
+  const res = await invokeTauri<string>("get_notes_dir");
+  return res ?? "";
+}
+
+export async function updateNotesDir(path: string, migrateExisting: boolean): Promise<boolean> {
+  return invokeTauriBool("set_notes_dir", { path, migrateExisting });
+}
+
+export async function pickNotesDir(): Promise<string | null> {
+  const res = await invokeTauri<string | null>("pick_notes_dir");
+  return res ?? null;
+}
+
+export async function fetchNoteFolders(): Promise<NoteFolder[]> {
+  const res = await invokeTauri<NoteFolder[]>("list_note_folders");
+  return res ?? [];
+}
+
+export async function createNoteFolder(relativePath: string): Promise<boolean> {
+  return invokeTauriBool("create_note_folder", { relativePath });
+}
+
+export async function renameNoteFolder(oldPath: string, newPath: string): Promise<boolean> {
+  return invokeTauriBool("rename_note_folder", { oldPath, newPath });
+}
+
+export async function deleteNoteFolder(relativePath: string): Promise<boolean> {
+  return invokeTauriBool("delete_note_folder", { relativePath });
+}
+
+export async function moveNoteToFolder(noteId: string, targetFolder: string): Promise<DbNote | null> {
+  return invokeTauri<DbNote>("move_note_to_folder", { noteId, targetFolder });
+}
+
+export async function readNoteFile(filePath: string): Promise<string | null> {
+  return invokeTauri<string>("read_note_file", { filePath });
 }
 
 // ========================================================
