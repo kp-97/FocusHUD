@@ -17,6 +17,10 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         apply_migration_v3(conn)?;
     }
 
+    if version < 4 {
+        apply_migration_v4(conn)?;
+    }
+
     Ok(())
 }
 
@@ -161,6 +165,57 @@ fn apply_migration_v3(conn: &mut Connection) -> Result<()> {
         )?;
     }
     tx.execute("PRAGMA user_version = 3;", [])?;
+    tx.commit()?;
+    Ok(())
+}
+
+fn apply_migration_v4(conn: &mut Connection) -> Result<()> {
+    let (has_notes_table, has_file_path): (bool, bool) = {
+        let table_exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='notes';",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|c| c > 0)
+            .unwrap_or(false);
+
+        if !table_exists {
+            (false, false)
+        } else {
+            let mut stmt = conn.prepare("PRAGMA table_info(notes);")?;
+            let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+            let mut found = false;
+            for col in columns {
+                if col? == "file_path" {
+                    found = true;
+                    break;
+                }
+            }
+            (true, found)
+        }
+    };
+
+    let tx = conn.transaction()?;
+    if has_notes_table && !has_file_path {
+        tx.execute("ALTER TABLE notes ADD COLUMN file_path TEXT;", [])?;
+        tx.execute("ALTER TABLE notes ADD COLUMN relative_path TEXT;", [])?;
+        tx.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notes_rel_path ON notes(relative_path);",
+            [],
+        )?;
+    }
+
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        );",
+        [],
+    )?;
+    tx.execute("PRAGMA user_version = 4;", [])?;
+
     tx.commit()?;
     Ok(())
 }

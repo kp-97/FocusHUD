@@ -62,7 +62,11 @@ export function useSyncEntity<TApp, TDb>({
 
     if (isTauriEnvironment()) {
       fetchDb().then((dbItems) => {
-        if (active && dbItems && (!Array.isArray(dbItems) || dbItems.length > 0)) {
+        if (
+          active &&
+          dbItems &&
+          (!Array.isArray(dbItems) || dbItems.length > 0 || entity === "notes")
+        ) {
           const adapted = adapter(dbItems);
           setData((prev) => (mergeFn ? mergeFn(prev, adapted) : adapted));
         }
@@ -74,7 +78,13 @@ export function useSyncEntity<TApp, TDb>({
         fetchDb().then((dbItems) => {
           if (active && dbItems) {
             const adapted = adapter(dbItems);
-            setData((prev) => (mergeFn ? mergeFn(prev, adapted) : adapted));
+            setData((prev) => {
+              const next = mergeFn ? mergeFn(prev, adapted) : adapted;
+              if (saveFn) {
+                saveFn(next);
+              }
+              return next;
+            });
           }
         });
       }

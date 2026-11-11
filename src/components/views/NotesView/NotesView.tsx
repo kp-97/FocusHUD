@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
-import { NoteItem } from "../../../types/hud";
+import { NoteItem, NoteFolder } from "../../../types/hud";
 import { NotesList, NoteFilter } from "./NotesList";
 import { NoteEditor } from "./NoteEditor";
 import { useSyncNotes } from "../../../hooks/useSyncEntity";
@@ -8,6 +8,11 @@ import { saveNotes } from "../../../stores/layoutStore";
 import {
   persistNote,
   removeNote,
+  fetchNoteFolders,
+  createNoteFolder,
+  renameNoteFolder,
+  deleteNoteFolder,
+  moveNoteToFolder,
   isTauriEnvironment,
 } from "../../../services/dbService";
 
@@ -16,6 +21,23 @@ export interface NotesViewProps {
   isCompact?: boolean;
   onBackToMonitoring?: () => void;
 }
+
+const toDbPayload = (n: NoteItem) => ({
+  id: n.id,
+  parentId: n.parentId || null,
+  goalId: n.goalId || null,
+  taskId: n.taskId || null,
+  actionPlanId: n.actionPlanId || null,
+  calendarEventId: n.calendarEventId || null,
+  title: n.title,
+  content: n.content,
+  isPinned: n.isPinned || false,
+  sortOrder: n.sortOrder || 0,
+  createdAt: n.createdAt || Date.now(),
+  updatedAt: n.updatedAt || Date.now(),
+  filePath: n.filePath || null,
+  relativePath: n.relativePath || null,
+});
 
 export const NotesView: React.FC<NotesViewProps> = ({
   isLeftDock = false,
@@ -30,6 +52,9 @@ export const NotesView: React.FC<NotesViewProps> = ({
   const [filter, setFilter] = useState<NoteFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
+
+  const [folders, setFolders] = useState<NoteFolder[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
   // In compact layout (or single pane), track if viewing editor or list
   const [viewingDetailOnCompact, setViewingDetailOnCompact] = useState<boolean>(false);
@@ -53,6 +78,19 @@ export const NotesView: React.FC<NotesViewProps> = ({
   // Keep ref to latest notes for listeners and unmount flush
   const notesRef = useRef<NoteItem[]>(notes);
   notesRef.current = notes;
+
+  const loadFolders = useCallback(async () => {
+    if (isTauriEnvironment()) {
+      try {
+        const list = await fetchNoteFolders();
+        setFolders(list);
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
 
   // Track container width for responsive split vs single pane layout
   useEffect(() => {
@@ -93,27 +131,28 @@ export const NotesView: React.FC<NotesViewProps> = ({
       try {
         saveNotes(updatedList);
 
-        // Persist to SQLite
+        // Persist to SQLite and filesystem
         if (isTauriEnvironment()) {
-          await persistNote({
-            id: targetNote.id,
-            parentId: targetNote.parentId || null,
-            goalId: targetNote.goalId || null,
-            taskId: targetNote.taskId || null,
-            actionPlanId: targetNote.actionPlanId || null,
-            title: targetNote.title,
-            content: targetNote.content,
-            isPinned: targetNote.isPinned || false,
-            sortOrder: targetNote.sortOrder || 0,
-            createdAt: targetNote.createdAt || Date.now(),
-            updatedAt: targetNote.updatedAt || Date.now(),
-          });
+          const res = await persistNote(toDbPayload(targetNote));
+          if (res?.filePath || res?.relativePath) {
+            setNotes((prevNotes) =>
+              prevNotes.map((n) =>
+                n.id === targetNote.id
+                  ? {
+                      ...n,
+                      filePath: res.filePath || n.filePath,
+                      relativePath: res.relativePath || n.relativePath,
+                    }
+                  : n
+              )
+            );
+          }
         }
       } finally {
         setSaveStatus("saved");
       }
     }, 350);
-  }, []);
+  }, [setNotes]);
 
   // Update a note in state and trigger auto-save
   const updateNote = useCallback(
@@ -189,6 +228,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
   // Create New Note Action (Ctrl+N)
   const handleNewNote = useCallback(() => {
+    const rel = selectedFolder ? `${selectedFolder}/UNTITLED NOTE.md` : undefined;
     const newNote: NoteItem = {
       id: "note_" + Date.now(),
       title: "UNTITLED NOTE",
@@ -197,14 +237,35 @@ export const NotesView: React.FC<NotesViewProps> = ({
       sortOrder: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      relativePath: rel,
     };
 
     const next = [newNote, ...notesRef.current];
     setNotes(next);
     setSelectedNoteId(newNote.id);
     setViewingDetailOnCompact(true);
-    triggerAutoSave(next, newNote);
-  }, [triggerAutoSave]);
+    saveNotes(next);
+
+    if (isTauriEnvironment()) {
+      persistNote(toDbPayload(newNote))
+        .then((res) => {
+          if (res?.filePath || res?.relativePath) {
+            setNotes((prev) =>
+              prev.map((n) =>
+                n.id === newNote.id
+                  ? {
+                      ...n,
+                      filePath: res.filePath || n.filePath,
+                      relativePath: res.relativePath || n.relativePath,
+                    }
+                  : n
+              )
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedFolder, setNotes]);
 
   // Delete Note Action (Ctrl+Delete)
   const handleDeleteNote = useCallback(
@@ -212,11 +273,19 @@ export const NotesView: React.FC<NotesViewProps> = ({
       const targetId = idToDelete || selectedNoteId;
       if (!targetId) return;
 
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      setSaveStatus("saved");
+
       const remaining = notesRef.current.filter((n) => n.id !== targetId);
       saveAndSetNotes(remaining);
 
       if (isTauriEnvironment()) {
-        removeNote(targetId).catch(() => {});
+        try {
+          await removeNote(targetId);
+        } catch {}
       }
 
       if (selectedNoteId === targetId) {
@@ -227,7 +296,65 @@ export const NotesView: React.FC<NotesViewProps> = ({
         }
       }
     },
-    [selectedNoteId]
+    [selectedNoteId, saveAndSetNotes]
+  );
+
+  // Folder management handlers
+  const handleCreateFolder = useCallback(
+    async (_parentPath: string, name: string) => {
+      if (isTauriEnvironment()) {
+        await createNoteFolder(name);
+        await loadFolders();
+      }
+    },
+    [loadFolders]
+  );
+
+  const handleRenameFolder = useCallback(
+    async (oldPath: string, newPath: string) => {
+      if (isTauriEnvironment()) {
+        await renameNoteFolder(oldPath, newPath);
+        await loadFolders();
+      }
+    },
+    [loadFolders]
+  );
+
+  const handleDeleteFolder = useCallback(
+    async (folderPath: string) => {
+      if (isTauriEnvironment()) {
+        await deleteNoteFolder(folderPath);
+        await loadFolders();
+        if (selectedFolder === folderPath) {
+          setSelectedFolder(null);
+        }
+      }
+    },
+    [loadFolders, selectedFolder]
+  );
+
+  const handleMoveNoteToFolder = useCallback(
+    async (noteId: string, targetFolder: string) => {
+      if (isTauriEnvironment()) {
+        const updated = await moveNoteToFolder(noteId, targetFolder);
+        if (updated) {
+          setNotes((prevNotes) =>
+            prevNotes.map((n) =>
+              n.id === noteId
+                ? {
+                    ...n,
+                    filePath: updated.filePath,
+                    relativePath: updated.relativePath,
+                    updatedAt: updated.updatedAt || Date.now(),
+                  }
+                : n
+            )
+          );
+        }
+        await loadFolders();
+      }
+    },
+    [loadFolders, setNotes]
   );
 
   // Keyboard Shortcuts: Ctrl+N, Ctrl+Delete
@@ -242,7 +369,6 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
       // Ctrl+Delete: Delete active note
       if ((e.ctrlKey || e.metaKey) && (e.key === "Delete" || e.key === "Backspace")) {
-        // Only trigger if not actively typing in an input/textarea
         const tag = (document.activeElement?.tagName || "").toLowerCase();
         if (tag !== "input" && tag !== "textarea") {
           e.preventDefault();
@@ -281,7 +407,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
         <div
           className={`h-full overflow-hidden ${
             isSplitLayout
-              ? "w-56 shrink-0 block"
+              ? "w-60 shrink-0 block"
               : viewingDetailOnCompact
                 ? "hidden"
                 : "w-full flex-1 block"
@@ -302,6 +428,13 @@ export const NotesView: React.FC<NotesViewProps> = ({
             onChangeFilter={setFilter}
             searchQuery={searchQuery}
             onChangeSearchQuery={setSearchQuery}
+            folders={folders}
+            selectedFolder={selectedFolder}
+            onSelectFolder={setSelectedFolder}
+            onCreateFolder={handleCreateFolder}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onMoveNoteToFolder={handleMoveNoteToFolder}
           />
         </div>
 

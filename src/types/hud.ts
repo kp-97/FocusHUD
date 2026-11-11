@@ -34,6 +34,14 @@ export interface NoteItem {
   sortOrder?: number;
   createdAt?: number;
   updatedAt?: number;
+  filePath?: string | null;
+  relativePath?: string | null;
+}
+
+export interface NoteFolder {
+  name: string;
+  relativePath: string;
+  children: NoteFolder[];
 }
 
 export interface GoalNode {

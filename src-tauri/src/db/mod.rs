@@ -100,13 +100,33 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 3);
+        assert!(version >= 3);
 
         // Verify recurrence column exists and can be queried
         let mut stmt = conn
             .prepare("SELECT id, recurrence FROM calendar_events")
             .unwrap();
         let _ = stmt.query([]).unwrap();
+    }
+
+    #[test]
+    fn test_migration_v4_adds_note_file_columns_and_settings() {
+        let conn = init_memory_db().expect("init memory db failed");
+        let version: i32 = conn
+            .query_row("PRAGMA user_version;", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 4);
+
+        // Verify file_path and relative_path columns on notes
+        let mut stmt = conn
+            .prepare("SELECT id, file_path, relative_path FROM notes")
+            .unwrap();
+        let _ = stmt.query([]).unwrap();
+
+        // Verify app_settings table works
+        queries::set_setting(&conn, "test_key", "test_val").unwrap();
+        let val = queries::get_setting(&conn, "test_key").unwrap();
+        assert_eq!(val, Some("test_val".into()));
     }
 
     #[test]
@@ -210,6 +230,8 @@ mod tests {
             sort_order: 0,
             created_at: 400,
             updated_at: 400,
+            file_path: None,
+            relative_path: None,
         };
         queries::upsert_note(&conn, &note).unwrap();
 
@@ -374,6 +396,8 @@ mod tests {
             sort_order: 0,
             created_at: 100,
             updated_at: 100,
+            file_path: None,
+            relative_path: None,
         }];
         queries::sync_notes(&mut conn, &initial_notes).unwrap();
         let notes = queries::get_all_notes(&conn).unwrap();
@@ -394,6 +418,8 @@ mod tests {
                 sort_order: 0,
                 created_at: 100,
                 updated_at: 200,
+                file_path: None,
+                relative_path: None,
             },
             models::Note {
                 id: "n_sync_2".into(),
@@ -408,6 +434,8 @@ mod tests {
                 sort_order: 1,
                 created_at: 200,
                 updated_at: 200,
+                file_path: None,
+                relative_path: None,
             },
         ];
         queries::sync_notes(&mut conn, &updated_notes).unwrap();
