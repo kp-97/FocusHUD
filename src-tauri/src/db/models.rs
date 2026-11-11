@@ -91,6 +91,10 @@ pub struct Note {
     pub sort_order: i32,
     pub created_at: i64,
     pub updated_at: i64,
+    #[serde(default)]
+    pub file_path: Option<String>,
+    #[serde(default)]
+    pub relative_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

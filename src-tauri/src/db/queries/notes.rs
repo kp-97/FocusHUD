@@ -4,7 +4,7 @@ use rusqlite::{Connection, Result, params};
 
 pub fn get_all_notes(conn: &Connection) -> Result<Vec<Note>> {
     let mut stmt = conn.prepare(
-        "SELECT id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at, calendar_event_id
+        "SELECT id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at, calendar_event_id, file_path, relative_path
          FROM notes
          ORDER BY is_pinned DESC, sort_order ASC, updated_at DESC",
     )?;
@@ -24,6 +24,8 @@ pub fn get_all_notes(conn: &Connection) -> Result<Vec<Note>> {
             created_at: row.get(9)?,
             updated_at: row.get(10)?,
             calendar_event_id: row.get(11)?,
+            file_path: row.get(12)?,
+            relative_path: row.get(13)?,
         })
     })?;
 
@@ -45,8 +47,8 @@ pub fn upsert_note(conn: &Connection, note: &Note) -> Result<()> {
     let is_pinned_int = if note.is_pinned { 1 } else { 0 };
 
     conn.execute(
-        "INSERT INTO notes (id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at, calendar_event_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        "INSERT INTO notes (id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at, calendar_event_id, file_path, relative_path)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(id) DO UPDATE SET
             parent_id = excluded.parent_id,
             goal_id = excluded.goal_id,
@@ -57,7 +59,9 @@ pub fn upsert_note(conn: &Connection, note: &Note) -> Result<()> {
             is_pinned = excluded.is_pinned,
             sort_order = excluded.sort_order,
             updated_at = excluded.updated_at,
-            calendar_event_id = excluded.calendar_event_id",
+            calendar_event_id = excluded.calendar_event_id,
+            file_path = excluded.file_path,
+            relative_path = excluded.relative_path",
         params![
             note.id,
             note.parent_id,
@@ -71,6 +75,8 @@ pub fn upsert_note(conn: &Connection, note: &Note) -> Result<()> {
             created_at,
             updated_at,
             note.calendar_event_id,
+            note.file_path,
+            note.relative_path,
         ],
     )?;
     Ok(())
@@ -109,8 +115,8 @@ pub fn sync_notes(conn: &mut Connection, notes: &[Note]) -> Result<()> {
         };
         let is_pinned_int = if note.is_pinned { 1 } else { 0 };
         tx.execute(
-            "INSERT INTO notes (id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at, calendar_event_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            "INSERT INTO notes (id, parent_id, goal_id, task_id, action_plan_id, title, content, is_pinned, sort_order, created_at, updated_at, calendar_event_id, file_path, relative_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT(id) DO UPDATE SET
                 parent_id = excluded.parent_id,
                 goal_id = excluded.goal_id,
@@ -121,7 +127,9 @@ pub fn sync_notes(conn: &mut Connection, notes: &[Note]) -> Result<()> {
                 is_pinned = excluded.is_pinned,
                 sort_order = excluded.sort_order,
                 updated_at = excluded.updated_at,
-                calendar_event_id = excluded.calendar_event_id",
+                calendar_event_id = excluded.calendar_event_id,
+                file_path = excluded.file_path,
+                relative_path = excluded.relative_path",
             params![
                 note.id,
                 note.parent_id,
@@ -135,6 +143,8 @@ pub fn sync_notes(conn: &mut Connection, notes: &[Note]) -> Result<()> {
                 created_at,
                 updated_at,
                 note.calendar_event_id,
+                note.file_path,
+                note.relative_path,
             ],
         )?;
     }
