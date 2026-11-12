@@ -61,3 +61,4 @@ describe("JointDualViewContainer component", () => {
     expect(defaultProps.onToggleDualView).toHaveBeenCalledWith(false);
   });
 });
+
