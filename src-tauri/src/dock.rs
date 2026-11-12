@@ -106,6 +106,13 @@ pub fn calculate_canvas_width(scale: f64) -> i32 {
     ((MAX_DOCK_LOGICAL_WIDTH as f64) * scale).round() as i32
 }
 
+/// Calculates stationary physical canvas width for a dock considering monitor width and DPI scale.
+/// Ensures the dock window can physically span across the monitor to connect with the opposite rail.
+pub fn calculate_dock_canvas_width(mon_width: i32, scale: f64) -> i32 {
+    let base_canvas = calculate_canvas_width(scale);
+    mon_width.max(base_canvas)
+}
+
 /// Calculates visible physical width for a dock considering dragging state and DPI scale
 pub fn calculate_visible_width(logical_width: i32, is_drag_active: bool, scale: f64) -> i32 {
     let phys_canvas = calculate_canvas_width(scale);
@@ -128,7 +135,13 @@ pub fn calculate_work_area_margins(
     phys_left: i32,
     phys_right: i32,
 ) -> (i32, i32) {
-    (orig_left + phys_left, orig_right - phys_right)
+    let mut left = orig_left + phys_left;
+    let mut right = orig_right - phys_right;
+    if left >= right {
+        left = left.min(orig_right - 1);
+        right = right.max(left + 1);
+    }
+    (left, right)
 }
 
 /// Computes physical dock layout, synchronizing both Tauri window positioning
@@ -160,11 +173,19 @@ pub fn apply_dock_geometry(app: &tauri::AppHandle, left_width: i32, right_width:
         RIGHT_DRAG_ACTIVE.load(Ordering::Relaxed) || RIGHT_POPOUT_ACTIVE.load(Ordering::Relaxed);
 
     // The OS windows are ALWAYS the full canvas size and never move/resize during drag.
-    let phys_canvas = calculate_canvas_width(scale);
+    let phys_canvas = calculate_dock_canvas_width(mon_width, scale);
 
     // Visible + clickable area is clipped with a window region.
-    let left_visible = calculate_visible_width(left_width, left_expanded, scale);
-    let right_visible = calculate_visible_width(right_width, right_expanded, scale);
+    let left_visible = if left_expanded {
+        phys_canvas
+    } else {
+        calculate_visible_width(left_width, false, scale)
+    };
+    let right_visible = if right_expanded {
+        phys_canvas
+    } else {
+        calculate_visible_width(right_width, false, scale)
+    };
 
     if let Some(left_win) = app.get_webview_window("left-dock") {
         if let Ok(hwnd) = left_win.hwnd() {
@@ -319,5 +340,19 @@ mod tests {
         let (new_left, new_right) = calculate_work_area_margins(0, 3440, 280, 280);
         assert_eq!(new_left, 280);
         assert_eq!(new_right, 3160);
+    }
+
+    #[test]
+    fn test_dock_canvas_width_covers_full_monitor_span() {
+        assert_eq!(calculate_dock_canvas_width(1920, 1.0), 1920);
+        assert_eq!(calculate_dock_canvas_width(2560, 1.0), 2560);
+        assert_eq!(calculate_dock_canvas_width(3840, 1.0), 3840);
+        assert_eq!(calculate_dock_canvas_width(1280, 1.0), 1280);
+    }
+
+    #[test]
+    fn test_work_area_margins_prevents_inversion() {
+        let (left, right) = calculate_work_area_margins(0, 1920, 1000, 1000);
+        assert!(left < right);
     }
 }

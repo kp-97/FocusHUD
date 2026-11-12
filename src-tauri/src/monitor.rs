@@ -182,43 +182,17 @@ pub fn set_work_area_cache(new_rect: RECT, orig: RECT) {
 }
 
 #[cfg(target_os = "windows")]
-pub unsafe fn apply_system_work_area_no_broadcast(new_rect: &RECT) {
-    set_windows_snap_enabled(false);
-    let rect_copy = *new_rect;
-    let _ = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst);
-    unsafe {
-        SystemParametersInfoW(SPI_SETWORKAREA, 0, &rect_copy as *const _ as *mut _, 0);
-    }
+pub unsafe fn apply_system_work_area_no_broadcast(_new_rect: &RECT) {
+    // Intentionally do NOT call SystemParametersInfoW(SPI_SETWORKAREA) during live resize.
+    // Changing the OS work area during resize causes Windows Explorer to shift and scramble
+    // desktop icons. FocusHUD reflows snapped windows directly via SetWindowPos.
 }
 
 #[cfg(target_os = "windows")]
-pub unsafe fn apply_system_work_area(new_rect: &RECT) {
-    // Ensure native Windows layout selector / Aero Snap is disabled while FocusHUD reserves work area
-    set_windows_snap_enabled(false);
-
-    let rect_copy = *new_rect;
-    let seq = WORK_AREA_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
-    unsafe {
-        // Immediate synchronous application of work area without broadcast delay
-        SystemParametersInfoW(SPI_SETWORKAREA, 0, &rect_copy as *const _ as *mut _, 0);
-    }
-
-    // Detached thread for non-blocking broadcast to external windows and taskbars.
-    // Delay slightly and verify sequence counter to ensure newer work area updates
-    // are not overwritten by an earlier thread, preventing broadcast races.
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(25));
-        if WORK_AREA_SEQ.load(Ordering::SeqCst) == seq {
-            unsafe {
-                SystemParametersInfoW(
-                    SPI_SETWORKAREA,
-                    0,
-                    &rect_copy as *const _ as *mut _,
-                    SPIF_SENDCHANGE,
-                );
-            }
-        }
-    });
+pub unsafe fn apply_system_work_area(_new_rect: &RECT) {
+    // Intentionally do NOT mutate OS SPI_SETWORKAREA when resizing or updating docks.
+    // Keeping the OS work area at its original bounds ensures Windows Explorer never
+    // moves or shifts the user's desktop icons. FocusHUD manages window snapping directly.
 }
 
 /// Synchronously restores the desktop work area to the captured original dimensions,
