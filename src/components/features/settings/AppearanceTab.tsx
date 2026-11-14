@@ -14,6 +14,7 @@ import {
 } from "../../../stores/layoutStore";
 import { useTheme, THEME_LIST } from "../../../stores/themeStore";
 import { setPanesReserveZonesMode } from "../../../services/tauriBridge";
+import { TypographySection } from "./TypographySection";
 
 interface AppearanceTabProps {
   onResetDefaults: () => void;
@@ -242,6 +243,9 @@ export const AppearanceTab: React.FC<AppearanceTabProps> = ({
           )}
         </div>
       </div>
+
+      {/* TYPOGRAPHY & FONT SELECTION SECTION (Issue #92) */}
+      <TypographySection />
 
       {/* DESKTOP ZONES RESERVATION */}
       <div className="bg-cyan-950/40 border border-cyan-500/20 rounded p-3 space-y-3">

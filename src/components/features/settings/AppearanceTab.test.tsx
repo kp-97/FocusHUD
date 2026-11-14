@@ -131,5 +131,17 @@ describe("AppearanceTab", () => {
     fireEvent.change(rightInput, { target: { value: "350" } });
     expect(localStorage.getItem("hud_custom_default_right_width")).toBe("350");
   });
+
+  it("renders typography selection and selects a font", () => {
+    render(<AppearanceTab onResetDefaults={() => {}} resetSuccess={false} />);
+
+    expect(screen.getByText("HUD TYPOGRAPHY & FONT")).toBeInTheDocument();
+    const latoOption = screen.getByLabelText("Select font Lato");
+    fireEvent.click(latoOption);
+
+    expect(screen.getByText("ACTIVE: LATO")).toBeInTheDocument();
+    expect(localStorage.getItem("focushud_font_family")).toBe("lato");
+    expect(document.documentElement.getAttribute("data-font")).toBe("lato");
+  });
 });
 
