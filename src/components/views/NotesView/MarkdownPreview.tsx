@@ -205,7 +205,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
             className="my-3 w-full overflow-x-auto rounded border border-cyan-500/30 bg-black/50 shadow-inner"
           >
             <table className="w-full min-w-full border-collapse text-left text-xs text-cyan-200">
-              <thead className="border-b border-cyan-500/30 bg-cyan-950/60 font-orbitron font-semibold tracking-wider text-cyan-100 uppercase">
+              <thead className="border-b border-cyan-500/30 bg-cyan-950/60 font-semibold tracking-wider text-cyan-100 uppercase">
                 <tr>
                   {headerCells.map((headerText, cIdx) => (
                     <th
@@ -252,7 +252,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
       elements.push(
         <h3
           key={`h3_${idx}`}
-          className="text-xs font-orbitron font-bold text-cyan-300 tracking-wider uppercase mt-3 mb-1 pb-0.5 border-b border-cyan-500/20"
+          className="text-xs font-bold text-cyan-300 tracking-wider uppercase mt-3 mb-1 pb-0.5 border-b border-cyan-500/20"
         >
           {renderInline(line.slice(4))}
         </h3>
@@ -263,7 +263,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
       elements.push(
         <h2
           key={`h2_${idx}`}
-          className="text-sm font-orbitron font-bold text-cyan-200 tracking-wider uppercase mt-4 mb-1.5 pb-1 border-b border-cyan-500/30"
+          className="text-sm font-bold text-cyan-200 tracking-wider uppercase mt-4 mb-1.5 pb-1 border-b border-cyan-500/30"
         >
           {renderInline(line.slice(3))}
         </h2>
@@ -274,7 +274,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
       elements.push(
         <h1
           key={`h1_${idx}`}
-          className="text-base font-orbitron font-extrabold text-cyan-100 tracking-wider uppercase mt-4 mb-2 pb-1 border-b border-cyan-500/40 hud-glow-cyan"
+          className="text-base font-extrabold text-cyan-100 tracking-wider uppercase mt-4 mb-2 pb-1 border-b border-cyan-500/40 hud-glow-cyan"
         >
           {renderInline(line.slice(2))}
         </h1>

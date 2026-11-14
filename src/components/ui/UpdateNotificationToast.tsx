@@ -36,7 +36,7 @@ export const UpdateNotificationToast: React.FC<UpdateNotificationToastProps> = (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-          <span className="font-orbitron font-bold tracking-wider text-amber-100 uppercase text-[11px]">
+          <span className="font-bold tracking-wider text-amber-100 uppercase text-[11px]">
             UPDATE AVAILABLE: v{updateInfo.version}
           </span>
         </div>

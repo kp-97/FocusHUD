@@ -256,7 +256,7 @@ export const NoteFormattingToolbar: React.FC<NoteFormattingToolbarProps> = ({
         type="button"
         onClick={() => handleClick("h1")}
         title="Heading 1 (# Text)"
-        className="px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        className="px-1.5 py-0.5 rounded text-[10px] font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
       >
         H1
       </button>
@@ -264,7 +264,7 @@ export const NoteFormattingToolbar: React.FC<NoteFormattingToolbarProps> = ({
         type="button"
         onClick={() => handleClick("h2")}
         title="Heading 2 (## Text)"
-        className="px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        className="px-1.5 py-0.5 rounded text-[10px] font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
       >
         H2
       </button>
@@ -272,7 +272,7 @@ export const NoteFormattingToolbar: React.FC<NoteFormattingToolbarProps> = ({
         type="button"
         onClick={() => handleClick("h3")}
         title="Heading 3 (### Text)"
-        className="px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
+        className="px-1.5 py-0.5 rounded text-[10px] font-bold text-cyan-400/70 hover:text-cyan-100 hover:bg-cyan-500/20 transition cursor-pointer"
       >
         H3
       </button>

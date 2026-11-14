@@ -98,7 +98,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         {!isCompact && (
           <h1
             data-testid="calendar-header-title"
-            className="text-base font-orbitron font-medium text-cyan-100 tracking-wide select-text ml-1"
+            className="text-base font-semibold text-cyan-100 tracking-wide select-text ml-1"
           >
             {headerTitle}
           </h1>

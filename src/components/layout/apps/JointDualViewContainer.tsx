@@ -53,7 +53,7 @@ export const JointDualViewContainer: React.FC<JointDualViewContainerProps> = ({
   if (!isDualView) {
     return (
       <HudBrackets variant="cyan" showTicks={false} className="h-full w-full flex flex-col overflow-hidden">
-        <div className="h-7 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-cyan-950/20 text-cyan-400 font-mono text-xs select-none">
+        <div className="h-7 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-cyan-950/20 text-cyan-400 text-xs select-none">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00e5ff]" />
             <span className="uppercase tracking-wider font-semibold">{activeNav}</span>
@@ -87,7 +87,7 @@ export const JointDualViewContainer: React.FC<JointDualViewContainerProps> = ({
         className="h-full shrink-0 flex flex-col overflow-hidden pr-0.5"
       >
         <HudBrackets variant="cyan" showTicks={false} className="h-full w-full flex flex-col overflow-hidden">
-          <div className="h-7 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-cyan-950/20 text-cyan-400 font-mono text-xs select-none">
+          <div className="h-7 shrink-0 flex items-center justify-between px-3 border-b border-cyan-500/20 bg-cyan-950/20 text-cyan-400 text-xs select-none">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00e5ff]" />
               <span className="uppercase tracking-wider font-semibold truncate">VIEW 1: {activeNav}</span>
@@ -118,7 +118,7 @@ export const JointDualViewContainer: React.FC<JointDualViewContainerProps> = ({
         className="flex-1 h-full min-w-0 flex flex-col overflow-hidden pl-0.5"
       >
         <HudBrackets variant="amber" showTicks={false} className="h-full w-full flex flex-col overflow-hidden">
-          <div className="h-7 shrink-0 flex items-center justify-between px-3 border-b border-amber-500/20 bg-amber-950/20 text-amber-400 font-mono text-xs select-none relative z-30">
+          <div className="h-7 shrink-0 flex items-center justify-between px-3 border-b border-amber-500/20 bg-amber-950/20 text-amber-400 text-xs select-none relative z-30">
             <div className="relative" ref={dropdownRef}>
               <button
                 data-testid="dual-view-right-selector-button"

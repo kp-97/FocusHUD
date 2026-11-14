@@ -125,7 +125,7 @@ export const ActionPlansView: React.FC<ActionPlansViewProps> = ({
                 node.completed
                   ? "line-through text-cyan-400/40"
                   : depth === 0
-                  ? "font-orbitron font-bold text-amber-200"
+                  ? "font-bold text-amber-200"
                   : "text-cyan-200"
               }`}
             >
@@ -197,7 +197,7 @@ export const ActionPlansView: React.FC<ActionPlansViewProps> = ({
           <div className="flex items-center gap-1.5">
             <Workflow className="w-3.5 h-3.5 text-amber-400" />
             {!isCompact && (
-              <span className="font-orbitron font-bold text-amber-200 tracking-wider">
+              <span className="font-bold text-amber-200 tracking-wider">
                 ACTION PLANS
               </span>
             )}
