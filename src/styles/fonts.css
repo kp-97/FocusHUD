@@ -1,0 +1,36 @@
+/* Bundled Open-Source Typography for Offline Support (Issue #92) */
+
+/* Open Sans (Humanist Sans) */
+@import "@fontsource/open-sans/400.css";
+@import "@fontsource/open-sans/600.css";
+@import "@fontsource/open-sans/700.css";
+
+/* Lato (Humanist Sans) */
+@import "@fontsource/lato/400.css";
+@import "@fontsource/lato/700.css";
+
+/* Poppins (Geometric Sans) */
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
+
+/* Roboto (Neo-grotesque) */
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fontsource/roboto/700.css";
+
+/* Montserrat (Geometric Sans) */
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+
+/* Inter (Neo-grotesque) */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* Merriweather (Modern Serif) */
+@import "@fontsource/merriweather/400.css";
+@import "@fontsource/merriweather/700.css";
+
