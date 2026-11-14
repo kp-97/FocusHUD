@@ -135,7 +135,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
       {/* Messages Scroll Area */}
       <div
         ref={messagesContainerRef}
-        className={`flex-1 min-h-0 overflow-y-auto ${isCompact ? "space-y-1.5" : "space-y-2.5"} pr-1 font-tech`}
+        className={`flex-1 min-h-0 overflow-y-auto ${isCompact ? "space-y-1.5" : "space-y-2.5"} pr-1`}
       >
         {messages.map((msg, idx) => {
           const isUser = msg.role === "user";

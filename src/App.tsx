@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useTheme } from "./stores/themeStore";
+import { useFont } from "./stores/fontStore";
 import { useSpellcheck } from "./stores/spellcheckStore";
 import { useDockLayout, DockWindowType } from "./hooks/useDockLayout";
 import {
@@ -11,8 +12,9 @@ import {
 } from "./components/layout/apps";
 
 export default function App() {
-  // Initialize and synchronize HUD multi-theme engine and spellcheck dictionary
+  // Initialize and synchronize HUD multi-theme engine, typography, and spellcheck dictionary
   useTheme();
+  useFont();
   useSpellcheck();
 
   // Check if opened as dedicated dock window (e.g. ?dock=left or ?dock=right or ?dock=settings)

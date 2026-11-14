@@ -156,7 +156,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
               className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(0,229,255,0.4)]"
               style={{ backgroundColor: color }}
             />
-            <span className="text-xs font-orbitron font-semibold tracking-wider text-cyan-200">
+            <span className="text-xs font-bold tracking-wider text-cyan-200">
               {isEditing ? "EDIT EVENT" : "NEW EVENT"}
             </span>
           </div>

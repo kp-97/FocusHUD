@@ -34,7 +34,7 @@ export const YearView: React.FC<YearViewProps> = ({
             key={m}
             className="p-2.5 rounded-lg border border-cyan-500/20 bg-[#050b14] flex flex-col shadow-[0_0_12px_rgba(0,229,255,0.05)]"
           >
-            <div className="text-xs font-orbitron font-bold text-cyan-200 mb-1.5 uppercase tracking-wider">
+            <div className="text-xs font-bold text-cyan-200 mb-1.5 uppercase tracking-wider">
               {monthName}
             </div>
 

@@ -184,7 +184,7 @@ export const NotesList: React.FC<NotesListProps> = ({
         <div className="flex items-center gap-1.5 min-w-0">
           <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
           {!isCompact && (
-            <span className="font-orbitron font-bold text-xs tracking-wider text-cyan-200 truncate">
+            <span className="font-bold text-xs tracking-wider text-cyan-200 truncate">
               NOTES
             </span>
           )}
@@ -364,7 +364,7 @@ export const NotesList: React.FC<NotesListProps> = ({
                 </div>
 
                 {/* Content Snippet */}
-                <p className="text-[11px] text-cyan-400/60 line-clamp-2 font-mono leading-tight mb-1">
+                <p className="text-[11px] text-cyan-400/60 line-clamp-2 leading-tight mb-1">
                   {snippet || "(Empty note)"}
                 </p>
 

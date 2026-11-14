@@ -63,7 +63,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({ isCompact = false }) => 
         <div className="flex items-center gap-1.5">
           <Columns3 className="w-3.5 h-3.5 text-cyan-400" />
           {!isCompact && (
-            <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
+            <span className="font-bold text-cyan-200 tracking-wider">
               KANBAN WORKFLOW
             </span>
           )}

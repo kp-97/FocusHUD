@@ -288,7 +288,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <h2
               id="settings-modal-title"
               data-tauri-drag-region
-              className="font-orbitron font-bold text-sm tracking-wider text-cyan-100 uppercase"
+              className="font-bold text-sm tracking-wider text-cyan-100 uppercase"
             >
               HUD PREFERENCES & SETTINGS
             </h2>

@@ -122,7 +122,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
                 node.completed
                   ? "line-through text-cyan-400/40"
                   : depth === 0
-                  ? "font-orbitron font-bold text-cyan-100"
+                  ? "font-bold text-cyan-100"
                   : "text-cyan-200/90"
               }`}
             >
@@ -196,7 +196,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
           <div className="flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-cyan-400" />
             {!isCompact && (
-              <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
+              <span className="font-bold text-cyan-200 tracking-wider">
                 GOALS HIERARCHY
               </span>
             )}

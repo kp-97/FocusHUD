@@ -65,7 +65,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             >
               <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-cyan-500/15">
                 <span
-                  className={`text-xs font-orbitron font-bold tracking-wider ${
+                  className={`text-xs font-bold tracking-wider ${
                     d.isToday ? "text-amber-300" : "text-cyan-200"
                   }`}
                 >

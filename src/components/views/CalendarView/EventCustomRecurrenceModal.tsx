@@ -54,7 +54,7 @@ export const EventCustomRecurrenceModal: React.FC<EventCustomRecurrenceModalProp
       className="absolute inset-0 z-50 rounded-xl bg-[#071322] border border-cyan-400/60 p-4 shadow-[0_12px_36px_rgba(0,0,0,0.9)] flex flex-col justify-between font-hud"
     >
       <div>
-        <h2 className="text-sm font-orbitron font-semibold text-cyan-100 mb-4 tracking-wide">
+        <h2 className="text-sm font-semibold text-cyan-100 mb-4 tracking-wide">
           Custom recurrence
         </h2>
 

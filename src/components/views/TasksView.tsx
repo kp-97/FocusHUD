@@ -29,7 +29,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const handleAddTask = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newTaskTitle.trim()) return;
-
     const newTask: TaskItem = {
       id: "task_" + Date.now(),
       title: newTaskTitle.trim().toUpperCase(),
@@ -38,7 +37,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
       status: "todo",
       subtasks: [],
     };
-
     saveAndSetTasks([...tasks, newTask]);
     setNewTaskTitle("");
     if (!selectedTaskId) setSelectedTaskId(newTask.id);
@@ -47,7 +45,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
   // Add Subtask (infinitely nested breakdown)
   const handleAddSubtask = (parentTaskId: string) => {
     if (!subtaskTitle.trim()) return;
-
     const newSub: TaskItem = {
       id: "subt_" + Date.now(),
       title: subtaskTitle.trim().toUpperCase(),
@@ -56,14 +53,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
       status: "todo",
       subtasks: [],
     };
-
     const insertSub = (list: TaskItem[]): TaskItem[] => {
       return list.map((item) => {
         if (item.id === parentTaskId) {
-          return {
-            ...item,
-            subtasks: [...(item.subtasks || []), newSub],
-          };
+          return { ...item, subtasks: [...(item.subtasks || []), newSub] };
         }
         if (item.subtasks && item.subtasks.length > 0) {
           return { ...item, subtasks: insertSub(item.subtasks) };
@@ -71,7 +64,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
         return item;
       });
     };
-
     saveAndSetTasks(insertSub(tasks));
     setSubtaskTitle("");
     setAddingSubToId(null);
@@ -80,7 +72,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
   // Toggle Task Completion
   const toggleTaskCompleted = (id: string) => {
     const today = getTodayString();
-
     const updateComplete = (list: TaskItem[]): TaskItem[] => {
       return list.map((item) => {
         if (item.id === id) {
@@ -98,7 +89,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
         return item;
       });
     };
-
     saveAndSetTasks(updateComplete(tasks));
   };
 
@@ -115,7 +105,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
           return item;
         });
     };
-
     saveAndSetTasks(remove(tasks));
     if (selectedTaskId === id) setSelectedTaskId(null);
   };
@@ -297,7 +286,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <div className="flex items-center gap-1.5">
             <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
             {!isCompact && (
-              <span className="font-orbitron font-bold text-cyan-200 tracking-wider">
+              <span className="font-bold text-cyan-200 tracking-wider">
                 TASK INVENTORY
               </span>
             )}

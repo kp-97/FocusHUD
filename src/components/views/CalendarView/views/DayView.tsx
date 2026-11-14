@@ -49,7 +49,7 @@ export const DayView: React.FC<DayViewProps> = ({
         </span>
         <span
           className={`ml-2 text-sm font-bold ${
-            isToday ? "text-amber-300 font-orbitron" : "text-cyan-200"
+            isToday ? "text-amber-300" : "text-cyan-200"
           }`}
         >
           {date.getDate()}

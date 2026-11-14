@@ -236,7 +236,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           placeholder="NOTE TITLE..."
           spellCheck={spellcheckEnabled}
           lang={spellcheckEnabled ? spellcheckLocale : undefined}
-          className="w-full bg-transparent font-orbitron font-bold text-sm text-cyan-100 tracking-wider placeholder:text-cyan-700/50 focus:outline-none"
+          className="w-full bg-transparent font-bold text-sm text-cyan-100 tracking-wider placeholder:text-cyan-700/50 focus:outline-none"
         />
 
         {/* Context Link Selector / Chip */}
@@ -275,7 +275,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             spellCheck={spellcheckEnabled}
             lang={spellcheckEnabled ? spellcheckLocale : undefined}
             placeholder="Type notes here... Supports Markdown headers (#), bullets (-), checklists (- [ ]), and bold (**text**)..."
-            className="flex-1 w-full p-3 bg-transparent text-cyan-200 font-mono text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
+            className="flex-1 w-full p-3 bg-transparent text-cyan-200 text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
           />
         )}
 
@@ -301,7 +301,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               spellCheck={spellcheckEnabled}
               lang={spellcheckEnabled ? spellcheckLocale : undefined}
               placeholder="Type markdown here..."
-              className="flex-1 h-full p-3 bg-transparent text-cyan-200 font-mono text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
+              className="flex-1 h-full p-3 bg-transparent text-cyan-200 text-xs leading-relaxed resize-none focus:outline-none placeholder:text-cyan-700/40 select-text"
             />
             <div className="flex-1 h-full p-3 overflow-y-auto bg-black/30">
               <MarkdownPreview
