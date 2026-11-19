@@ -1,4 +1,4 @@
-import { NavItemConfig } from "./hud";
+import { NavItemConfig } from "./navigation";
 
 export type SettingsTabId =
   | "views"
