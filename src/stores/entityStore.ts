@@ -3,7 +3,7 @@
  * Manages seed/mock entities, localStorage caching, and SQLite synchronization triggers.
  */
 
-import { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NoteItem } from "../types/hud";
+import type { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NoteItem } from "../types/entities";
 import { isTauriEnvironment, syncGoals, syncTasks, syncActionPlans, syncNotes, syncCalendarEvents } from "../services/dbService";
 import { treeToGoalsFlat, treeToTasksFlat, treeToActionPlansFlat, appEventsToDb } from "../services/dbAdapters";
 import { getTodayDateString } from "../utils/formatters";

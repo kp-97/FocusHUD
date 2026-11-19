@@ -39,7 +39,8 @@ import {
   loadNotes,
   saveNotes,
 } from "./layoutStore";
-import { TaskItem, GoalNode, CalendarEvent, ActionPlanNode, NavItemConfig } from "../types/hud";
+import type { TaskItem, GoalNode, CalendarEvent, ActionPlanNode } from "../types/entities";
+import type { NavItemConfig } from "../types/navigation";
 
 describe("layoutStore module", () => {
   beforeEach(() => {

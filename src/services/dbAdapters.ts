@@ -1,4 +1,4 @@
-import type { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NoteItem } from "../types/hud";
+import type { GoalNode, TaskItem, ActionPlanNode, CalendarEvent, NoteItem } from "../types/entities";
 import type { DbGoal, DbTask, DbActionPlan, DbCalendarEvent, DbNote } from "./dbService";
 
 // ========================================================

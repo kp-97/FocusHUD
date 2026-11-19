@@ -5,7 +5,7 @@
  */
 
 import type { SystemDiagnostics } from "../types/diagnostics";
-import type { WindowModeState } from "../types/hud";
+import type { WindowModeState } from "../types/dock";
 import { invokeTauri, invokeTauriBool, isTauriEnvironment } from "./ipc";
 
 export type { SystemDiagnostics };
