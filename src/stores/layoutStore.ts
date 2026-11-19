@@ -3,12 +3,12 @@
  * Manages dual-pane HUD layout widths, constraints, snapping, and cross-window commands.
  */
 
-import {
+import type {
   NavItemConfig,
   NavViewId,
   NavRailSide,
-  WindowModeState,
-} from "../types/hud";
+} from "../types/navigation";
+import type { WindowModeState } from "../types/dock";
 
 // Re-export entity store for full backwards compatibility
 export * from "./entityStore";

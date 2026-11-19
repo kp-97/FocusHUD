@@ -4,26 +4,9 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import type { ThemeId, ThemeConfig, ThemeCategory } from "../types/theme";
 
-export type ThemeId =
-  | "cyber"
-  | "dark"
-  | "light"
-  | "pink"
-  | "amber"
-  | "nord"
-  | "matrix";
-
-export interface ThemeConfig {
-  id: ThemeId;
-  name: string;
-  category: "dark" | "light";
-  description: string;
-  accentColor: string;
-  secondaryColor: string;
-  bgColor: string;
-  borderColor: string;
-}
+export type { ThemeId, ThemeConfig, ThemeCategory };
 
 export const THEMES: Record<ThemeId, ThemeConfig> = {
   cyber: {
