@@ -1,16 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  Home,
-  MessageSquare,
-  Calendar,
-  Target,
-  CheckSquare,
-  Columns3,
-  Workflow,
-  Timer,
-  Settings,
-  FileText,
-} from "lucide-react";
+import { Settings, Home } from "lucide-react";
 import { HudBrackets } from "../../ui/HudBrackets";
 import { getSystemDiagnostics, setDockPopoutMode } from "../../../services/tauriBridge";
 import type { SystemDiagnostics } from "../../../types/diagnostics";
@@ -26,29 +15,9 @@ import { Tooltip, TooltipProvider } from "../../ui/Tooltip";
 import { SystemMenuDropdown } from "./SystemMenuDropdown";
 import { LeftRailHeader } from "./LeftRailHeader";
 import { useTheme } from "../../../stores/themeStore";
+import { ViewSlot, NAV_ICON_MAP, getViewIcon } from "../../../features/viewRegistry";
 
-// View components for Left Pane
-import { HomeView } from "../../../features/home";
-import { ChatView } from "../../../features/chat";
-import { CalendarView } from "../../../features/calendar";
-import { GoalsView } from "../../../features/goals";
-import { TasksView } from "../../../features/tasks";
-import { NotesView } from "../../../features/notes";
-import { KanbanView } from "../../../features/kanban";
-import { ActionPlansView } from "../../../features/action-plans";
-import { PomodoroDial } from "../../../features/pomodoro";
-
-export const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
-  home: Home,
-  chat: MessageSquare,
-  calendar: Calendar,
-  goals: Target,
-  tasks: CheckSquare,
-  notes: FileText,
-  action_plans: Workflow,
-  timer: Timer,
-  kanban: Columns3,
-};
+export { NAV_ICON_MAP };
 
 interface LeftSidebarProps {
   width: number;
@@ -257,30 +226,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   const isIconOnly = width < 120;
 
-  const renderActiveView = () => {
-    switch (activeNav) {
-      case "home":
-        return <HomeView />;
-      case "chat":
-        return <ChatView />;
-      case "calendar":
-        return <CalendarView />;
-      case "goals":
-        return <GoalsView />;
-      case "tasks":
-        return <TasksView />;
-      case "notes":
-        return <NotesView isLeftDock={isDockMode} />;
-      case "kanban":
-        return <KanbanView />;
-      case "action_plans":
-        return <ActionPlansView />;
-      case "timer":
-        return <PomodoroDial isCompact={false} />;
-      default:
-        return <HomeView />;
-    }
-  };
+  const renderActiveView = () => (
+    <ViewSlot
+      viewId={activeNav}
+      isLeftDock={isDockMode}
+      isCompact={false}
+    />
+  );
 
   const handleNavClick = (id: string) => {
     if (isJoinedMode) {
@@ -406,7 +358,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             {navItems
               .filter((item) => item.visible && getNavItemRail(item) === "left")
               .map((item) => {
-                const IconComponent = NAV_ICON_MAP[item.id] || Home;
+                const IconComponent = NAV_ICON_MAP[item.id] || getViewIcon(item.id) || Home;
                 const isActive = isJoinedMode
                   ? activeNav === item.id
                   : !isLeftCollapsed && activeNav === item.id;

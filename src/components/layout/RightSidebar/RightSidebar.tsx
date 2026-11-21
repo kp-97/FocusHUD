@@ -1,17 +1,6 @@
 import { HudBrackets } from "../../ui/HudBrackets";
 import React, { useState, useEffect, useRef } from "react";
-import {
-  ChevronDown,
-  Home,
-  MessageSquare,
-  Calendar,
-  Target,
-  CheckSquare,
-  FileText,
-  Workflow,
-  Timer,
-  Columns3,
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { NavViewId, WindowModeState } from "../../../types/hud";
 import {
   getInitialRightNav,
@@ -19,29 +8,9 @@ import {
   subscribeRightNavChange,
 } from "../../../stores/layoutStore";
 import { RightSidebarCompactRail } from "./RightSidebarCompactRail";
+import { ViewSlot, AVAILABLE_RIGHT_VIEWS } from "../../../features/viewRegistry";
 
-// View components
-import { HomeView } from "../../../features/home";
-import { ChatView } from "../../../features/chat";
-import { CalendarView } from "../../../features/calendar";
-import { GoalsView } from "../../../features/goals";
-import { TasksView } from "../../../features/tasks";
-import { KanbanView } from "../../../features/kanban";
-import { ActionPlansView } from "../../../features/action-plans";
-import { NotesView } from "../../../features/notes";
-import { PomodoroDial } from "../../../features/pomodoro";
-
-export const AVAILABLE_RIGHT_VIEWS: Array<{ id: NavViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-  { id: "home", label: "HOME", icon: Home },
-  { id: "chat", label: "AI CHAT", icon: MessageSquare },
-  { id: "calendar", label: "CALENDAR", icon: Calendar },
-  { id: "goals", label: "GOALS", icon: Target },
-  { id: "tasks", label: "TASKS", icon: CheckSquare },
-  { id: "notes", label: "NOTES", icon: FileText },
-  { id: "action_plans", label: "ACTION PLANS", icon: Workflow },
-  { id: "timer", label: "TIMER", icon: Timer },
-  { id: "kanban", label: "KANBAN", icon: Columns3 },
-];
+export { AVAILABLE_RIGHT_VIEWS };
 
 interface RightSidebarProps {
   width: number;
@@ -139,30 +108,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   const isIconOnly = width < 120;
 
   // Render view corresponding to selected navigation in the Right Pane
-  const renderActiveView = () => {
-    switch (currentNav) {
-      case "home":
-        return <HomeView />;
-      case "chat":
-        return <ChatView />;
-      case "calendar":
-        return <CalendarView />;
-      case "goals":
-        return <GoalsView />;
-      case "tasks":
-        return <TasksView />;
-      case "notes":
-        return <NotesView />;
-      case "kanban":
-        return <KanbanView />;
-      case "action_plans":
-        return <ActionPlansView />;
-      case "timer":
-        return <PomodoroDial isCompact={false} />;
-      default:
-        return <HomeView />;
-    }
-  };
+  const renderActiveView = () => (
+    <ViewSlot viewId={currentNav} isCompact={false} />
+  );
 
   return (
     <aside
