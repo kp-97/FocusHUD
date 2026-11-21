@@ -1,21 +1,15 @@
+//! High-privilege Win32 work area reservation and snap setting controls.
+
 #[cfg(target_os = "windows")]
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::{POINT, RECT};
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
-};
+use windows_sys::Win32::Foundation::RECT;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_DWORD, RegCloseKey, RegOpenKeyExW, RegSetValueExW,
-};
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::UI::HiDpi::{
-    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -34,9 +28,6 @@ static PREVIOUS_WORK_AREA: Mutex<Option<RECT>> = Mutex::new(None);
 static WORK_AREA_SEQ: AtomicU64 = AtomicU64::new(0);
 #[cfg(target_os = "windows")]
 static WINDOWS_SNAP_SUPPRESSED: AtomicBool = AtomicBool::new(false);
-
-pub use crate::platform::ScreenMetrics;
-pub use crate::watchdog::*;
 
 /// Low-level helper that enables (`true`) or disables (`false`) the native Windows 11
 /// Snap Layouts bar (`EnableSnapBar`), hover flyout (`EnableSnapAssistFlyout`),
@@ -107,45 +98,6 @@ pub fn set_windows_snap_enabled(enabled: bool) {
     if WINDOWS_SNAP_SUPPRESSED.swap(should_suppress, Ordering::SeqCst) != should_suppress {
         unsafe {
             set_windows_snap_enabled_raw(enabled);
-        }
-    }
-}
-
-/// Enforces Per-Monitor DPI v2 awareness so Ultrawide and high-DPI displays
-/// report true physical resolutions instead of legacy scaled bounds.
-pub fn init_dpi_awareness() {
-    #[cfg(target_os = "windows")]
-    unsafe {
-        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    }
-}
-
-/// Queries true physical monitor bounds and work area using GetMonitorInfoW
-/// in Per-Monitor DPI v2 context so Ultrawide panels are never clipped.
-#[cfg(target_os = "windows")]
-pub unsafe fn get_primary_monitor_rects() -> (RECT, RECT) {
-    let pt = POINT { x: 0, y: 0 };
-    unsafe {
-        let hmon = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
-        let mut mi: MONITORINFO = std::mem::zeroed();
-        mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-        if GetMonitorInfoW(hmon, &mut mi) != 0 {
-            (mi.rcMonitor, mi.rcWork)
-        } else {
-            (
-                RECT {
-                    left: 0,
-                    top: 0,
-                    right: 3440,
-                    bottom: 1440,
-                },
-                RECT {
-                    left: 0,
-                    top: 0,
-                    right: 3440,
-                    bottom: 1356,
-                },
-            )
         }
     }
 }
@@ -256,81 +208,4 @@ pub fn restore_work_area() -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_screen_metrics_serialization() {
-        let metrics = ScreenMetrics {
-            screen_width: 3440,
-            screen_height: 1440,
-            original_left: 0,
-            original_top: 0,
-            original_right: 3440,
-            original_bottom: 1400,
-        };
-        let json = serde_json::to_string(&metrics).unwrap();
-        assert!(json.contains("screen_width"));
-        assert!(json.contains("3440"));
-    }
-
-    #[test]
-    fn test_signal_clean_exit_idempotent() {
-        signal_watchdog_clean_exit();
-        signal_watchdog_clean_exit();
-    }
-
-    #[test]
-    fn test_parse_watchdog_args_valid() {
-        let args = vec![
-            "FocusHUD.exe".to_string(),
-            "--watchdog".to_string(),
-            "12345".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "3440".to_string(),
-            "1400".to_string(),
-        ];
-        let parsed = parse_watchdog_args(&args);
-        assert_eq!(parsed, Some((12345, 0, 0, 3440, 1400)));
-    }
-
-    #[test]
-    fn test_parse_watchdog_args_normal_run() {
-        let args = vec!["FocusHUD.exe".to_string()];
-        assert_eq!(parse_watchdog_args(&args), None);
-    }
-
-    #[test]
-    fn test_parse_watchdog_args_malformed_number() {
-        let args = vec![
-            "FocusHUD.exe".to_string(),
-            "--watchdog".to_string(),
-            "not_a_number".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "3440".to_string(),
-            "1400".to_string(),
-        ];
-        assert_eq!(parse_watchdog_args(&args), None);
-    }
-
-    #[test]
-    fn test_parse_watchdog_args_insufficient_params() {
-        let args = vec![
-            "FocusHUD.exe".to_string(),
-            "--watchdog".to_string(),
-            "12345".to_string(),
-        ];
-        assert_eq!(parse_watchdog_args(&args), None);
-    }
-
-    #[test]
-    fn test_init_console_ctrl_handler_idempotent() {
-        init_console_ctrl_handler();
-        init_console_ctrl_handler();
-    }
 }
