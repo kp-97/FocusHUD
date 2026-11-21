@@ -12,15 +12,7 @@ import {
   startResizeWindow,
   resizeWindowByDelta,
 } from "../../../services/tauriBridge";
-import { HomeView } from "../../../features/home";
-import { ChatView } from "../../../features/chat";
-import { CalendarView } from "../../../features/calendar";
-import { GoalsView } from "../../../features/goals";
-import { TasksView } from "../../../features/tasks";
-import { NotesView } from "../../../features/notes";
-import { KanbanView } from "../../../features/kanban";
-import { ActionPlansView } from "../../../features/action-plans";
-import { PomodoroDial } from "../../../features/pomodoro";
+import { ViewSlot } from "../../../features/viewRegistry";
 
 interface FullLayoutAppProps {
   layout: UseDockLayoutReturn;
@@ -81,30 +73,9 @@ export const FullLayoutApp: React.FC<FullLayoutAppProps> = ({ layout }) => {
     MIN_LEFT_WIDTH,
   } = layout;
 
-  const renderFullScreenView = (nav: string) => {
-    switch (nav) {
-      case "home":
-        return <HomeView />;
-      case "chat":
-        return <ChatView />;
-      case "calendar":
-        return <CalendarView />;
-      case "goals":
-        return <GoalsView />;
-      case "tasks":
-        return <TasksView />;
-      case "notes":
-        return <NotesView />;
-      case "kanban":
-        return <KanbanView />;
-      case "action_plans":
-        return <ActionPlansView />;
-      case "timer":
-        return <PomodoroDial isCompact={false} />;
-      default:
-        return <HomeView />;
-    }
-  };
+  const renderFullScreenView = (nav: string) => (
+    <ViewSlot viewId={nav} isCompact={false} />
+  );
 
   const isDraggingWindowRef = useRef(false);
   const lastDragPosRef = useRef({ x: 0, y: 0 });
