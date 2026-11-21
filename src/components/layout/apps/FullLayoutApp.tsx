@@ -3,7 +3,7 @@ import { LeftSidebar } from "../LeftSidebar/LeftSidebar";
 import { RightSidebar } from "../RightSidebar/RightSidebar";
 import { ResizeHandle } from "../ResizeHandle";
 import { UpdateNotificationToast } from "../../ui/UpdateNotificationToast";
-import { SettingsModal } from "../../features/settings/SettingsModal";
+import { SettingsModal } from "../../../features/settings";
 import { JointDualViewContainer } from "./JointDualViewContainer";
 import { UseDockLayoutReturn } from "../../../hooks/useDockLayout";
 import {
@@ -12,15 +12,15 @@ import {
   startResizeWindow,
   resizeWindowByDelta,
 } from "../../../services/tauriBridge";
-import { HomeView } from "../../views/HomeView";
-import { ChatView } from "../../views/ChatView";
-import { CalendarView } from "../../views/CalendarView";
-import { GoalsView } from "../../views/GoalsView";
-import { TasksView } from "../../views/TasksView";
-import { NotesView } from "../../views/NotesView";
-import { KanbanView } from "../../views/KanbanView";
-import { ActionPlansView } from "../../views/ActionPlansView";
-import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
+import { HomeView } from "../../../features/home";
+import { ChatView } from "../../../features/chat";
+import { CalendarView } from "../../../features/calendar";
+import { GoalsView } from "../../../features/goals";
+import { TasksView } from "../../../features/tasks";
+import { NotesView } from "../../../features/notes";
+import { KanbanView } from "../../../features/kanban";
+import { ActionPlansView } from "../../../features/action-plans";
+import { PomodoroDial } from "../../../features/pomodoro";
 
 interface FullLayoutAppProps {
   layout: UseDockLayoutReturn;

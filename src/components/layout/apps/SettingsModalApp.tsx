@@ -1,5 +1,5 @@
 import React from "react";
-import { SettingsModal } from "../../features/settings/SettingsModal";
+import { SettingsModal } from "../../../features/settings";
 import { closeSettingsWindow } from "../../../services/tauriBridge";
 import { UseDockLayoutReturn } from "../../../hooks/useDockLayout";
 

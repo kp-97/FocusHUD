@@ -26,7 +26,7 @@ vi.mock("./services/tauriBridge", () => ({
   dismissSnapAssist: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("./components/features/settings/UpdatesTab", () => ({
+vi.mock("./features/settings/UpdatesTab", () => ({
   UpdatesTab: () => <div data-testid="updates-tab-mock" />,
 }));
 

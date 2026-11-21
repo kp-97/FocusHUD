@@ -28,15 +28,15 @@ import { LeftRailHeader } from "./LeftRailHeader";
 import { useTheme } from "../../../stores/themeStore";
 
 // View components for Left Pane
-import { HomeView } from "../../views/HomeView";
-import { ChatView } from "../../views/ChatView";
-import { CalendarView } from "../../views/CalendarView";
-import { GoalsView } from "../../views/GoalsView";
-import { TasksView } from "../../views/TasksView";
-import { NotesView } from "../../views/NotesView";
-import { KanbanView } from "../../views/KanbanView";
-import { ActionPlansView } from "../../views/ActionPlansView";
-import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
+import { HomeView } from "../../../features/home";
+import { ChatView } from "../../../features/chat";
+import { CalendarView } from "../../../features/calendar";
+import { GoalsView } from "../../../features/goals";
+import { TasksView } from "../../../features/tasks";
+import { NotesView } from "../../../features/notes";
+import { KanbanView } from "../../../features/kanban";
+import { ActionPlansView } from "../../../features/action-plans";
+import { PomodoroDial } from "../../../features/pomodoro";
 
 export const NAV_ICON_MAP: Record<NavViewId, React.ComponentType<{ className?: string }>> = {
   home: Home,

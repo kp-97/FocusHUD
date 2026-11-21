@@ -1,7 +1,7 @@
 import React from "react";
 import { RightSidebar } from "../RightSidebar/RightSidebar";
 import { ResizeHandle } from "../ResizeHandle";
-import { SettingsModal } from "../../features/settings/SettingsModal";
+import { SettingsModal } from "../../../features/settings";
 import { UseDockLayoutReturn } from "../../../hooks/useDockLayout";
 
 interface DockAppProps {
