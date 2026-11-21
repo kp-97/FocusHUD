@@ -103,29 +103,30 @@ pub unsafe fn set_clip_region(h: HWND, last: &AtomicI64, left: i32, right: i32, 
 
 /// Calculates physical canvas width given a DPI scaling factor
 pub fn calculate_canvas_width(scale: f64) -> i32 {
-    ((MAX_DOCK_LOGICAL_WIDTH as f64) * scale).round() as i32
+    crate::monitor::geometry::calculate_canvas_width(MAX_DOCK_LOGICAL_WIDTH, scale)
 }
 
 /// Calculates stationary physical canvas width for a dock considering monitor width and DPI scale.
 /// Ensures the dock window can physically span across the monitor to connect with the opposite rail.
 pub fn calculate_dock_canvas_width(mon_width: i32, scale: f64) -> i32 {
     let base_canvas = calculate_canvas_width(scale);
-    mon_width.max(base_canvas)
+    crate::monitor::geometry::calculate_dock_canvas_width(mon_width, base_canvas)
 }
 
 /// Calculates visible physical width for a dock considering dragging state and DPI scale
 pub fn calculate_visible_width(logical_width: i32, is_drag_active: bool, scale: f64) -> i32 {
-    let phys_canvas = calculate_canvas_width(scale);
-    if is_drag_active {
-        phys_canvas
-    } else {
-        (((logical_width + HANDLE_GUTTER_LOGICAL_PX) as f64) * scale).round() as i32
-    }
+    crate::monitor::geometry::calculate_visible_width(
+        logical_width,
+        HANDLE_GUTTER_LOGICAL_PX,
+        is_drag_active,
+        scale,
+        MAX_DOCK_LOGICAL_WIDTH,
+    )
 }
 
 /// Computes the X coordinate of the right-side dock window
 pub fn calculate_right_dock_x(mon_left: i32, mon_width: i32, phys_canvas: i32) -> i32 {
-    mon_left + mon_width - phys_canvas
+    crate::monitor::geometry::calculate_right_dock_x(mon_left, mon_width, phys_canvas)
 }
 
 /// Computes desktop work area margins for left and right docks
@@ -135,13 +136,9 @@ pub fn calculate_work_area_margins(
     phys_left: i32,
     phys_right: i32,
 ) -> (i32, i32) {
-    let mut left = orig_left + phys_left;
-    let mut right = orig_right - phys_right;
-    if left >= right {
-        left = left.min(orig_right - 1);
-        right = right.max(left + 1);
-    }
-    (left, right)
+    crate::monitor::geometry::calculate_work_area_margins(
+        orig_left, orig_right, phys_left, phys_right,
+    )
 }
 
 /// Computes physical dock layout, synchronizing both Tauri window positioning
