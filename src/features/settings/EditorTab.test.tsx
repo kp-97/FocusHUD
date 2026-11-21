@@ -5,7 +5,7 @@ import {
   SPELLCHECK_LOCALE_KEY,
   SPELLCHECK_ENABLED_KEY,
   DEFAULT_SPELLCHECK_LOCALE,
-} from "../../../stores/spellcheckStore";
+} from "../../stores/spellcheckStore";
 
 describe("EditorTab component", () => {
   beforeEach(() => {

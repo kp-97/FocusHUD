@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NotesTab } from "./NotesTab";
-import * as dbService from "../../../services/dbService";
+import * as dbService from "../../services/dbService";
 
-vi.mock("../../../services/dbService", () => ({
+vi.mock("../../services/dbService", () => ({
   fetchNotesDir: vi.fn(),
   updateNotesDir: vi.fn(),
   pickNotesDir: vi.fn(),

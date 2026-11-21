@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TypographySection } from "./TypographySection";
-import { FONT_STORAGE_KEY } from "../../../stores/fontStore";
+import { FONT_STORAGE_KEY } from "../../stores/fontStore";
 
 describe("TypographySection component", () => {
   beforeEach(() => {

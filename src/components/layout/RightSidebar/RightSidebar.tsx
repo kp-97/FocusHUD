@@ -21,15 +21,15 @@ import {
 import { RightSidebarCompactRail } from "./RightSidebarCompactRail";
 
 // View components
-import { HomeView } from "../../views/HomeView";
-import { ChatView } from "../../views/ChatView";
-import { CalendarView } from "../../views/CalendarView";
-import { GoalsView } from "../../views/GoalsView";
-import { TasksView } from "../../views/TasksView";
-import { KanbanView } from "../../views/KanbanView";
-import { ActionPlansView } from "../../views/ActionPlansView";
-import { NotesView } from "../../views/NotesView";
-import { PomodoroDial } from "../../features/pomodoro/PomodoroDial";
+import { HomeView } from "../../../features/home";
+import { ChatView } from "../../../features/chat";
+import { CalendarView } from "../../../features/calendar";
+import { GoalsView } from "../../../features/goals";
+import { TasksView } from "../../../features/tasks";
+import { KanbanView } from "../../../features/kanban";
+import { ActionPlansView } from "../../../features/action-plans";
+import { NotesView } from "../../../features/notes";
+import { PomodoroDial } from "../../../features/pomodoro";
 
 export const AVAILABLE_RIGHT_VIEWS: Array<{ id: NavViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "home", label: "HOME", icon: Home },

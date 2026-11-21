@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FileText, Search, Plus, Check, X } from "lucide-react";
-import { NoteItem } from "../../../types/hud";
+import type { NoteItem } from "../../../types/entities";
 
 export interface EventNotesSectionProps {
   availableNotes: NoteItem[];

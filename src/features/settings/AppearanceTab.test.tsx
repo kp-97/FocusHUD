@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { AppearanceTab } from "./AppearanceTab";
-import { THEME_STORAGE_KEY, THEME_AUTO_SYNC_KEY } from "../../../stores/themeStore";
+import { THEME_STORAGE_KEY, THEME_AUTO_SYNC_KEY } from "../../stores/themeStore";
 
 describe("AppearanceTab", () => {
   beforeEach(() => {

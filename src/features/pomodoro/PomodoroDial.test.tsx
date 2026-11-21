@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { PomodoroDial } from "./PomodoroDial";
-import { pomodoroActions, getPomodoroState } from "../../../stores/pomodoroStore";
+import { pomodoroActions, getPomodoroState } from "../../stores/pomodoroStore";
 
 describe("PomodoroDial component", () => {
   beforeEach(() => {

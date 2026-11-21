@@ -15,7 +15,7 @@ import {
   getAppCurrentVersion,
   APP_VERSION,
   AppUpdateInfo,
-} from "../../../services/updaterService";
+} from "../../services/updaterService";
 
 export const UpdatesTab: React.FC = () => {
   const [isChecking, setIsChecking] = useState(false);

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { UpdatesTab } from "./UpdatesTab";
-import * as updaterService from "../../../services/updaterService";
+import * as updaterService from "../../services/updaterService";
 
 describe("UpdatesTab Component", () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 import React from "react";
 import { ListOrdered, Check, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
-import { NavItemConfig } from "../../../types/hud";
+import type { NavItemConfig } from "../../types/navigation";
 
 interface ViewCustomizationTabProps {
   navConfig: NavItemConfig[];

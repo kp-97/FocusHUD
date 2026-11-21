@@ -1,6 +1,6 @@
 import React from "react";
 import { Maximize2, Check } from "lucide-react";
-import { MIN_PANE_MAX_WIDTH, MAX_PANE_MAX_WIDTH } from "../../../stores/layoutStore";
+import { MIN_PANE_MAX_WIDTH, MAX_PANE_MAX_WIDTH } from "../../stores/layoutStore";
 
 interface PaneLimitsTabProps {
   maxLeft: number;

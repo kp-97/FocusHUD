@@ -11,9 +11,9 @@ import {
   setCustomDefaultRightWidth,
   getPanesReserveZones,
   setPanesReserveZones,
-} from "../../../stores/layoutStore";
-import { useTheme, THEME_LIST } from "../../../stores/themeStore";
-import { setPanesReserveZonesMode } from "../../../services/tauriBridge";
+} from "../../stores/layoutStore";
+import { useTheme, THEME_LIST } from "../../stores/themeStore";
+import { setPanesReserveZonesMode } from "../../services/tauriBridge";
 import { TypographySection } from "./TypographySection";
 
 interface AppearanceTabProps {

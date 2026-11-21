@@ -5,7 +5,7 @@ import {
   updateNotesDir,
   pickNotesDir,
   isTauriEnvironment,
-} from "../../../services/dbService";
+} from "../../services/dbService";
 
 export const NotesTab: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>("");

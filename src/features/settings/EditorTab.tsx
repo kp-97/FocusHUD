@@ -4,7 +4,7 @@ import {
   useSpellcheck,
   SpellcheckLocale,
   SPELLCHECK_OPTIONS,
-} from "../../../stores/spellcheckStore";
+} from "../../stores/spellcheckStore";
 
 export const EditorTab: React.FC = () => {
   const { locale, enabled, setLocale, setEnabled, selectedOption } = useSpellcheck();

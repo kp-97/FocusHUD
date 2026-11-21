@@ -1,6 +1,6 @@
 import React from "react";
 import { Type, RotateCcw, Check } from "lucide-react";
-import { useFont, FONT_LIST, FontConfig } from "../../../stores/fontStore";
+import { useFont, FONT_LIST, FontConfig } from "../../stores/fontStore";
 
 export const TypographySection: React.FC = () => {
   const { font, setFont, fontConfig } = useFont();

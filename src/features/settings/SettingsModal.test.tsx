@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
-import * as store from "../../../stores/layoutStore";
-import * as tauriBridge from "../../../services/tauriBridge";
+import * as store from "../../stores/layoutStore";
+import * as tauriBridge from "../../services/tauriBridge";
 
 vi.mock("./UpdatesTab", () => ({
   UpdatesTab: () => <div data-testid="updates-tab">Mock Updates Tab</div>,

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X, Trash2, Clock, MapPin, AlignLeft, RotateCw, ChevronDown } from "lucide-react";
-import { CalendarEvent, NoteItem } from "../../../types/hud";
+import type { CalendarEvent, NoteItem } from "../../../types/entities";
 import { formatTime12 } from "../../../utils/calendarFormatters";
 import { formatDateToISO } from "../../../utils/formatters";
 import { EventNotesSection } from "./EventNotesSection";
