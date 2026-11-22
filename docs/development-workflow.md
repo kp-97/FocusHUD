@@ -194,3 +194,64 @@ git push origin main
 ```
 The merge/push will trigger `tag-on-release-merge.yml`, which mints the tag and executes `release.yml`.
 
+---
+
+## 8. Multi-Window Architecture & State Synchronization 🪟
+
+FocusHUD is designed to operate as a multi-window native desktop system on Windows, while offering a unified 3-column container when running in standard browser development mode (`npm run dev`).
+
+### Window Dispatching (`src/App.tsx`)
+In native desktop mode, Tauri spawns distinct WebViews that load the same frontend entrypoint (`index.html`) differentiated by the URL query parameter `?dock=...`:
+
+| Query Parameter | Window Role | Root Component | Description |
+| :--- | :--- | :--- | :--- |
+| `?dock=left` | **Left Dock** | `LeftDockApp` | Pinned to screen's left border; renders LeftSidebar and left navigation views. |
+| `?dock=right` | **Right Dock** | `RightDockApp` | Pinned to screen's right border; renders RightSidebar, compact mini rail, and timer. |
+| `?dock=settings` | **Settings** | `SettingsModalApp` | Floating popout modal for theme, layout, limits, and diagnostics configuration. |
+| `?dock=snap_overlay` | **Snap Overlay** | `SnapOverlayApp` | Translucent visual snapping zones displayed when dragging external windows. |
+| *(omitted)* | **Unified Layout** | `FullLayoutApp` | 3-column view used during browser development (`npm run dev`) and joined app mode. |
+
+### Cross-Window State Synchronization
+Because each Tauri window runs in its own isolated Chromium WebView, React component state and in-memory Zustand stores are **not shared directly** across processes. FocusHUD synchronizes state in real-time using web standards:
+
+1. **BroadcastChannel API (`layoutStore.ts` & `pomodoroSync.ts`)**:
+   - `focushud_layout_actions`: Broadcasts navigation switches (`SET_ACTIVE_NAV`, `NAV_CONFIG_CHANGE`), dual-view toggles, and window modes.
+   - `focushud_pomodoro`: Broadcasts timer ticks, mode changes (`focus`, `short_break`, `long_break`), cycle completions, and pause/start events between the right compact rail and the main view dial.
+   - `focushud_entity_sync`: Synchronizes CRUD operations across Notes, Goals, Tasks, and Calendar Events (`useSyncEntity.ts`).
+2. **Persistent Storage Events (`localStorage` & SQLite)**:
+   - Configuration changes (theme settings, font choices, nav ordering) persist to `localStorage` and trigger window `storage` events across WebViews.
+   - Entity data is saved to the native SQLite database via Tauri IPC commands (`tauriBridge.ts` -> `dbService.ts`).
+
+```mermaid
+flowchart TD
+    subgraph WebViews["Independent Tauri WebViews"]
+        LeftWin["Left Dock (?dock=left)<br/>LeftDockApp"]
+        RightWin["Right Dock (?dock=right)<br/>RightDockApp"]
+        SettingsWin["Settings (?dock=settings)<br/>SettingsModalApp"]
+    end
+
+    subgraph SyncBus["Cross-Window Event Bus"]
+        BC["HTML5 BroadcastChannel<br/>(focushud_layout_actions, focushud_pomodoro)"]
+        LS["localStorage StorageEvent<br/>(theme, nav_config, widths)"]
+    end
+
+    subgraph NativeBackend["Tauri Native Backend (Rust)"]
+        IPC["Tauri IPC Commands (tauriBridge)"]
+        DB[(SQLite Database)]
+        Win32["Win32 API (Work Area, SetWindowRgn)"]
+    end
+
+    LeftWin <--> BC
+    RightWin <--> BC
+    SettingsWin <--> BC
+
+    LeftWin -.-> LS
+    RightWin -.-> LS
+
+    LeftWin --> IPC
+    RightWin --> IPC
+    IPC --> DB
+    IPC --> Win32
+```
+
+
