@@ -1,7 +1,7 @@
 use super::*;
 use crate::db::models::{
-    self, ActionPlan, Goal, LegacyActionPlanNode, LegacyGoalNode, LegacyStorageData, LegacyTaskItem,
-    Note, Task,
+    self, ActionPlan, Goal, LegacyActionPlanNode, LegacyGoalNode, LegacyStorageData,
+    LegacyTaskItem, Note, Task,
 };
 use crate::db::queries;
 

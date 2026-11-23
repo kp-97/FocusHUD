@@ -56,4 +56,3 @@ pub fn init_memory_db() -> Result<Connection, Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod tests;
-

@@ -25,7 +25,12 @@ fn test_execute_tool_create_task() {
 
     let parsed: serde_json::Value = serde_json::from_str(&res).unwrap();
     assert_eq!(parsed["status"], "success");
-    assert!(parsed["message"].as_str().unwrap().contains("Implement AI Chat"));
+    assert!(
+        parsed["message"]
+            .as_str()
+            .unwrap()
+            .contains("Implement AI Chat")
+    );
 
     let tasks = get_all_tasks(&conn).unwrap();
     assert_eq!(tasks.len(), 1);

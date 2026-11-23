@@ -76,5 +76,6 @@ pub fn get_ai_config(app: AppHandle) -> Result<Option<String>, String> {
 #[command]
 pub fn save_ai_config(app: AppHandle, config: String) -> Result<(), String> {
     let conn = init_db(&app).map_err(|e| e.to_string())?;
-    crate::db::queries::set_setting(&conn, "focushud_ai_settings", &config).map_err(|e| e.to_string())
+    crate::db::queries::set_setting(&conn, "focushud_ai_settings", &config)
+        .map_err(|e| e.to_string())
 }

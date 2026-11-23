@@ -56,10 +56,7 @@ pub fn execute_tool(conn: &Connection, name: &str, arguments: &str) -> Result<St
                 .as_str()
                 .ok_or("Missing required field 'title'")?
                 .to_string();
-            let description = args["description"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+            let description = args["description"].as_str().unwrap_or_default().to_string();
             let priority = args["priority"].as_i64().unwrap_or(3) as i32;
             let due_date = args["dueDate"].as_str().map(|s| s.to_string());
 
@@ -95,10 +92,7 @@ pub fn execute_tool(conn: &Connection, name: &str, arguments: &str) -> Result<St
                 .as_str()
                 .ok_or("Missing required field 'title'")?
                 .to_string();
-            let description = args["description"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+            let description = args["description"].as_str().unwrap_or_default().to_string();
             let target_date = args["targetDate"].as_str().map(|s| s.to_string());
 
             let now = current_timestamp_ms();

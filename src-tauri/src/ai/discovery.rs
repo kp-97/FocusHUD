@@ -17,7 +17,10 @@ pub async fn fetch_available_models(
     }
 }
 
-async fn fetch_ollama_models(client: &Client, endpoint: Option<&str>) -> Result<Vec<String>, String> {
+async fn fetch_ollama_models(
+    client: &Client,
+    endpoint: Option<&str>,
+) -> Result<Vec<String>, String> {
     let raw_endpoint = endpoint.unwrap_or("http://localhost:11434/api/tags");
     let target_url = normalize_ollama_tags_endpoint(raw_endpoint);
 
@@ -99,7 +102,10 @@ async fn fetch_openai_compatible_models(
     Ok(models)
 }
 
-async fn fetch_anthropic_models(client: &Client, api_key: Option<&str>) -> Result<Vec<String>, String> {
+async fn fetch_anthropic_models(
+    client: &Client,
+    api_key: Option<&str>,
+) -> Result<Vec<String>, String> {
     let default_models = vec![
         "claude-3-5-sonnet-20241022".to_string(),
         "claude-3-5-haiku-20241022".to_string(),
@@ -139,7 +145,10 @@ async fn fetch_anthropic_models(client: &Client, api_key: Option<&str>) -> Resul
     Ok(default_models)
 }
 
-async fn fetch_gemini_models(client: &Client, api_key: Option<&str>) -> Result<Vec<String>, String> {
+async fn fetch_gemini_models(
+    client: &Client,
+    api_key: Option<&str>,
+) -> Result<Vec<String>, String> {
     let default_models = vec![
         "gemini-1.5-flash".to_string(),
         "gemini-1.5-pro".to_string(),

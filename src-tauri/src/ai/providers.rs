@@ -1,13 +1,16 @@
 use crate::ai::models::{
-    ChatCompletionRequest, StreamChunkEvent, ToolCallPayload,
-    normalize_ollama_chat_endpoint, normalize_openai_chat_endpoint,
+    ChatCompletionRequest, StreamChunkEvent, ToolCallPayload, normalize_ollama_chat_endpoint,
+    normalize_openai_chat_endpoint,
 };
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter};
 
-pub async fn stream_provider(app: &AppHandle, request: &ChatCompletionRequest) -> Result<(), String> {
+pub async fn stream_provider(
+    app: &AppHandle,
+    request: &ChatCompletionRequest,
+) -> Result<(), String> {
     let client = Client::new();
 
     match request.provider.to_lowercase().as_str() {
@@ -197,7 +200,11 @@ async fn stream_anthropic(
 
     if !res.status().is_success() {
         let err_text = res.text().await.unwrap_or_default();
-        emit_error(app, &request.session_id, &format!("Anthropic API Error: {err_text}"));
+        emit_error(
+            app,
+            &request.session_id,
+            &format!("Anthropic API Error: {err_text}"),
+        );
         return Ok(());
     }
 
@@ -274,7 +281,11 @@ async fn stream_gemini(
 
     if !res.status().is_success() {
         let err_text = res.text().await.unwrap_or_default();
-        emit_error(app, &request.session_id, &format!("Gemini API Error: {err_text}"));
+        emit_error(
+            app,
+            &request.session_id,
+            &format!("Gemini API Error: {err_text}"),
+        );
         return Ok(());
     }
 
@@ -352,7 +363,11 @@ async fn stream_ollama(
 
     if !res.status().is_success() {
         let err_text = res.text().await.unwrap_or_default();
-        emit_error(app, &request.session_id, &format!("Ollama Error: {err_text}"));
+        emit_error(
+            app,
+            &request.session_id,
+            &format!("Ollama Error: {err_text}"),
+        );
         return Ok(());
     }
 
