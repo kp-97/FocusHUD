@@ -20,6 +20,7 @@ import { AppearanceTab } from "./AppearanceTab";
 import { EditorTab } from "./EditorTab";
 import { NotesTab } from "./NotesTab";
 import { UpdatesTab } from "./UpdatesTab";
+import { AITab } from "./AITab";
 import { startDraggingWindow, moveWindowByDelta } from "../../services/tauriBridge";
 
 interface SettingsModalProps {
@@ -307,6 +308,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 pb-2.5 mb-2 border-b border-cyan-500/20 shrink-0 select-none">
           {[
             { id: "all", label: "ALL" },
+            { id: "ai", label: "AI ASSISTANT" },
             { id: "notes", label: "NOTES STORAGE" },
             { id: "appearance", label: "THEMES & PALETTE" },
             { id: "editor", label: "EDITOR & SPELLCHECK" },
@@ -334,6 +336,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           data-testid="settings-scroll-body"
           className="space-y-4 text-xs font-tech overflow-y-auto flex-1 min-h-0 pr-1 select-text"
         >
+          {/* AI Assistant Settings */}
+          {(activeTab === "all" || activeTab === "ai") && <AITab />}
+
           {/* Notes Storage Settings */}
           {(activeTab === "all" || activeTab === "notes") && <NotesTab />}
 
