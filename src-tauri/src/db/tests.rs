@@ -1,0 +1,448 @@
+use super::*;
+use crate::db::models::{
+    self, ActionPlan, Goal, LegacyActionPlanNode, LegacyGoalNode, LegacyStorageData, LegacyTaskItem,
+    Note, Task,
+};
+use crate::db::queries;
+
+#[test]
+fn test_migrations_and_initial_empty_state() {
+    let conn = init_memory_db().expect("init memory db failed");
+    assert!(queries::is_database_empty(&conn).unwrap());
+}
+
+#[test]
+fn test_migration_v2_to_v3_adds_recurrence_column() {
+    let mut conn = Connection::open_in_memory().expect("failed to open memory db");
+    // Simulate a database at v2 where calendar_events lacked recurrence
+    conn.execute_batch(
+        r#"
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE calendar_events (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            location TEXT NOT NULL DEFAULT '',
+            date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            is_all_day INTEGER NOT NULL DEFAULT 0,
+            color TEXT NOT NULL DEFAULT '#00e5ff',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+        PRAGMA user_version = 2;
+        "#,
+    )
+    .unwrap();
+
+    // Run migrations
+    migrations::run_migrations(&mut conn).unwrap();
+
+    let version: i32 = conn
+        .query_row("PRAGMA user_version;", [], |row| row.get(0))
+        .unwrap();
+    assert!(version >= 3);
+
+    // Verify recurrence column exists and can be queried
+    let mut stmt = conn
+        .prepare("SELECT id, recurrence FROM calendar_events")
+        .unwrap();
+    let _ = stmt.query([]).unwrap();
+}
+
+#[test]
+fn test_migration_v4_adds_note_file_columns_and_settings() {
+    let conn = init_memory_db().expect("init memory db failed");
+    let version: i32 = conn
+        .query_row("PRAGMA user_version;", [], |row| row.get(0))
+        .unwrap();
+    assert!(version >= 4);
+
+    // Verify file_path and relative_path columns on notes
+    let mut stmt = conn
+        .prepare("SELECT id, file_path, relative_path FROM notes")
+        .unwrap();
+    let _ = stmt.query([]).unwrap();
+
+    // Verify app_settings table works
+    queries::set_setting(&conn, "test_key", "test_val").unwrap();
+    let val = queries::get_setting(&conn, "test_key").unwrap();
+    assert_eq!(val, Some("test_val".into()));
+}
+
+#[test]
+fn test_migration_v5_adds_chat_tables() {
+    let conn = init_memory_db().expect("init memory db failed");
+    let version: i32 = conn
+        .query_row("PRAGMA user_version;", [], |row| row.get(0))
+        .unwrap();
+    assert!(version >= 5);
+
+    let session = models::ChatSession {
+        id: "s1".to_string(),
+        title: "Test Session".to_string(),
+        provider: "ollama".to_string(),
+        model: "llama3.2".to_string(),
+        created_at: 1000,
+        updated_at: 1000,
+    };
+    queries::save_chat_session(&conn, &session).unwrap();
+    let sessions = queries::get_chat_sessions(&conn).unwrap();
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0].title, "Test Session");
+
+    let msg = models::ChatMessageDb {
+        id: "m1".to_string(),
+        session_id: "s1".to_string(),
+        role: "user".to_string(),
+        content: "Hello AI".to_string(),
+        tool_calls: None,
+        created_at: 1000,
+    };
+    queries::save_chat_message(&conn, &msg).unwrap();
+    let msgs = queries::get_chat_messages(&conn, "s1").unwrap();
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0].content, "Hello AI");
+}
+
+#[test]
+fn test_goal_crud_and_nesting() {
+    let conn = init_memory_db().expect("init memory db failed");
+
+    let parent_goal = Goal {
+        id: "g1".into(),
+        parent_id: None,
+        title: "Master Rust".into(),
+        description: "Deep dive into systems programming".into(),
+        status: "active".into(),
+        target_date: Some("2026-12-31".into()),
+        sort_order: 0,
+        created_at: 1000,
+        updated_at: 1000,
+    };
+    queries::upsert_goal(&conn, &parent_goal).unwrap();
+
+    let child_goal = Goal {
+        id: "g1-1".into(),
+        parent_id: Some("g1".into()),
+        title: "Async Rust".into(),
+        description: "Tokio and concurrency".into(),
+        status: "active".into(),
+        target_date: None,
+        sort_order: 1,
+        created_at: 1001,
+        updated_at: 1001,
+    };
+    queries::upsert_goal(&conn, &child_goal).unwrap();
+
+    let all = queries::get_all_goals(&conn).unwrap();
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].id, "g1");
+    assert_eq!(all[1].parent_id, Some("g1".into()));
+
+    // Delete parent cascades to child
+    queries::delete_goal(&conn, "g1").unwrap();
+    let remaining = queries::get_all_goals(&conn).unwrap();
+    assert_eq!(remaining.len(), 0);
+}
+
+#[test]
+fn test_task_and_action_plan_linkages() {
+    let conn = init_memory_db().expect("init memory db failed");
+
+    let goal = Goal {
+        id: "g_alpha".into(),
+        parent_id: None,
+        title: "Product Launch".into(),
+        description: "".into(),
+        status: "active".into(),
+        target_date: None,
+        sort_order: 0,
+        created_at: 100,
+        updated_at: 100,
+    };
+    queries::upsert_goal(&conn, &goal).unwrap();
+
+    let task = Task {
+        id: "t_core".into(),
+        parent_id: None,
+        goal_id: Some("g_alpha".into()),
+        title: "Build SQLite Backend".into(),
+        description: "Zero external dependencies".into(),
+        status: "todo".into(),
+        priority: 1,
+        due_date: Some("2026-10-30".into()),
+        estimated_minutes: Some(120),
+        sort_order: 0,
+        created_at: 200,
+        updated_at: 200,
+    };
+    queries::upsert_task(&conn, &task).unwrap();
+
+    let plan = ActionPlan {
+        id: "ap_1".into(),
+        parent_id: None,
+        goal_id: Some("g_alpha".into()),
+        task_id: Some("t_core".into()),
+        title: "Execution Steps".into(),
+        content: "1. Models\n2. Migrations\n3. Queries".into(),
+        status: "draft".into(),
+        sort_order: 0,
+        created_at: 300,
+        updated_at: 300,
+    };
+    queries::upsert_action_plan(&conn, &plan).unwrap();
+
+    let note = Note {
+        id: "n_scratch".into(),
+        parent_id: None,
+        goal_id: Some("g_alpha".into()),
+        task_id: Some("t_core".into()),
+        action_plan_id: Some("ap_1".into()),
+        calendar_event_id: None,
+        title: "Design Notes".into(),
+        content: "Remember to check WAL mode".into(),
+        is_pinned: true,
+        sort_order: 0,
+        created_at: 400,
+        updated_at: 400,
+        file_path: None,
+        relative_path: None,
+    };
+    queries::upsert_note(&conn, &note).unwrap();
+
+    let notes = queries::get_all_notes(&conn).unwrap();
+    assert_eq!(notes.len(), 1);
+    assert!(notes[0].is_pinned);
+    assert_eq!(notes[0].action_plan_id, Some("ap_1".into()));
+
+    // Deleting goal sets goal_id to null on task (ON DELETE SET NULL)
+    queries::delete_goal(&conn, "g_alpha").unwrap();
+    let tasks = queries::get_all_tasks(&conn).unwrap();
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].goal_id, None);
+}
+
+#[test]
+fn test_legacy_data_migration() {
+    let mut conn = init_memory_db().expect("init memory db failed");
+
+    let legacy = LegacyStorageData {
+        goals: Some(vec![LegacyGoalNode {
+            id: "old_g1".into(),
+            title: "Legacy Goal".into(),
+            completed: false,
+            completed_at: None,
+            parent_id: None,
+            children: Some(vec![LegacyGoalNode {
+                id: "old_g1_sub".into(),
+                title: "Legacy Sub Goal".into(),
+                completed: true,
+                completed_at: Some("2026-10-20".into()),
+                parent_id: None,
+                children: None,
+            }]),
+        }]),
+        tasks: Some(vec![LegacyTaskItem {
+            id: "old_t1".into(),
+            title: "Legacy Task".into(),
+            completed: true,
+            completed_at: None,
+            goal_id: Some("old_g1".into()),
+            parent_id: None,
+            status: Some("done".into()),
+            subtasks: None,
+        }]),
+        action_plans: Some(vec![LegacyActionPlanNode {
+            id: "old_p1".into(),
+            title: "Legacy Plan".into(),
+            completed: false,
+            completed_at: None,
+            parent_id: None,
+            children: None,
+        }]),
+    };
+
+    queries::migrate_legacy_data(&mut conn, &legacy).unwrap();
+
+    let goals = queries::get_all_goals(&conn).unwrap();
+    assert_eq!(goals.len(), 2);
+    assert_eq!(goals[1].parent_id, Some("old_g1".into()));
+    assert_eq!(goals[1].status, "completed");
+
+    let tasks = queries::get_all_tasks(&conn).unwrap();
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].goal_id, Some("old_g1".into()));
+    assert_eq!(tasks[0].status, "done");
+
+    let plans = queries::get_all_action_plans(&conn).unwrap();
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].title, "Legacy Plan");
+}
+
+#[test]
+fn test_sync_entities() {
+    let mut conn = init_memory_db().expect("init memory db failed");
+
+    let initial_tasks = vec![
+        Task {
+            id: "t_sync_1".into(),
+            parent_id: None,
+            goal_id: None,
+            title: "Task 1".into(),
+            description: "".into(),
+            status: "todo".into(),
+            priority: 3,
+            due_date: None,
+            estimated_minutes: None,
+            sort_order: 0,
+            created_at: 100,
+            updated_at: 100,
+        },
+        Task {
+            id: "t_sync_2".into(),
+            parent_id: None,
+            goal_id: None,
+            title: "Task 2".into(),
+            description: "".into(),
+            status: "todo".into(),
+            priority: 3,
+            due_date: None,
+            estimated_minutes: None,
+            sort_order: 1,
+            created_at: 200,
+            updated_at: 200,
+        },
+    ];
+
+    queries::sync_tasks(&mut conn, &initial_tasks).unwrap();
+    assert_eq!(queries::get_all_tasks(&conn).unwrap().len(), 2);
+
+    // Update task 1 and delete task 2, add task 3
+    let updated_tasks = vec![
+        Task {
+            id: "t_sync_1".into(),
+            parent_id: None,
+            goal_id: None,
+            title: "Task 1 Updated".into(),
+            description: "New description".into(),
+            status: "done".into(),
+            priority: 1,
+            due_date: None,
+            estimated_minutes: None,
+            sort_order: 0,
+            created_at: 100,
+            updated_at: 300,
+        },
+        Task {
+            id: "t_sync_3".into(),
+            parent_id: None,
+            goal_id: None,
+            title: "Task 3".into(),
+            description: "".into(),
+            status: "todo".into(),
+            priority: 2,
+            due_date: None,
+            estimated_minutes: None,
+            sort_order: 1,
+            created_at: 300,
+            updated_at: 300,
+        },
+    ];
+
+    queries::sync_tasks(&mut conn, &updated_tasks).unwrap();
+    let tasks = queries::get_all_tasks(&conn).unwrap();
+    assert_eq!(tasks.len(), 2);
+    assert_eq!(tasks[0].id, "t_sync_1");
+    assert_eq!(tasks[0].title, "Task 1 Updated");
+    assert_eq!(tasks[0].status, "done");
+    assert_eq!(tasks[1].id, "t_sync_3");
+
+    // Test sync_notes
+    let initial_notes = vec![models::Note {
+        id: "n_sync_1".into(),
+        parent_id: None,
+        goal_id: None,
+        task_id: None,
+        action_plan_id: None,
+        calendar_event_id: None,
+        title: "Note 1".into(),
+        content: "Content 1".into(),
+        is_pinned: false,
+        sort_order: 0,
+        created_at: 100,
+        updated_at: 100,
+        file_path: None,
+        relative_path: None,
+    }];
+    queries::sync_notes(&mut conn, &initial_notes).unwrap();
+    let notes = queries::get_all_notes(&conn).unwrap();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].id, "n_sync_1");
+
+    let updated_notes = vec![
+        models::Note {
+            id: "n_sync_1".into(),
+            parent_id: None,
+            goal_id: None,
+            task_id: None,
+            action_plan_id: None,
+            calendar_event_id: None,
+            title: "Note 1 Updated".into(),
+            content: "Content Updated".into(),
+            is_pinned: true,
+            sort_order: 0,
+            created_at: 100,
+            updated_at: 200,
+            file_path: None,
+            relative_path: None,
+        },
+        models::Note {
+            id: "n_sync_2".into(),
+            parent_id: None,
+            goal_id: None,
+            task_id: None,
+            action_plan_id: None,
+            calendar_event_id: None,
+            title: "Note 2".into(),
+            content: "Content 2".into(),
+            is_pinned: false,
+            sort_order: 1,
+            created_at: 200,
+            updated_at: 200,
+            file_path: None,
+            relative_path: None,
+        },
+    ];
+    queries::sync_notes(&mut conn, &updated_notes).unwrap();
+    let notes = queries::get_all_notes(&conn).unwrap();
+    assert_eq!(notes.len(), 2);
+    assert_eq!(notes[0].id, "n_sync_1");
+    assert!(notes[0].is_pinned);
+    assert_eq!(notes[1].id, "n_sync_2");
+
+    // Test calendar_events CRUD & sync
+    let event = models::CalendarEvent {
+        id: "ev_1".into(),
+        title: "Sprint Planning".into(),
+        description: "Review sprint backlog".into(),
+        location: "Room A".into(),
+        date: "2026-10-29".into(),
+        start_time: "09:00".into(),
+        end_time: "10:30".into(),
+        is_all_day: false,
+        color: "#00e5ff".into(),
+        recurrence: Some("weekly".into()),
+        created_at: 500,
+        updated_at: 500,
+    };
+    queries::upsert_calendar_event(&conn, &event).unwrap();
+    let events = queries::get_all_calendar_events(&conn).unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].title, "Sprint Planning");
+
+    queries::delete_calendar_event(&conn, "ev_1").unwrap();
+    let events_after = queries::get_all_calendar_events(&conn).unwrap();
+    assert_eq!(events_after.len(), 0);
+}

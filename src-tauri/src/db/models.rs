@@ -178,3 +178,25 @@ pub struct LegacyStorageData {
     pub tasks: Option<Vec<LegacyTaskItem>>,
     pub action_plans: Option<Vec<LegacyActionPlanNode>>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSession {
+    pub id: String,
+    pub title: String,
+    pub provider: String,
+    pub model: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessageDb {
+    pub id: String,
+    pub session_id: String,
+    pub role: String,
+    pub content: String,
+    pub tool_calls: Option<String>,
+    pub created_at: i64,
+}

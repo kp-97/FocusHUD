@@ -21,6 +21,10 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         apply_migration_v4(conn)?;
     }
 
+    if version < 5 {
+        apply_migration_v5(conn)?;
+    }
+
     Ok(())
 }
 
@@ -216,6 +220,38 @@ fn apply_migration_v4(conn: &mut Connection) -> Result<()> {
     )?;
     tx.execute("PRAGMA user_version = 4;", [])?;
 
+    tx.commit()?;
+    Ok(())
+}
+
+fn apply_migration_v5(conn: &mut Connection) -> Result<()> {
+    let tx = conn.transaction()?;
+
+    tx.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL DEFAULT '',
+            tool_calls TEXT,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+        "#,
+    )?;
+
+    tx.execute("PRAGMA user_version = 5;", [])?;
     tx.commit()?;
     Ok(())
 }
