@@ -1,133 +1,403 @@
-import React, { useState, useRef } from "react";
-import { Send, Bot, User, Radio, Sparkles } from "lucide-react";
-import type { ChatMessage } from "../../types/entities";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Send, Bot, Radio, History } from "lucide-react";
 import { WaveformVisualizer } from "../../components/ui/WaveformVisualizer";
-
-const SAMPLE_RESPONSES = [
-  "Analyzing system telemetry... All core processes are operating within nominal thresholds. Memory allocation is stable at 48% and GPU rendering latency is 2.4ms.",
-  "Understood. I have logged your action plan into the local database and synced it with your current Pomodoro cycle. Next focus block is scheduled in 15 minutes.",
-  "FocusHUD diagnostics show zero dropped frames on the Win32 stationary canvas clipping pipeline. External windows are snapping smoothly between the dual docks.",
-  "Task decomposition complete: 1 primary goal has been divided into 3 actionable milestones with nested subtasks. The 3D neural tree projection is updated.",
-];
+import { ChatMessageItem } from "./ChatMessageItem";
+import { ChatSessionDrawer } from "./ChatSessionDrawer";
+import type {
+  ChatMessageItem as ChatMessageType,
+  ChatSessionItem,
+  StreamChunkPayload,
+  ToolCallItem,
+} from "../../types/ai";
+import { DEFAULT_AI_TOOLS } from "../../types/ai";
+import {
+  fetchChatSessions,
+  persistChatSession,
+  removeChatSession,
+  fetchChatMessages,
+  persistChatMessage,
+  streamChat,
+  onStreamChunk,
+  loadAiSettings,
+  executeAiToolCall,
+} from "../../services/aiService";
+import { getSystemDiagnostics } from "../../services/tauriBridge";
 
 export interface ChatViewProps {
   isCompact?: boolean;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "m0",
-      role: "assistant",
-      content: "FocusHUD Tactical Intelligence Online. How may I assist your workflow today?",
-      timestamp: "10:00",
-    },
-  ]);
-
+  const [sessions, setSessions] = useState<ChatSessionItem[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [inputText, setInputText] = useState("");
-  const [streamMode, setStreamMode] = useState<boolean>(true); // Stream vs Send When Complete
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamMode, setStreamMode] = useState<boolean>(true);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantMsgRef = useRef<HTMLDivElement | null>(null);
+  const currentAssistantMsgIdRef = useRef<string | null>(null);
+  const accumulatedContentRef = useRef<string>("");
 
-  const handleSend = () => {
+  const currentSessionIdRef = useRef(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
+
+  const streamModeRef = useRef(streamMode);
+  streamModeRef.current = streamMode;
+
+  const scrollToStartOfResponse = useCallback(() => {
+    if (activeAssistantMsgRef.current) {
+      activeAssistantMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  const scrollToStartOfResponseRef = useRef(scrollToStartOfResponse);
+  scrollToStartOfResponseRef.current = scrollToStartOfResponse;
+
+  // Initialize or load sessions
+  const loadInitialData = useCallback(async () => {
+    try {
+      const existingSessions = await fetchChatSessions();
+      setSessions(existingSessions);
+
+      if (existingSessions.length > 0) {
+        const latest = existingSessions[0];
+        setCurrentSessionId(latest.id);
+        const msgs = await fetchChatMessages(latest.id);
+        setMessages(msgs);
+      } else {
+        await handleCreateSession();
+      }
+    } catch {
+      // Fallback greeting if session load fails
+      setMessages([
+        {
+          id: "m_welcome",
+          sessionId: "default",
+          role: "assistant",
+          content: "FocusHUD Tactical Intelligence Online. How may I assist your workflow today?",
+          createdAt: Date.now(),
+        },
+      ]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Handle switching sessions
+  const handleSelectSession = async (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    try {
+      const msgs = await fetchChatMessages(sessionId);
+      setMessages(msgs);
+    } catch {
+      setMessages([]);
+    }
+  };
+
+  // Create a new session
+  const handleCreateSession = async () => {
+    const settings = loadAiSettings();
+    const newSession: ChatSessionItem = {
+      id: "sess_" + Date.now(),
+      title: "Tactical Query",
+      provider: settings.provider,
+      model: settings.model,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await persistChatSession(newSession);
+    setSessions((prev) => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
+    setMessages([
+      {
+        id: "m_init_" + Date.now(),
+        sessionId: newSession.id,
+        role: "assistant",
+        content: `FocusHUD AI Agent initialized (${settings.provider}:${settings.model}). Ready for instructions.`,
+        createdAt: Date.now(),
+      },
+    ]);
+  };
+
+  // Delete a session
+  const handleDeleteSession = async (sessionId: string) => {
+    await removeChatSession(sessionId);
+    const updated = sessions.filter((s) => s.id !== sessionId);
+    setSessions(updated);
+    if (currentSessionId === sessionId) {
+      if (updated.length > 0) {
+        handleSelectSession(updated[0].id);
+      } else {
+        handleCreateSession();
+      }
+    }
+  };
+
+  // Wire up incoming stream chunk listener once on mount
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let isCancelled = false;
+
+    onStreamChunk(async (payload: StreamChunkPayload) => {
+      if (isCancelled) return;
+      const assistantId = currentAssistantMsgIdRef.current;
+      if (!assistantId) return;
+      if (currentSessionIdRef.current && payload.sessionId !== currentSessionIdRef.current) return;
+
+      if (payload.chunkType === "text") {
+        accumulatedContentRef.current += payload.delta;
+        if (streamModeRef.current) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId
+                ? { ...msg, content: accumulatedContentRef.current }
+                : msg
+            )
+          );
+        }
+      } else if (payload.chunkType === "tool_call" && payload.toolCall) {
+        const tool = payload.toolCall;
+        const toolCallItem: ToolCallItem = {
+          id: tool.id,
+          name: tool.name,
+          arguments: tool.arguments,
+          status: "executing",
+        };
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? { ...msg, toolCalls: [...(msg.toolCalls || []), toolCallItem] }
+              : msg
+          )
+        );
+
+        try {
+          const resultStr = await executeAiToolCall(tool.name, tool.arguments);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId
+                ? {
+                    ...msg,
+                    toolCalls: (msg.toolCalls || []).map((tc) =>
+                      tc.id === tool.id ? { ...tc, status: "success", result: resultStr } : tc
+                    ),
+                  }
+                : msg
+            )
+          );
+        } catch {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId
+                ? {
+                    ...msg,
+                    toolCalls: (msg.toolCalls || []).map((tc) =>
+                      tc.id === tool.id ? { ...tc, status: "error" } : tc
+                    ),
+                  }
+                : msg
+            )
+          );
+        }
+      } else if (payload.chunkType === "done" || payload.chunkType === "error") {
+        const finalContent =
+          payload.chunkType === "error" && !accumulatedContentRef.current
+            ? (payload.delta || "Error connecting to AI Provider. Please verify settings.")
+            : accumulatedContentRef.current;
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId ? { ...msg, content: finalContent } : msg
+          )
+        );
+        setIsGenerating(false);
+
+        const activeSess = currentSessionIdRef.current;
+        if (activeSess && payload.chunkType === "done") {
+          persistChatMessage({
+            id: assistantId,
+            sessionId: activeSess,
+            role: "assistant",
+            content: finalContent,
+            createdAt: Date.now(),
+          }).catch(() => {});
+        }
+
+        setTimeout(() => {
+          scrollToStartOfResponseRef.current();
+        }, 50);
+      }
+    }).then((fn) => {
+      if (isCancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  // Send message
+  const handleSend = async () => {
     if (!inputText.trim() || isGenerating) return;
 
-    const userMsg: ChatMessage = {
-      id: String(Date.now()),
+    const settings = loadAiSettings();
+    let activeSession = currentSessionId;
+    if (!activeSession) {
+      activeSession = "sess_" + Date.now();
+      setCurrentSessionId(activeSession);
+      const newSession: ChatSessionItem = {
+        id: activeSession,
+        title: inputText.trim().slice(0, 24),
+        provider: settings.provider,
+        model: settings.model,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      persistChatSession(newSession).catch(() => {});
+      setSessions((prev) => [newSession, ...prev]);
+    }
+
+    const userText = inputText.trim();
+    setInputText("");
+
+    const userMsg: ChatMessageType = {
+      id: "u_" + Date.now(),
+      sessionId: activeSession,
       role: "user",
-      content: inputText.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      content: userText,
+      createdAt: Date.now(),
     };
 
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
-    setInputText("");
+    persistChatMessage(userMsg).catch(() => {});
+
     setIsGenerating(true);
+    accumulatedContentRef.current = "";
 
-    const randomResponse = SAMPLE_RESPONSES[Math.floor(Math.random() * SAMPLE_RESPONSES.length)];
-    const assistantId = "bot_" + Date.now();
+    const assistantId = "a_" + Date.now();
+    currentAssistantMsgIdRef.current = assistantId;
 
-    if (streamMode) {
-      // Streaming mode: append characters progressively
-      let charIndex = 0;
-      const initialBotMsg: ChatMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setMessages([...nextMessages, initialBotMsg]);
+    const initialAssistantMsg: ChatMessageType = {
+      id: assistantId,
+      sessionId: activeSession,
+      role: "assistant",
+      content: "",
+      createdAt: Date.now(),
+    };
 
-      const interval = setInterval(() => {
-        charIndex += 2;
-        const currentSlice = randomResponse.slice(0, charIndex);
+    setMessages([...nextMessages, initialAssistantMsg]);
 
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === assistantId ? { ...msg, content: currentSlice } : msg))
-        );
+    try {
+      // Build conversation payload with context injection if enabled
+      let contextPrefix = "";
+      if (settings.enableContext) {
+        try {
+          const diag = await getSystemDiagnostics();
+          if (diag) {
+            contextPrefix = `[Current FocusHUD Telemetry: CPU ${diag.cpu_usage.toFixed(1)}%, Mem ${diag.ram_usage.toFixed(1)}% (${(diag.ram_used_bytes / (1024 * 1024)).toFixed(0)}MB / ${(diag.ram_total_bytes / (1024 * 1024)).toFixed(0)}MB)]\n`;
+          }
+        } catch {}
+      }
 
-        if (charIndex >= randomResponse.length) {
-          clearInterval(interval);
-          setIsGenerating(false);
+      const formattedHistory = nextMessages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m, idx, arr) => {
+          if (idx === arr.length - 1 && contextPrefix && m.role === "user") {
+            return { role: m.role, content: contextPrefix + m.content };
+          }
+          return { role: m.role, content: m.content };
+        });
 
-          // Crucial user requirement:
-          // "When the response is complete the chat will not automatically scroll to the end of the response but stay at the start of it."
-          scrollToStartOfResponse();
-        }
-      }, 25);
-    } else {
-      // Send when complete mode: delay slightly then reveal full message at once
-      setTimeout(() => {
-        const fullBotMsg: ChatMessage = {
-          id: assistantId,
-          role: "assistant",
-          content: randomResponse,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-
-        setMessages([...nextMessages, fullBotMsg]);
-        setIsGenerating(false);
-
-        // Crucial user requirement:
-        // "When the response is complete the chat will not automatically scroll to the end of the response but stay at the start of it."
-        setTimeout(scrollToStartOfResponse, 50);
-      }, 800);
-    }
-  };
-
-  const scrollToStartOfResponse = () => {
-    if (activeAssistantMsgRef.current) {
-      activeAssistantMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      await streamChat(
+        activeSession,
+        formattedHistory,
+        settings,
+        settings.enableTools ? DEFAULT_AI_TOOLS : undefined
+      );
+    } catch {
+      setIsGenerating(false);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? { ...msg, content: "Error connecting to AI Provider. Please verify settings." }
+            : msg
+        )
+      );
     }
   };
 
   return (
-    <div className={`h-full w-full flex flex-col ${isCompact ? "p-1.5" : "p-2.5"} bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none`}>
-      {/* Header with Streaming Mode Toggle */}
-      <div className={`w-full flex items-center justify-between border-b border-cyan-500/30 ${isCompact ? "pb-1 mb-1" : "pb-2 mb-2"} text-[10px] font-tech uppercase tracking-wider`}>
+    <div
+      data-testid="chat-view"
+      className={`relative h-full w-full flex flex-col ${
+        isCompact ? "p-1.5" : "p-2.5"
+      } bg-[#03070d] text-cyan-300 font-hud overflow-hidden select-none`}
+    >
+      {/* Session Drawer Overlay */}
+      {isDrawerOpen && (
+        <ChatSessionDrawer
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSelectSession={handleSelectSession}
+          onCreateSession={handleCreateSession}
+          onDeleteSession={handleDeleteSession}
+          onClose={() => setIsDrawerOpen(false)}
+        />
+      )}
+
+      {/* Header with Streaming Mode Toggle & Sessions Button */}
+      <div
+        className={`w-full flex items-center justify-between border-b border-cyan-500/30 ${
+          isCompact ? "pb-1 mb-1" : "pb-2 mb-2"
+        } text-[10px] font-tech uppercase tracking-wider shrink-0`}
+      >
         <div className="flex items-center gap-1.5">
           <Bot className="w-3.5 h-3.5 text-cyan-400" />
           {!isCompact && <span className="font-bold text-cyan-200">AI AGENT CHAT</span>}
         </div>
 
-        {/* Streaming Mode Toggle */}
-        <button
-          onClick={() => setStreamMode(!streamMode)}
-          title="Toggle between real-time streaming and complete message dispatch"
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition cursor-pointer ${
-            streamMode
-              ? "bg-cyan-950/60 border-cyan-400/60 text-cyan-200 shadow-[0_0_8px_rgba(0,229,255,0.3)]"
-              : "bg-black/40 border-cyan-500/20 text-cyan-400/70 hover:text-cyan-200"
-          }`}
-        >
-          <Radio className={`w-3 h-3 ${streamMode ? "text-cyan-400 animate-pulse" : "text-neutral-500"}`} />
-          <span>{streamMode ? "MODE: STREAMING" : "MODE: COMPLETE"}</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* History/Sessions Drawer Button */}
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            title="Chat Sessions History"
+            aria-label="Chat Sessions History"
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/30 hover:border-cyan-400 bg-black/40 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 transition cursor-pointer"
+          >
+            <History className="w-3 h-3 text-cyan-400" />
+            {!isCompact && <span>LOGS</span>}
+          </button>
+
+          {/* Streaming Mode Toggle */}
+          <button
+            onClick={() => setStreamMode(!streamMode)}
+            title="Toggle between real-time streaming and complete message dispatch"
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition cursor-pointer ${
+              streamMode
+                ? "bg-cyan-950/60 border-cyan-400/60 text-cyan-200 shadow-[0_0_8px_rgba(0,229,255,0.3)]"
+                : "bg-black/40 border-cyan-500/20 text-cyan-400/70 hover:text-cyan-200"
+            }`}
+          >
+            <Radio
+              className={`w-3 h-3 ${streamMode ? "text-cyan-400 animate-pulse" : "text-neutral-500"}`}
+            />
+            <span>{streamMode ? "STREAM" : "COMPLETE"}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Relocated Voice Waveform Visualizer to keep navigation rail buttons vertically fixed */}
+      {/* Voice Waveform Visualizer */}
       <div className={`${isCompact ? "mb-1" : "mb-2"} shrink-0`}>
         <WaveformVisualizer isCompact={isCompact} />
       </div>
@@ -135,62 +405,34 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
       {/* Messages Scroll Area */}
       <div
         ref={messagesContainerRef}
-        className={`flex-1 min-h-0 overflow-y-auto ${isCompact ? "space-y-1.5" : "space-y-2.5"} pr-1`}
+        data-testid="chat-messages-container"
+        className={`flex-1 min-h-0 overflow-y-auto ${
+          isCompact ? "space-y-1.5" : "space-y-2.5"
+        } pr-1`}
       >
         {messages.map((msg, idx) => {
-          const isUser = msg.role === "user";
-          const isLastAssistant = !isUser && idx === messages.length - 1;
-
+          const isLastAssistant = msg.role === "assistant" && idx === messages.length - 1;
           return (
-            <div
+            <ChatMessageItem
               key={msg.id}
-              ref={isLastAssistant ? activeAssistantMsgRef : null}
-              className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
-            >
-              <div className="flex items-center gap-1 text-[9px] text-cyan-500/60 mb-0.5 px-1 uppercase tracking-wider">
-                {isUser ? (
-                  <>
-                    <span>OPERATOR</span>
-                    <User className="w-2.5 h-2.5 text-cyan-400" />
-                  </>
-                ) : (
-                  <>
-                    <Bot className="w-2.5 h-2.5 text-amber-400" />
-                    <span className="text-amber-400/80">AGENT JARVIS</span>
-                  </>
-                )}
-                <span>· {msg.timestamp}</span>
-              </div>
-
-              <div
-                className={`max-w-[90%] rounded-lg px-3 py-2 text-xs leading-relaxed border ${
-                  isUser
-                    ? "bg-cyan-950/40 border-cyan-500/40 text-cyan-100 shadow-[0_0_10px_rgba(0,229,255,0.15)]"
-                    : "bg-[#090b10] border-amber-500/30 text-amber-100/90 shadow-[0_0_12px_rgba(255,145,0,0.1)]"
-                }`}
-              >
-                {msg.content ? (
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-cyan-400/60 italic text-[11px]">
-                    <Sparkles className="w-3 h-3 animate-spin" /> Generating response...
-                  </span>
-                )}
-              </div>
-            </div>
+              message={msg}
+              isGenerating={isLastAssistant && isGenerating}
+              refCallback={isLastAssistant ? (node) => (activeAssistantMsgRef.current = node) : undefined}
+            />
           );
         })}
       </div>
 
       {/* Input Box */}
-      <div className="mt-2 pt-2 border-t border-cyan-500/30 flex items-center gap-1.5">
+      <div className="mt-2 pt-2 border-t border-cyan-500/30 flex items-center gap-1.5 shrink-0">
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Ask local agent..."
+          placeholder="Ask tactical agent or request task/goal action..."
           disabled={isGenerating}
+          aria-label="Ask tactical agent"
           className="flex-1 bg-black/60 border border-cyan-500/30 rounded px-2.5 py-1.5 text-xs text-cyan-200 placeholder-cyan-500/40 focus:outline-none focus:border-cyan-400 transition"
         />
 
@@ -198,6 +440,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
           onClick={handleSend}
           disabled={!inputText.trim() || isGenerating}
           title="Send Command"
+          aria-label="Send Command"
           className="p-1.5 rounded bg-cyan-600/30 hover:bg-cyan-500/40 border border-cyan-400/50 hover:border-cyan-300 text-cyan-200 disabled:opacity-40 transition cursor-pointer"
         >
           <Send className="w-3.5 h-3.5" />
