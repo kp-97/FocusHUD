@@ -1,5 +1,6 @@
 #![allow(clippy::missing_safety_doc, clippy::collapsible_if)]
 
+pub mod ai;
 pub mod commands;
 pub mod db;
 pub mod diagnostics;
@@ -88,7 +89,18 @@ pub fn run() {
             commands::rename_note_folder,
             commands::delete_note_folder,
             commands::move_note_to_folder,
-            commands::read_note_file
+            commands::read_note_file,
+            commands::stream_chat_completion,
+            commands::get_chat_sessions,
+            commands::save_chat_session,
+            commands::delete_chat_session,
+            commands::get_chat_messages,
+            commands::save_chat_message,
+            commands::execute_ai_tool,
+            commands::get_ai_tools,
+            commands::fetch_ai_models,
+            commands::get_ai_config,
+            commands::save_ai_config
         ])
         .setup(|app| {
             let conn = db::init_db(app.handle())?;
