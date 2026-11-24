@@ -1,17 +1,21 @@
 use crate::ai::models::{self, ChatCompletionRequest, ChatMessageParam, StreamChunkEvent};
 use crate::ai::tools::{execute_tool, get_default_tools};
 use crate::db::migrations::run_migrations;
-use crate::db::queries::{get_all_goals, get_all_tasks};
+use crate::db::queries::{get_all_goals, get_all_tasks, set_setting};
 use rusqlite::Connection;
 
 #[test]
 fn test_get_default_tools_returns_core_tools() {
     let tools = get_default_tools();
-    assert_eq!(tools.len(), 3);
+    assert_eq!(tools.len(), 7);
 
     let names: Vec<String> = tools.into_iter().map(|t| t.name).collect();
     assert!(names.contains(&"create_task".to_string()));
     assert!(names.contains(&"create_goal".to_string()));
+    assert!(names.contains(&"get_tasks".to_string()));
+    assert!(names.contains(&"get_goals".to_string()));
+    assert!(names.contains(&"get_workspace_summary".to_string()));
+    assert!(names.contains(&"get_pomodoro_status".to_string()));
     assert!(names.contains(&"get_system_diagnostics".to_string()));
 }
 
@@ -62,6 +66,95 @@ fn test_execute_tool_get_system_diagnostics() {
     let res = execute_tool(&conn, "get_system_diagnostics", "{}").unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&res).unwrap();
     assert!(parsed.is_object());
+}
+
+#[test]
+fn test_execute_tool_get_tasks_and_filtering() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    run_migrations(&mut conn).unwrap();
+
+    execute_tool(
+        &conn,
+        "create_task",
+        r#"{"title": "Pending Task", "priority": 1}"#,
+    )
+    .unwrap();
+    execute_tool(
+        &conn,
+        "create_task",
+        r#"{"title": "Low Priority Task", "priority": 4}"#,
+    )
+    .unwrap();
+
+    let res = execute_tool(&conn, "get_tasks", r#"{"status": "pending"}"#).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&res).unwrap();
+    assert_eq!(parsed["count"], 2);
+
+    let priority_res = execute_tool(&conn, "get_tasks", r#"{"priority": 1}"#).unwrap();
+    let priority_parsed: serde_json::Value = serde_json::from_str(&priority_res).unwrap();
+    assert_eq!(priority_parsed["count"], 1);
+    assert_eq!(priority_parsed["tasks"][0]["title"], "Pending Task");
+}
+
+#[test]
+fn test_execute_tool_get_goals() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    run_migrations(&mut conn).unwrap();
+
+    execute_tool(&conn, "create_goal", r#"{"title": "Strategic Goal 1"}"#).unwrap();
+
+    let res = execute_tool(&conn, "get_goals", r#"{"status": "active"}"#).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&res).unwrap();
+    assert_eq!(parsed["count"], 1);
+    assert_eq!(parsed["goals"][0]["title"], "Strategic Goal 1");
+}
+
+#[test]
+fn test_execute_tool_get_workspace_summary() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    run_migrations(&mut conn).unwrap();
+
+    execute_tool(
+        &conn,
+        "create_task",
+        r#"{"title": "Urgent Bug", "priority": 1}"#,
+    )
+    .unwrap();
+    execute_tool(&conn, "create_goal", r#"{"title": "Q4 Deliverables"}"#).unwrap();
+
+    let res = execute_tool(&conn, "get_workspace_summary", "{}").unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&res).unwrap();
+
+    assert_eq!(parsed["tasks"]["total"], 1);
+    assert_eq!(parsed["tasks"]["urgent"], 1);
+    assert_eq!(parsed["goals"]["active"], 1);
+    assert_eq!(parsed["pomodoro"]["mode"], "focus");
+}
+
+#[test]
+fn test_execute_tool_get_pomodoro_status() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    run_migrations(&mut conn).unwrap();
+
+    // Default status
+    let res = execute_tool(&conn, "get_pomodoro_status", "{}").unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&res).unwrap();
+    assert_eq!(parsed["mode"], "focus");
+    assert_eq!(parsed["state"], "idle");
+
+    // After state is saved
+    set_setting(
+        &conn,
+        "focushud_pomodoro_state",
+        r#"{"mode": "shortBreak", "isRunning": true, "isPaused": false, "timeLeft": 300, "currentCycle": 2, "totalCycles": 4}"#,
+    )
+    .unwrap();
+
+    let synced_res = execute_tool(&conn, "get_pomodoro_status", "{}").unwrap();
+    let synced_parsed: serde_json::Value = serde_json::from_str(&synced_res).unwrap();
+    assert_eq!(synced_parsed["mode"], "shortBreak");
+    assert_eq!(synced_parsed["isRunning"], true);
+    assert_eq!(synced_parsed["timeLeft"], 300);
 }
 
 #[test]

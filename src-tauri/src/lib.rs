@@ -100,7 +100,8 @@ pub fn run() {
             commands::get_ai_tools,
             commands::fetch_ai_models,
             commands::get_ai_config,
-            commands::save_ai_config
+            commands::save_ai_config,
+            commands::sync_pomodoro_state,
         ])
         .setup(|app| {
             let conn = db::init_db(app.handle())?;

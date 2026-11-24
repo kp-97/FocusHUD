@@ -79,3 +79,10 @@ pub fn save_ai_config(app: AppHandle, config: String) -> Result<(), String> {
     crate::db::queries::set_setting(&conn, "focushud_ai_settings", &config)
         .map_err(|e| e.to_string())
 }
+
+#[command]
+pub fn sync_pomodoro_state(app: AppHandle, state: String) -> Result<(), String> {
+    let conn = init_db(&app).map_err(|e| e.to_string())?;
+    crate::db::queries::set_setting(&conn, "focushud_pomodoro_state", &state)
+        .map_err(|e| e.to_string())
+}

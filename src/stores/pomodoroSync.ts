@@ -1,4 +1,5 @@
 import type { PomodoroState } from "./pomodoroStore";
+import { syncPomodoroState } from "../services/tauriBridge";
 
 export type PomodoroSyncActionType =
   | "START"
@@ -49,6 +50,16 @@ export const postPomodoroSync = (
 
   try {
     localStorage.setItem("focushud_last_pomodoro_sync", JSON.stringify(payload));
+    syncPomodoroState(
+      JSON.stringify({
+        mode: state.mode,
+        isRunning: state.isRunning,
+        timeLeft: state.timeLeft,
+        totalSeconds: state.totalSeconds,
+        cycle: state.cycle,
+        totalCycles: state.totalCycles,
+      })
+    ).catch(() => {});
   } catch {
     // Ignore storage quota or disabled storage
   }

@@ -163,5 +163,23 @@ Here is a paragraph after the table.
       expect(screen.getByText("Here is a paragraph after the table.")).toBeInTheDocument();
     });
   });
+
+  describe("Variant & Links Support", () => {
+    it("renders with amber theme variant and renders links correctly", () => {
+      const markdown = `
+### Tactical Brief
+Check [Docs](https://example.com) for details.
+* Bullet item
+`;
+      render(<MarkdownPreview content={markdown} variant="amber" />);
+      const heading = screen.getByRole("heading", { level: 3 });
+      expect(heading).toHaveTextContent("Tactical Brief");
+      expect(heading).toHaveClass("text-amber-300");
+
+      const link = screen.getByRole("link", { name: "Docs" });
+      expect(link).toHaveAttribute("href", "https://example.com");
+      expect(link).toHaveAttribute("target", "_blank");
+    });
+  });
 });
 

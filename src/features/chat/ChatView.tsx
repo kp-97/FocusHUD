@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Bot, Radio, History } from "lucide-react";
+import { Send, Bot, Radio, History, Plus, Trash2 } from "lucide-react";
 import { WaveformVisualizer } from "../../components/ui/WaveformVisualizer";
 import { ChatMessageItem } from "./ChatMessageItem";
 import { ChatSessionDrawer } from "./ChatSessionDrawer";
@@ -21,7 +21,6 @@ import {
   loadAiSettings,
   executeAiToolCall,
 } from "../../services/aiService";
-import { getSystemDiagnostics } from "../../services/tauriBridge";
 
 export interface ChatViewProps {
   isCompact?: boolean;
@@ -35,6 +34,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
   const [streamMode, setStreamMode] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState<boolean>(false);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantMsgRef = useRef<HTMLDivElement | null>(null);
@@ -299,31 +299,24 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
     setMessages([...nextMessages, initialAssistantMsg]);
 
     try {
-      // Build conversation payload with context injection if enabled
-      let contextPrefix = "";
-      if (settings.enableContext) {
-        try {
-          const diag = await getSystemDiagnostics();
-          if (diag) {
-            contextPrefix = `[Current FocusHUD Telemetry: CPU ${diag.cpu_usage.toFixed(1)}%, Mem ${diag.ram_usage.toFixed(1)}% (${(diag.ram_used_bytes / (1024 * 1024)).toFixed(0)}MB / ${(diag.ram_total_bytes / (1024 * 1024)).toFixed(0)}MB)]\n`;
-          }
-        } catch {}
-      }
-
       const formattedHistory = nextMessages
         .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m, idx, arr) => {
-          if (idx === arr.length - 1 && contextPrefix && m.role === "user") {
-            return { role: m.role, content: contextPrefix + m.content };
-          }
-          return { role: m.role, content: m.content };
-        });
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const toolsToOffer = settings.enableTools
+        ? DEFAULT_AI_TOOLS.filter((tool) => {
+            if (tool.name === "get_system_diagnostics") {
+              return settings.enableContext;
+            }
+            return true;
+          })
+        : undefined;
 
       await streamChat(
         activeSession,
         formattedHistory,
         settings,
-        settings.enableTools ? DEFAULT_AI_TOOLS : undefined
+        toolsToOffer
       );
     } catch {
       setIsGenerating(false);
@@ -368,6 +361,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* New Chat Button */}
+          <button
+            onClick={handleCreateSession}
+            title="Start New Conversation"
+            aria-label="Start New Conversation"
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/30 hover:border-cyan-400 bg-black/40 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 transition cursor-pointer"
+          >
+            <Plus className="w-3 h-3 text-cyan-400" />
+            {!isCompact && <span>NEW</span>}
+          </button>
+
           {/* History/Sessions Drawer Button */}
           <button
             onClick={() => setIsDrawerOpen(true)}
@@ -378,6 +382,40 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
             <History className="w-3 h-3 text-cyan-400" />
             {!isCompact && <span>LOGS</span>}
           </button>
+
+          {/* Delete Current Conversation Button */}
+          {confirmDeleteSession ? (
+            <div className="flex items-center gap-1 bg-red-950/80 border border-red-500/50 rounded px-1.5 py-0.5 text-[9px] font-tech text-red-200 select-none">
+              <span>DEL?</span>
+              <button
+                onClick={async () => {
+                  setConfirmDeleteSession(false);
+                  if (currentSessionId) {
+                    await handleDeleteSession(currentSessionId);
+                  }
+                }}
+                aria-label="Confirm Delete Conversation"
+                className="font-bold text-red-400 hover:text-red-200 underline cursor-pointer"
+              >
+                YES
+              </button>
+              <button
+                onClick={() => setConfirmDeleteSession(false)}
+                className="text-cyan-300 hover:text-cyan-100 cursor-pointer ml-0.5"
+              >
+                NO
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDeleteSession(true)}
+              title="Delete Current Conversation"
+              aria-label="Delete Current Conversation"
+              className="flex items-center p-1 rounded border border-cyan-500/30 hover:border-red-400/60 bg-black/40 hover:bg-red-950/40 text-cyan-400/60 hover:text-red-400 transition cursor-pointer"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
 
           {/* Streaming Mode Toggle */}
           <button

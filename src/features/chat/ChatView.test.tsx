@@ -76,4 +76,82 @@ describe("ChatView Component", () => {
       expect(streamChatSpy).toHaveBeenCalled();
     });
   });
+
+  it("renders markdown formatting in messages", async () => {
+    vi.spyOn(aiService, "fetchChatSessions").mockResolvedValue([
+      {
+        id: "sess_1",
+        title: "Test Session",
+        provider: "ollama",
+        model: "llama3.2",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ]);
+    vi.spyOn(aiService, "fetchChatMessages").mockResolvedValue([
+      {
+        id: "msg_md",
+        sessionId: "sess_1",
+        role: "assistant",
+        content: "### **Task Management**\n* **Create Tasks:** Available tool\n`inline_code`",
+        createdAt: Date.now(),
+      },
+    ]);
+
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent("Task Management");
+      expect(screen.getByText("Create Tasks:")).toBeInTheDocument();
+      expect(screen.getByText("inline_code")).toBeInTheDocument();
+    });
+  });
+
+  it("allows starting a new conversation via header button", async () => {
+    const persistSessionSpy = vi.spyOn(aiService, "persistChatSession").mockResolvedValue(undefined);
+
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Start New Conversation/i })).toBeInTheDocument();
+    });
+
+    const newBtn = screen.getByRole("button", { name: /Start New Conversation/i });
+    fireEvent.click(newBtn);
+
+    await waitFor(() => {
+      expect(persistSessionSpy).toHaveBeenCalled();
+    });
+  });
+
+  it("allows deleting the current conversation with inline confirmation", async () => {
+    const removeSessionSpy = vi.spyOn(aiService, "removeChatSession").mockResolvedValue(undefined);
+    vi.spyOn(aiService, "fetchChatSessions").mockResolvedValue([
+      {
+        id: "sess_to_delete",
+        title: "Deletable Session",
+        provider: "ollama",
+        model: "llama3.2",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ]);
+
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Delete Current Conversation/i })).toBeInTheDocument();
+    });
+
+    const delBtn = screen.getByRole("button", { name: /Delete Current Conversation/i });
+    fireEvent.click(delBtn);
+
+    expect(screen.getByText("DEL?")).toBeInTheDocument();
+    const yesBtn = screen.getByRole("button", { name: /Confirm Delete Conversation/i });
+    fireEvent.click(yesBtn);
+
+    await waitFor(() => {
+      expect(removeSessionSpy).toHaveBeenCalledWith("sess_to_delete");
+    });
+  });
 });

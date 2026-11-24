@@ -344,7 +344,7 @@ export const AITab: React.FC = () => {
               onChange={(e) => updateSettings({ enableContext: e.target.checked })}
               className="accent-cyan-400 w-3.5 h-3.5 cursor-pointer"
             />
-            <span className="text-[11px] text-cyan-200">Inject Workspace Context (Telemetry & Tasks)</span>
+            <span className="text-[11px] text-cyan-200">Allow Hardware Diagnostics Tool (CPU, RAM, GPU)</span>
           </label>
 
           <label className="flex items-center gap-2 p-2 rounded bg-black/40 border border-cyan-500/20 cursor-pointer hover:border-cyan-400/50">
@@ -354,7 +354,7 @@ export const AITab: React.FC = () => {
               onChange={(e) => updateSettings({ enableTools: e.target.checked })}
               className="accent-cyan-400 w-3.5 h-3.5 cursor-pointer"
             />
-            <span className="text-[11px] text-cyan-200">Enable Agent Actions (Create Tasks/Goals)</span>
+            <span className="text-[11px] text-cyan-200">Enable Workspace Tools (Tasks, Goals, Timer)</span>
           </label>
         </div>
       </div>
