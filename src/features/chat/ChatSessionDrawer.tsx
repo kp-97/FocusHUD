@@ -92,8 +92,9 @@ export const ChatSessionDrawer: React.FC<ChatSessionDrawerProps> = ({
                     e.stopPropagation();
                     onDeleteSession(session.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 text-cyan-500/50 hover:text-red-400 p-1 transition cursor-pointer shrink-0 ml-1"
+                  className="text-cyan-400/50 hover:text-red-400 p-1 transition cursor-pointer shrink-0 ml-1"
                   title="Delete Session"
+                  aria-label={`Delete ${session.title || "Session"}`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

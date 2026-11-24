@@ -1,6 +1,7 @@
 import React from "react";
 import { Bot, User, Sparkles, CheckCircle2, Wrench, AlertCircle } from "lucide-react";
 import type { ChatMessageItem as ChatMessageType } from "../../types/ai";
+import { MarkdownPreview } from "../notes/NotesView/MarkdownPreview";
 
 export interface ChatMessageItemProps {
   message: ChatMessageType;
@@ -81,7 +82,14 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
         {/* Message Content */}
         {message.content ? (
-          <p className="whitespace-pre-wrap font-sans">{message.content}</p>
+          <div className="font-sans leading-relaxed">
+            <MarkdownPreview
+              content={message.content}
+              variant={isUser ? "cyan" : "amber"}
+              hideEmptyPlaceholder
+              className="text-xs"
+            />
+          </div>
         ) : isGenerating ? (
           <span className="inline-flex items-center gap-1 text-cyan-400/60 italic text-[11px]">
             <Sparkles className="w-3 h-3 animate-spin" /> Generating response...
