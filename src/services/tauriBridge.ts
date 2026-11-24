@@ -58,6 +58,10 @@ export async function getSystemDiagnostics(): Promise<SystemDiagnostics | null> 
   return invokeTauri<SystemDiagnostics>("get_system_diagnostics");
 }
 
+export async function syncPomodoroState(state: string): Promise<boolean> {
+  return invokeTauriBool("sync_pomodoro_state", { state });
+}
+
 export async function openSettingsWindow(): Promise<boolean> {
   return invokeTauriBool("open_settings_window");
 }
