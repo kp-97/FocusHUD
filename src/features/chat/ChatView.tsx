@@ -7,7 +7,6 @@ import type {
   ChatMessageItem as ChatMessageType,
   ChatSessionItem,
   StreamChunkPayload,
-  ToolCallItem,
 } from "../../types/ai";
 import { DEFAULT_AI_TOOLS } from "../../types/ai";
 import {
@@ -19,8 +18,8 @@ import {
   streamChat,
   onStreamChunk,
   loadAiSettings,
-  executeAiToolCall,
 } from "../../services/aiService";
+import { handleToolExecution, finalizeTurnMessage } from "./chatToolUtils";
 
 export interface ChatViewProps {
   isCompact?: boolean;
@@ -161,72 +160,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
           );
         }
       } else if (payload.chunkType === "tool_call" && payload.toolCall) {
-        const tool = payload.toolCall;
-        const toolCallItem: ToolCallItem = {
-          id: tool.id,
-          name: tool.name,
-          arguments: tool.arguments,
-          status: "executing",
-        };
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantId
-              ? { ...msg, toolCalls: [...(msg.toolCalls || []), toolCallItem] }
-              : msg
-          )
+        handleToolExecution(
+          payload.toolCall,
+          assistantId,
+          setMessages,
+          currentSessionIdRef.current
         );
-
-        try {
-          const resultStr = await executeAiToolCall(tool.name, tool.arguments);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    toolCalls: (msg.toolCalls || []).map((tc) =>
-                      tc.id === tool.id ? { ...tc, status: "success", result: resultStr } : tc
-                    ),
-                  }
-                : msg
-            )
-          );
-        } catch {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    toolCalls: (msg.toolCalls || []).map((tc) =>
-                      tc.id === tool.id ? { ...tc, status: "error" } : tc
-                    ),
-                  }
-                : msg
-            )
-          );
-        }
       } else if (payload.chunkType === "done" || payload.chunkType === "error") {
-        const finalContent =
+        const rawContent =
           payload.chunkType === "error" && !accumulatedContentRef.current
             ? (payload.delta || "Error connecting to AI Provider. Please verify settings.")
             : accumulatedContentRef.current;
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantId ? { ...msg, content: finalContent } : msg
-          )
+
+        finalizeTurnMessage(
+          assistantId,
+          rawContent,
+          setMessages,
+          currentSessionIdRef.current
         );
         setIsGenerating(false);
-
-        const activeSess = currentSessionIdRef.current;
-        if (activeSess && payload.chunkType === "done") {
-          persistChatMessage({
-            id: assistantId,
-            sessionId: activeSess,
-            role: "assistant",
-            content: finalContent,
-            createdAt: Date.now(),
-          }).catch(() => {});
-        }
 
         setTimeout(() => {
           scrollToStartOfResponseRef.current();
@@ -304,12 +256,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
         .map((m) => ({ role: m.role, content: m.content }));
 
       const toolsToOffer = settings.enableTools
-        ? DEFAULT_AI_TOOLS.filter((tool) => {
-            if (tool.name === "get_system_diagnostics") {
-              return settings.enableContext;
-            }
-            return true;
-          })
+        ? DEFAULT_AI_TOOLS.filter((t) => t.name !== "get_system_diagnostics" || settings.enableContext)
         : undefined;
 
       await streamChat(
