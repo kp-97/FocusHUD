@@ -80,6 +80,14 @@ export interface StreamChunkPayload {
 
 export const DEFAULT_AI_TOOLS = [
   {
+    name: "get_current_time",
+    description: "Retrieve the current local date, time, day of the week, and timezone",
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
     name: "get_workspace_summary",
     description: "Retrieve a summary of the current FocusHUD workspace including task counts, active goals, and scheduled events",
     parameters: {
@@ -164,6 +172,70 @@ export const DEFAULT_AI_TOOLS = [
     parameters: {
       type: "object",
       properties: {},
+    },
+  },
+  {
+    name: "get_calendar_events",
+    description: "Retrieve scheduled calendar events with optional date range or keyword filtering",
+    parameters: {
+      type: "object",
+      properties: {
+        startDate: { type: "string", description: "Filter events on or after YYYY-MM-DD" },
+        endDate: { type: "string", description: "Filter events on or before YYYY-MM-DD" },
+        query: { type: "string", description: "Optional keyword search in event title or description" },
+        includeTasks: { type: "boolean", description: "Whether to include tasks appearing on the calendar (default: true)" },
+        limit: { type: "integer", description: "Max events to return (default: 30)" },
+      },
+    },
+  },
+  {
+    name: "create_calendar_event",
+    description: "Create and schedule a new calendar event in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Event title" },
+        date: { type: "string", description: "Event date in YYYY-MM-DD format" },
+        startTime: { type: "string", description: "Start time in HH:mm 24-hour format (e.g. '14:30')" },
+        endTime: { type: "string", description: "End time in HH:mm 24-hour format (e.g. '15:30')" },
+        description: { type: "string", description: "Optional event details or notes" },
+        location: { type: "string", description: "Optional event location or meeting link" },
+        isAllDay: { type: "boolean", description: "Whether the event lasts all day (default: false)" },
+        recurrence: { type: "string", description: "Recurrence rule: 'none', 'daily', 'weekly', 'monthly', 'annually' (default: 'none')" },
+        color: { type: "string", description: "Hex color code for event (default: '#00e5ff')" },
+      },
+      required: ["title", "date", "startTime", "endTime"],
+    },
+  },
+  {
+    name: "update_calendar_event",
+    description: "Update an existing scheduled calendar event in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the event to update" },
+        title: { type: "string", description: "Updated event title" },
+        date: { type: "string", description: "Updated date in YYYY-MM-DD format" },
+        startTime: { type: "string", description: "Updated start time in HH:mm format" },
+        endTime: { type: "string", description: "Updated end time in HH:mm format" },
+        description: { type: "string", description: "Updated description" },
+        location: { type: "string", description: "Updated location" },
+        isAllDay: { type: "boolean", description: "Whether event is all-day" },
+        recurrence: { type: "string", description: "Updated recurrence rule" },
+        color: { type: "string", description: "Updated hex color code" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_calendar_event",
+    description: "Delete a scheduled calendar event by ID",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the event to delete" },
+      },
+      required: ["id"],
     },
   },
 ];

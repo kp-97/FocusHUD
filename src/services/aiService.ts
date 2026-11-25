@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { isTauriEnvironment } from "./dbService";
+import { formatDateToISO } from "../utils/formatters";
 import {
   AiSettingsConfig,
   DEFAULT_AI_SETTINGS,
@@ -176,6 +177,23 @@ export async function streamChat(
     return;
   }
 
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const localIso = formatDateToISO(now);
+  const timeContext = `Current System Date & Time: ${dateStr}, ${timeStr} (local time). Today's local date (YYYY-MM-DD): ${localIso}. When querying or scheduling for "today", use date "${localIso}".`;
+  const basePrompt = settings.systemPrompt?.trim() || "You are FocusHUD Tactical AI Assistant.";
+  const effectiveSystemPrompt = `${basePrompt}\n\n${timeContext}`;
+
   return invoke("stream_chat_completion", {
     request: {
       sessionId,
@@ -183,7 +201,7 @@ export async function streamChat(
       model: settings.model,
       apiKey: settings.apiKey || null,
       endpoint: settings.endpoint || null,
-      systemPrompt: settings.systemPrompt || null,
+      systemPrompt: effectiveSystemPrompt,
       messages,
       temperature: settings.temperature,
       tools: settings.enableTools ? tools : null,

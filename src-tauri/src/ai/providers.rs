@@ -1,11 +1,14 @@
 use crate::ai::models::{
-    ChatCompletionRequest, StreamChunkEvent, ToolCallPayload, normalize_ollama_chat_endpoint,
-    normalize_openai_chat_endpoint,
+    ChatCompletionRequest, normalize_ollama_chat_endpoint, normalize_openai_chat_endpoint,
+};
+use crate::ai::streaming::{
+    PendingTool, convert_tools, emit_done, emit_error, emit_text, emit_tool_call,
+    flush_pending_tools,
 };
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 pub async fn stream_provider(
     app: &AppHandle,
@@ -57,20 +60,7 @@ async fn stream_openai(
 
     if let Some(tools) = &request.tools {
         if !tools.is_empty() {
-            let tools_json: Vec<Value> = tools
-                .iter()
-                .map(|t| {
-                    json!({
-                        "type": "function",
-                        "function": {
-                            "name": t.name,
-                            "description": t.description,
-                            "parameters": t.parameters
-                        }
-                    })
-                })
-                .collect();
-            payload["tools"] = json!(tools_json);
+            payload["tools"] = json!(convert_tools(tools));
         }
     }
 
@@ -95,6 +85,8 @@ async fn stream_openai(
 
     let mut stream = res.bytes_stream();
     let mut buffer = String::new();
+    let mut pending_tools: std::collections::BTreeMap<usize, PendingTool> =
+        std::collections::BTreeMap::new();
 
     while let Some(chunk) = stream.next().await {
         let chunk_bytes = chunk.map_err(|e| format!("Error receiving stream chunk: {e}"))?;
@@ -107,6 +99,7 @@ async fn stream_openai(
 
             if let Some(data_str) = line.strip_prefix("data: ") {
                 if data_str == "[DONE]" {
+                    flush_pending_tools(app, &request.session_id, &mut pending_tools);
                     emit_done(app, &request.session_id);
                     return Ok(());
                 }
@@ -120,24 +113,24 @@ async fn stream_openai(
 
                             if let Some(tool_calls) = first["delta"]["tool_calls"].as_array() {
                                 for tc in tool_calls {
+                                    let index = tc["index"].as_u64().unwrap_or(0) as usize;
+                                    let entry = pending_tools.entry(index).or_default();
+                                    if let Some(id) = tc["id"].as_str() {
+                                        if !id.is_empty() {
+                                            entry.id = id.to_string();
+                                        }
+                                    }
                                     if let Some(func) = tc["function"].as_object() {
-                                        let name = func
-                                            .get("name")
-                                            .and_then(|n| n.as_str())
-                                            .unwrap_or_default()
-                                            .to_string();
-                                        let args = func
-                                            .get("arguments")
-                                            .and_then(|a| a.as_str())
-                                            .unwrap_or_default()
-                                            .to_string();
-                                        emit_tool_call(
-                                            app,
-                                            &request.session_id,
-                                            &format!("tc_{}", tc["index"]),
-                                            &name,
-                                            &args,
-                                        );
+                                        if let Some(n) = func.get("name").and_then(|v| v.as_str()) {
+                                            if !n.is_empty() {
+                                                entry.name.push_str(n);
+                                            }
+                                        }
+                                        if let Some(a) =
+                                            func.get("arguments").and_then(|v| v.as_str())
+                                        {
+                                            entry.arguments.push_str(a);
+                                        }
                                     }
                                 }
                             }
@@ -148,6 +141,7 @@ async fn stream_openai(
         }
     }
 
+    flush_pending_tools(app, &request.session_id, &mut pending_tools);
     emit_done(app, &request.session_id);
     Ok(())
 }
@@ -348,11 +342,16 @@ async fn stream_ollama(
         }));
     }
 
-    let payload = json!({
+    let mut payload = json!({
         "model": request.model,
         "messages": messages_json,
         "stream": true
     });
+    if let Some(tools) = &request.tools {
+        if !tools.is_empty() {
+            payload["tools"] = json!(convert_tools(tools));
+        }
+    }
 
     let res = client
         .post(&endpoint)
@@ -387,6 +386,34 @@ async fn stream_ollama(
                     if let Some(content) = v["message"]["content"].as_str() {
                         emit_text(app, &request.session_id, content);
                     }
+                    if let Some(tool_calls) = v["message"]["tool_calls"].as_array() {
+                        for (i, tc) in tool_calls.iter().enumerate() {
+                            if let Some(func) = tc["function"].as_object() {
+                                let name = func
+                                    .get("name")
+                                    .and_then(|n| n.as_str())
+                                    .unwrap_or_default();
+                                let args_val =
+                                    func.get("arguments").unwrap_or(&serde_json::Value::Null);
+                                let args_str = if args_val.is_string() {
+                                    args_val.as_str().unwrap().to_string()
+                                } else if args_val.is_object() {
+                                    args_val.to_string()
+                                } else {
+                                    "{}".to_string()
+                                };
+                                if !name.is_empty() {
+                                    emit_tool_call(
+                                        app,
+                                        &request.session_id,
+                                        &format!("tc_{i}"),
+                                        name,
+                                        &args_str,
+                                    );
+                                }
+                            }
+                        }
+                    }
                     if v["done"].as_bool().unwrap_or(false) {
                         emit_done(app, &request.session_id);
                         return Ok(());
@@ -398,48 +425,4 @@ async fn stream_ollama(
 
     emit_done(app, &request.session_id);
     Ok(())
-}
-
-fn emit_text(app: &AppHandle, session_id: &str, delta: &str) {
-    let event = StreamChunkEvent {
-        session_id: session_id.to_string(),
-        chunk_type: "text".to_string(),
-        delta: delta.to_string(),
-        tool_call: None,
-    };
-    let _ = app.emit("ai:stream-chunk", event);
-}
-
-fn emit_tool_call(app: &AppHandle, session_id: &str, id: &str, name: &str, args: &str) {
-    let event = StreamChunkEvent {
-        session_id: session_id.to_string(),
-        chunk_type: "tool_call".to_string(),
-        delta: String::new(),
-        tool_call: Some(ToolCallPayload {
-            id: id.to_string(),
-            name: name.to_string(),
-            arguments: args.to_string(),
-        }),
-    };
-    let _ = app.emit("ai:stream-chunk", event);
-}
-
-fn emit_done(app: &AppHandle, session_id: &str) {
-    let event = StreamChunkEvent {
-        session_id: session_id.to_string(),
-        chunk_type: "done".to_string(),
-        delta: String::new(),
-        tool_call: None,
-    };
-    let _ = app.emit("ai:stream-chunk", event);
-}
-
-fn emit_error(app: &AppHandle, session_id: &str, err: &str) {
-    let event = StreamChunkEvent {
-        session_id: session_id.to_string(),
-        chunk_type: "error".to_string(),
-        delta: err.to_string(),
-        tool_call: None,
-    };
-    let _ = app.emit("ai:stream-chunk", event);
 }
