@@ -291,13 +291,40 @@ export async function migrateLegacyStorage(data: LegacyStorageData): Promise<boo
 export async function onDbChange(
   callback: (payload: DbChangePayload) => void
 ): Promise<(() => void) | null> {
-  if (!isTauriEnvironment()) return null;
+  const domHandler = (e: Event) => {
+    const detail = (e as CustomEvent<DbChangePayload>).detail;
+    if (detail) {
+      callback(detail);
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("focushud:db-change", domHandler);
+  }
+
+  if (!isTauriEnvironment()) {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focushud:db-change", domHandler);
+      }
+    };
+  }
+
   try {
     const { listen } = await import("@tauri-apps/api/event");
-    return await listen<DbChangePayload>("db-change", (event) => {
+    const unlisten = await listen<DbChangePayload>("db-change", (event) => {
       callback(event.payload);
     });
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focushud:db-change", domHandler);
+      }
+      unlisten();
+    };
   } catch {
-    return null;
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focushud:db-change", domHandler);
+      }
+    };
   }
 }

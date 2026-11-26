@@ -18,6 +18,12 @@ pub async fn stream_chat_completion(
 }
 
 #[command]
+pub fn abort_chat_stream(session_id: String) -> Result<(), String> {
+    crate::ai::cancel_stream(&session_id);
+    Ok(())
+}
+
+#[command]
 pub fn get_chat_sessions(app: AppHandle) -> Result<Vec<ChatSession>, String> {
     let conn = init_db(&app).map_err(|e| e.to_string())?;
     db_get_sessions(&conn).map_err(|e| e.to_string())
@@ -50,7 +56,59 @@ pub fn save_chat_message(app: AppHandle, message: ChatMessageDb) -> Result<(), S
 #[command]
 pub fn execute_ai_tool(app: AppHandle, name: String, arguments: String) -> Result<String, String> {
     let conn = init_db(&app).map_err(|e| e.to_string())?;
-    execute_tool(&conn, &name, &arguments)
+    let result_str = execute_tool(&conn, &name, &arguments)?;
+
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&result_str) {
+        if v.get("status").and_then(|s| s.as_str()) == Some("success") {
+            let normalized = name.trim().to_lowercase();
+            match normalized.as_str() {
+                "create_calendar_event" => {
+                    let id = v.get("eventId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "calendar_events", "create", id);
+                }
+                "update_calendar_event" => {
+                    let id = v.get("eventId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "calendar_events", "update", id);
+                }
+                "delete_calendar_event" => {
+                    let id = v.get("eventId").and_then(|i| i.as_str()).map(String::from);
+                    if let Some(id_str) = &id {
+                        if id_str.starts_with("task_") {
+                            crate::commands::db::emit_db_change(
+                                &app,
+                                "tasks",
+                                "delete",
+                                Some(id_str.clone()),
+                            );
+                        }
+                    }
+                    crate::commands::db::emit_db_change(&app, "calendar_events", "delete", id);
+                }
+                "create_task" => {
+                    let id = v.get("taskId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "tasks", "create", id);
+                    crate::commands::db::emit_db_change(&app, "calendar_events", "update", None);
+                }
+                "update_task" => {
+                    let id = v.get("taskId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "tasks", "update", id);
+                    crate::commands::db::emit_db_change(&app, "calendar_events", "update", None);
+                }
+                "delete_task" => {
+                    let id = v.get("taskId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "tasks", "delete", id);
+                    crate::commands::db::emit_db_change(&app, "calendar_events", "update", None);
+                }
+                "create_goal" => {
+                    let id = v.get("goalId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "goals", "create", id);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(result_str)
 }
 
 #[command]

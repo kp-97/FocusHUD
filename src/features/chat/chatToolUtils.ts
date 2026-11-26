@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ToolCallItem, ChatMessageItem } from "../../types/ai";
 import { executeAiToolCall, persistChatMessage } from "../../services/aiService";
+import { isTauriEnvironment } from "../../services/dbService";
 
 /**
  * Generates user-friendly markdown text if the AI provider completed turn execution
@@ -78,7 +79,7 @@ export async function handleToolExecution(
   assistantId: string,
   setMessages: Dispatch<SetStateAction<ChatMessageItem[]>>,
   sessionId: string | null
-): Promise<void> {
+): Promise<string> {
   const toolCallItem: ToolCallItem = {
     id: tool.id,
     name: tool.name,
@@ -129,7 +130,33 @@ export async function handleToolExecution(
         createdAt: Date.now(),
       }).catch(() => {});
     }
-  } catch {
+
+    if (!isTauriEnvironment() && typeof window !== "undefined") {
+      const lowerName = tool.name.toLowerCase();
+      const entity = lowerName.includes("calendar")
+        ? "calendar_events"
+        : lowerName.includes("task")
+        ? "tasks"
+        : lowerName.includes("goal")
+        ? "goals"
+        : "all";
+      const action = lowerName.startsWith("delete") ? "delete" : "update";
+      window.dispatchEvent(
+        new CustomEvent("focushud:db-change", {
+          detail: { entity, action },
+        })
+      );
+      if (entity === "tasks") {
+        window.dispatchEvent(
+          new CustomEvent("focushud:db-change", {
+            detail: { entity: "calendar_events", action: "update" },
+          })
+        );
+      }
+    }
+
+    return resultStr;
+  } catch (err: unknown) {
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === assistantId
@@ -142,6 +169,7 @@ export async function handleToolExecution(
           : msg
       )
     );
+    return JSON.stringify({ status: "error", error: String(err) });
   }
 }
 

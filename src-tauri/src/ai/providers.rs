@@ -2,8 +2,8 @@ use crate::ai::models::{
     ChatCompletionRequest, normalize_ollama_chat_endpoint, normalize_openai_chat_endpoint,
 };
 use crate::ai::streaming::{
-    PendingTool, convert_tools, emit_done, emit_error, emit_text, emit_tool_call,
-    flush_pending_tools,
+    PendingTool, clear_cancelled_stream, convert_message_param_to_json, convert_tools, emit_done,
+    emit_error, emit_text, emit_tool_call, flush_pending_tools, is_stream_cancelled,
 };
 use futures_util::StreamExt;
 use reqwest::Client;
@@ -14,6 +14,7 @@ pub async fn stream_provider(
     app: &AppHandle,
     request: &ChatCompletionRequest,
 ) -> Result<(), String> {
+    clear_cancelled_stream(&request.session_id);
     let client = Client::new();
 
     match request.provider.to_lowercase().as_str() {
@@ -45,10 +46,7 @@ async fn stream_openai(
     }
 
     for msg in &request.messages {
-        body_messages.push(json!({
-            "role": msg.role,
-            "content": msg.content
-        }));
+        body_messages.push(convert_message_param_to_json(msg));
     }
 
     let mut payload = json!({
@@ -89,6 +87,9 @@ async fn stream_openai(
         std::collections::BTreeMap::new();
 
     while let Some(chunk) = stream.next().await {
+        if is_stream_cancelled(&request.session_id) {
+            break;
+        }
         let chunk_bytes = chunk.map_err(|e| format!("Error receiving stream chunk: {e}"))?;
         let text = String::from_utf8_lossy(&chunk_bytes);
         buffer.push_str(&text);
@@ -160,10 +161,17 @@ async fn stream_anthropic(
         .messages
         .iter()
         .map(|m| {
-            json!({
-                "role": m.role,
-                "content": m.content
-            })
+            if m.role == "tool" {
+                json!({
+                    "role": "user",
+                    "content": format!("[Tool Result for {}: {}]", m.name.as_deref().unwrap_or("function"), m.content.as_deref().unwrap_or(""))
+                })
+            } else {
+                json!({
+                    "role": m.role,
+                    "content": m.content.as_deref().unwrap_or("")
+                })
+            }
         })
         .collect();
 
@@ -206,6 +214,9 @@ async fn stream_anthropic(
     let mut buffer = String::new();
 
     while let Some(chunk) = stream.next().await {
+        if is_stream_cancelled(&request.session_id) {
+            break;
+        }
         let chunk_bytes = chunk.map_err(|e| format!("Stream error: {e}"))?;
         buffer.push_str(&String::from_utf8_lossy(&chunk_bytes));
 
@@ -249,10 +260,17 @@ async fn stream_gemini(
         .messages
         .iter()
         .map(|m| {
-            json!({
-                "role": if m.role == "assistant" { "model" } else { "user" },
-                "parts": [{ "text": m.content }]
-            })
+            if m.role == "tool" {
+                json!({
+                    "role": "user",
+                    "parts": [{ "text": format!("[Tool Result for {}: {}]", m.name.as_deref().unwrap_or("function"), m.content.as_deref().unwrap_or("")) }]
+                })
+            } else {
+                json!({
+                    "role": if m.role == "assistant" { "model" } else { "user" },
+                    "parts": [{ "text": m.content.as_deref().unwrap_or("") }]
+                })
+            }
         })
         .collect();
 
@@ -287,6 +305,9 @@ async fn stream_gemini(
     let mut buffer = String::new();
 
     while let Some(chunk) = stream.next().await {
+        if is_stream_cancelled(&request.session_id) {
+            break;
+        }
         let chunk_bytes = chunk.map_err(|e| format!("Stream error: {e}"))?;
         buffer.push_str(&String::from_utf8_lossy(&chunk_bytes));
 
@@ -336,10 +357,7 @@ async fn stream_ollama(
     }
 
     for msg in &request.messages {
-        messages_json.push(json!({
-            "role": msg.role,
-            "content": msg.content
-        }));
+        messages_json.push(convert_message_param_to_json(msg));
     }
 
     let mut payload = json!({
@@ -374,6 +392,9 @@ async fn stream_ollama(
     let mut buffer = String::new();
 
     while let Some(chunk) = stream.next().await {
+        if is_stream_cancelled(&request.session_id) {
+            break;
+        }
         let chunk_bytes = chunk.map_err(|e| format!("Stream error: {e}"))?;
         buffer.push_str(&String::from_utf8_lossy(&chunk_bytes));
 

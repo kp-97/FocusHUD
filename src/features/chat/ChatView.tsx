@@ -1,25 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Bot, Radio, History, Plus, Trash2 } from "lucide-react";
+import { Send, Bot, Radio, History, Plus, Trash2, Square, Clock, X, Archive } from "lucide-react";
 import { WaveformVisualizer } from "../../components/ui/WaveformVisualizer";
 import { ChatMessageItem } from "./ChatMessageItem";
 import { ChatSessionDrawer } from "./ChatSessionDrawer";
 import type {
   ChatMessageItem as ChatMessageType,
+  ChatMessageParam,
   ChatSessionItem,
-  StreamChunkPayload,
 } from "../../types/ai";
-import { DEFAULT_AI_TOOLS } from "../../types/ai";
 import {
   fetchChatSessions,
   persistChatSession,
   removeChatSession,
   fetchChatMessages,
   persistChatMessage,
-  streamChat,
-  onStreamChunk,
   loadAiSettings,
 } from "../../services/aiService";
-import { handleToolExecution, finalizeTurnMessage } from "./chatToolUtils";
+import { chatCoordinator } from "./chatCoordinator";
+import { compactSession, useAutoCompaction } from "./chatCompactor";
+
+const LAST_SESSION_STORAGE_KEY = "focushud_last_chat_session_id";
 
 export interface ChatViewProps {
   isCompact?: boolean;
@@ -30,6 +30,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [inputText, setInputText] = useState("");
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const [streamMode, setStreamMode] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
@@ -37,14 +38,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantMsgRef = useRef<HTMLDivElement | null>(null);
-  const currentAssistantMsgIdRef = useRef<string | null>(null);
-  const accumulatedContentRef = useRef<string>("");
-
   const currentSessionIdRef = useRef(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
-
-  const streamModeRef = useRef(streamMode);
-  streamModeRef.current = streamMode;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const scrollToStartOfResponse = useCallback(() => {
     if (activeAssistantMsgRef.current) {
@@ -61,16 +58,26 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
       const existingSessions = await fetchChatSessions();
       setSessions(existingSessions);
 
-      if (existingSessions.length > 0) {
-        const latest = existingSessions[0];
-        setCurrentSessionId(latest.id);
-        const msgs = await fetchChatMessages(latest.id);
+      const activeTurn = chatCoordinator.getActiveTurn();
+      const savedSessionId = localStorage.getItem(LAST_SESSION_STORAGE_KEY);
+
+      let targetSessionId: string | null = null;
+      if (activeTurn && existingSessions.some((s) => s.id === activeTurn.sessionId)) {
+        targetSessionId = activeTurn.sessionId;
+      } else if (savedSessionId && existingSessions.some((s) => s.id === savedSessionId)) {
+        targetSessionId = savedSessionId;
+      } else if (existingSessions.length > 0) {
+        targetSessionId = existingSessions[0].id;
+      }
+
+      if (targetSessionId) {
+        setCurrentSessionId(targetSessionId);
+        const msgs = await fetchChatMessages(targetSessionId);
         setMessages(msgs);
       } else {
         await handleCreateSession();
       }
     } catch {
-      // Fallback greeting if session load fails
       setMessages([
         {
           id: "m_welcome",
@@ -87,10 +94,21 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
     loadInitialData();
   }, [loadInitialData]);
 
+  // Auto-compaction hook
+  const settings = loadAiSettings();
+  useAutoCompaction(
+    currentSessionId,
+    messages,
+    isGenerating,
+    settings.autoCompactMinutes ?? 1,
+    (compacted) => setMessages(compacted)
+  );
+
   // Handle switching sessions
   const handleSelectSession = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
     try {
+      localStorage.setItem(LAST_SESSION_STORAGE_KEY, sessionId);
       const msgs = await fetchChatMessages(sessionId);
       setMessages(msgs);
     } catch {
@@ -100,24 +118,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
 
   // Create a new session
   const handleCreateSession = async () => {
-    const settings = loadAiSettings();
+    const currentSettings = loadAiSettings();
     const newSession: ChatSessionItem = {
       id: "sess_" + Date.now(),
       title: "Tactical Query",
-      provider: settings.provider,
-      model: settings.model,
+      provider: currentSettings.provider,
+      model: currentSettings.model,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     await persistChatSession(newSession);
     setSessions((prev) => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
+    localStorage.setItem(LAST_SESSION_STORAGE_KEY, newSession.id);
     setMessages([
       {
         id: "m_init_" + Date.now(),
         sessionId: newSession.id,
         role: "assistant",
-        content: `FocusHUD AI Agent initialized (${settings.provider}:${settings.model}). Ready for instructions.`,
+        content: `FocusHUD AI Agent initialized (${currentSettings.provider}:${currentSettings.model}). Ready for instructions.`,
         createdAt: Date.now(),
       },
     ]);
@@ -137,81 +156,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
     }
   };
 
-  // Wire up incoming stream chunk listener once on mount
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let isCancelled = false;
+  // Core execution logic for sending a user prompt
+  const executeSend = useCallback(async (text: string) => {
+    if (!text.trim()) return;
 
-    onStreamChunk(async (payload: StreamChunkPayload) => {
-      if (isCancelled) return;
-      const assistantId = currentAssistantMsgIdRef.current;
-      if (!assistantId) return;
-      if (currentSessionIdRef.current && payload.sessionId !== currentSessionIdRef.current) return;
-
-      if (payload.chunkType === "text") {
-        accumulatedContentRef.current += payload.delta;
-        if (streamModeRef.current) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId
-                ? { ...msg, content: accumulatedContentRef.current }
-                : msg
-            )
-          );
-        }
-      } else if (payload.chunkType === "tool_call" && payload.toolCall) {
-        handleToolExecution(
-          payload.toolCall,
-          assistantId,
-          setMessages,
-          currentSessionIdRef.current
-        );
-      } else if (payload.chunkType === "done" || payload.chunkType === "error") {
-        const rawContent =
-          payload.chunkType === "error" && !accumulatedContentRef.current
-            ? (payload.delta || "Error connecting to AI Provider. Please verify settings.")
-            : accumulatedContentRef.current;
-
-        finalizeTurnMessage(
-          assistantId,
-          rawContent,
-          setMessages,
-          currentSessionIdRef.current
-        );
-        setIsGenerating(false);
-
-        setTimeout(() => {
-          scrollToStartOfResponseRef.current();
-        }, 50);
-      }
-    }).then((fn) => {
-      if (isCancelled) {
-        fn();
-      } else {
-        unlisten = fn;
-      }
-    });
-
-    return () => {
-      isCancelled = true;
-      if (unlisten) unlisten();
-    };
-  }, []);
-
-  // Send message
-  const handleSend = async () => {
-    if (!inputText.trim() || isGenerating) return;
-
-    const settings = loadAiSettings();
-    let activeSession = currentSessionId;
+    const currentSettings = loadAiSettings();
+    let activeSession = currentSessionIdRef.current;
     if (!activeSession) {
       activeSession = "sess_" + Date.now();
       setCurrentSessionId(activeSession);
       const newSession: ChatSessionItem = {
         id: activeSession,
-        title: inputText.trim().slice(0, 24),
-        provider: settings.provider,
-        model: settings.model,
+        title: text.trim().slice(0, 24),
+        provider: currentSettings.provider,
+        model: currentSettings.model,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -219,26 +177,23 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
       setSessions((prev) => [newSession, ...prev]);
     }
 
-    const userText = inputText.trim();
-    setInputText("");
+    localStorage.setItem(LAST_SESSION_STORAGE_KEY, activeSession);
 
     const userMsg: ChatMessageType = {
       id: "u_" + Date.now(),
       sessionId: activeSession,
       role: "user",
-      content: userText,
+      content: text.trim(),
       createdAt: Date.now(),
     };
 
-    const nextMessages = [...messages, userMsg];
+    const currentMsgs = messagesRef.current;
+    const nextMessages = [...currentMsgs, userMsg];
     setMessages(nextMessages);
     persistChatMessage(userMsg).catch(() => {});
 
     setIsGenerating(true);
-    accumulatedContentRef.current = "";
-
     const assistantId = "a_" + Date.now();
-    currentAssistantMsgIdRef.current = assistantId;
 
     const initialAssistantMsg: ChatMessageType = {
       id: assistantId,
@@ -250,31 +205,111 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
 
     setMessages([...nextMessages, initialAssistantMsg]);
 
-    try {
-      const formattedHistory = nextMessages
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({ role: m.role, content: m.content }));
+    const formattedHistory: ChatMessageParam[] = nextMessages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role, content: m.content }));
 
-      const toolsToOffer = settings.enableTools
-        ? DEFAULT_AI_TOOLS.filter((t) => t.name !== "get_system_diagnostics" || settings.enableContext)
-        : undefined;
+    await chatCoordinator.startTurn(activeSession, formattedHistory, assistantId);
+  }, []);
 
-      await streamChat(
-        activeSession,
-        formattedHistory,
-        settings,
-        toolsToOffer
-      );
-    } catch {
-      setIsGenerating(false);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantId
-            ? { ...msg, content: "Error connecting to AI Provider. Please verify settings." }
-            : msg
-        )
-      );
+  // Wire up incoming stream chunk listener via chatCoordinator
+  useEffect(() => {
+    chatCoordinator.init();
+    let renderRaf: number | null = null;
+
+    const unsubscribe = chatCoordinator.subscribe((turn) => {
+      if (!turn || turn.sessionId !== currentSessionIdRef.current) {
+        setIsGenerating(false);
+        if (!turn && currentSessionIdRef.current) {
+          fetchChatMessages(currentSessionIdRef.current)
+            .then((msgs) => {
+              setMessages(msgs);
+              setTimeout(() => {
+                scrollToStartOfResponseRef.current();
+              }, 50);
+
+              // Check if queued messages exist to auto-execute next
+              setQueuedMessages((currentQueue) => {
+                if (currentQueue.length > 0) {
+                  const [nextMsg, ...rest] = currentQueue;
+                  setTimeout(() => {
+                    executeSend(nextMsg);
+                  }, 150);
+                  return rest;
+                }
+                return currentQueue;
+              });
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
+      setIsGenerating(turn.isGenerating);
+
+      // Throttled RAF render to prevent UI freezing during fast token streaming
+      if (renderRaf) return;
+      renderRaf = requestAnimationFrame(() => {
+        renderRaf = null;
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === turn.assistantId);
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                id: turn.assistantId,
+                sessionId: turn.sessionId,
+                role: "assistant",
+                content: turn.accumulatedContent,
+                toolCalls: turn.toolCalls.length > 0 ? turn.toolCalls : undefined,
+                createdAt: Date.now(),
+              },
+            ];
+          }
+          return prev.map((msg) =>
+            msg.id === turn.assistantId
+              ? {
+                  ...msg,
+                  content: turn.accumulatedContent,
+                  toolCalls: turn.toolCalls.length > 0 ? turn.toolCalls : msg.toolCalls,
+                }
+              : msg
+          );
+        });
+      });
+    });
+
+    return () => {
+      if (renderRaf) cancelAnimationFrame(renderRaf);
+      unsubscribe();
+    };
+  }, [executeSend]);
+
+  // Send message or queue if busy
+  const handleSend = async () => {
+    const text = inputText.trim();
+    if (!text) return;
+    setInputText("");
+
+    if (isGenerating) {
+      setQueuedMessages((prev) => [...prev, text]);
+      return;
     }
+
+    await executeSend(text);
+  };
+
+  // Stop active generation
+  const handleStop = async () => {
+    await chatCoordinator.stopTurn();
+    setIsGenerating(false);
+  };
+
+  // Manual compaction button
+  const handleManualCompact = async () => {
+    if (!currentSessionId || messages.length <= 2 || isGenerating) return;
+    const compacted = await compactSession(currentSessionId, messages);
+    setMessages(compacted);
   };
 
   return (
@@ -308,6 +343,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Compact Button */}
+          <button
+            onClick={handleManualCompact}
+            title="Compact Chat History to Conserve Context Tokens"
+            aria-label="Compact Chat History"
+            disabled={messages.length <= 2 || isGenerating}
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/30 hover:border-cyan-400 bg-black/40 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 transition cursor-pointer disabled:opacity-40"
+          >
+            <Archive className="w-3 h-3 text-cyan-400" />
+            {!isCompact && <span>COMPACT</span>}
+          </button>
+
           {/* New Chat Button */}
           <button
             onClick={handleCreateSession}
@@ -408,28 +455,74 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
         })}
       </div>
 
-      {/* Input Box */}
-      <div className="mt-2 pt-2 border-t border-cyan-500/30 flex items-center gap-1.5 shrink-0">
+      {/* Queued Messages Notification Bar */}
+      {queuedMessages.length > 0 && (
+        <div
+          data-testid="queued-messages-bar"
+          className="flex items-center gap-1.5 px-2 py-1 mb-1 rounded bg-amber-950/50 border border-amber-500/40 text-[10px] font-tech text-amber-200 shrink-0"
+        >
+          <Clock className="w-3 h-3 text-amber-400 shrink-0 animate-spin" />
+          <span className="font-bold tracking-wider uppercase">QUEUED ({queuedMessages.length}):</span>
+          <span className="truncate flex-1 italic text-amber-300/80 font-mono">"{queuedMessages[0]}"</span>
+          <button
+            onClick={() => setQueuedMessages((prev) => prev.slice(1))}
+            title="Dismiss queued message"
+            aria-label="Dismiss queued message"
+            className="text-amber-400/60 hover:text-red-400 p-0.5 cursor-pointer ml-1"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Input Box & Action Controls */}
+      <div className="mt-1 pt-1.5 border-t border-cyan-500/30 flex items-center gap-1.5 shrink-0">
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Ask tactical agent or request task/goal action..."
-          disabled={isGenerating}
+          placeholder={isGenerating ? "Agent busy... Type to queue next message" : "Ask tactical agent or request task/goal action..."}
           aria-label="Ask tactical agent"
           className="flex-1 bg-black/60 border border-cyan-500/30 rounded px-2.5 py-1.5 text-xs text-cyan-200 placeholder-cyan-500/40 focus:outline-none focus:border-cyan-400 transition"
         />
 
-        <button
-          onClick={handleSend}
-          disabled={!inputText.trim() || isGenerating}
-          title="Send Command"
-          aria-label="Send Command"
-          className="p-1.5 rounded bg-cyan-600/30 hover:bg-cyan-500/40 border border-cyan-400/50 hover:border-cyan-300 text-cyan-200 disabled:opacity-40 transition cursor-pointer"
-        >
-          <Send className="w-3.5 h-3.5" />
-        </button>
+        {isGenerating ? (
+          <div className="flex items-center gap-1">
+            {inputText.trim() && (
+              <button
+                onClick={handleSend}
+                title="Queue Message"
+                aria-label="Queue Message"
+                data-testid="chat-queue-button"
+                className="px-2 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-tech font-bold uppercase transition cursor-pointer"
+              >
+                QUEUE
+              </button>
+            )}
+            <button
+              onClick={handleStop}
+              title="Stop Generation"
+              aria-label="Stop Generation"
+              data-testid="chat-stop-button"
+              className="flex items-center gap-1 px-3 py-1.5 rounded bg-red-950/80 hover:bg-red-900 border border-red-500/60 hover:border-red-400 text-red-200 text-xs font-tech font-bold uppercase tracking-wider transition cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.3)] animate-pulse"
+            >
+              <Square className="w-3.5 h-3.5 fill-red-400 text-red-400" />
+              <span>STOP</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={!inputText.trim()}
+            title="Send Command"
+            aria-label="Send Command"
+            data-testid="chat-send-button"
+            className="p-1.5 rounded bg-cyan-600/30 hover:bg-cyan-500/40 border border-cyan-400/50 hover:border-cyan-300 text-cyan-200 disabled:opacity-40 transition cursor-pointer"
+          >
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );

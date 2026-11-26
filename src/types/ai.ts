@@ -9,6 +9,7 @@ export interface AiSettingsConfig {
   temperature: number;
   enableTools: boolean;
   enableContext: boolean;
+  autoCompactMinutes?: number;
 }
 
 export const DEFAULT_AI_SETTINGS: AiSettingsConfig = {
@@ -21,6 +22,7 @@ export const DEFAULT_AI_SETTINGS: AiSettingsConfig = {
   temperature: 0.7,
   enableTools: true,
   enableContext: true,
+  autoCompactMinutes: 1,
 };
 
 export const PROVIDER_DEFAULT_MODELS: Record<AiProvider, { defaultModel: string; endpoint?: string }> = {
@@ -65,6 +67,21 @@ export interface ChatMessageItem {
   content: string;
   toolCalls?: ToolCallItem[];
   createdAt: number;
+}
+
+export interface ChatMessageParam {
+  role: string;
+  content?: string | null;
+  toolCalls?: Array<{
+    id: string;
+    type: string;
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
+  toolCallId?: string;
+  name?: string;
 }
 
 export interface StreamChunkPayload {
@@ -151,6 +168,33 @@ export const DEFAULT_AI_TOOLS = [
         dueDate: { type: "string", description: "Due date in YYYY-MM-DD format" },
       },
       required: ["title"],
+    },
+  },
+  {
+    name: "update_task",
+    description: "Update an existing task's status, priority, due date, or title in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the task to update" },
+        title: { type: "string", description: "Updated title of the task" },
+        status: { type: "string", description: "Status: 'todo', 'in_progress', or 'done'" },
+        priority: { type: "integer", description: "Priority: 1-4" },
+        dueDate: { type: "string", description: "Due date in YYYY-MM-DD format" },
+        description: { type: "string", description: "Updated details" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_task",
+    description: "Delete a task by ID in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the task to delete" },
+      },
+      required: ["id"],
     },
   },
   {
