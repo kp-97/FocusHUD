@@ -23,7 +23,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   return (
     <div
       ref={refCallback}
-      className={`flex flex-col ${isUser ? "items-end" : "items-start"} font-hud select-text`}
+      className={`flex flex-col ${isUser ? "items-end" : "items-start"} font-hud select-text w-full min-w-0`}
     >
       {/* Header Info */}
       <div className="flex items-center gap-1 text-[9px] text-cyan-500/60 mb-0.5 px-1 uppercase tracking-wider select-none">
@@ -43,7 +43,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
       {/* Bubble Container */}
       <div
-        className={`max-w-[92%] rounded-lg px-3 py-2 text-xs leading-relaxed border ${
+        className={`max-w-[92%] rounded-lg px-3 py-2 text-xs leading-relaxed border break-words [overflow-wrap:anywhere] min-w-0 ${
           isUser
             ? "bg-cyan-950/40 border-cyan-500/40 text-cyan-100 shadow-[0_0_10px_rgba(0,229,255,0.15)]"
             : "bg-[#090b10] border-amber-500/30 text-amber-100/90 shadow-[0_0_12px_rgba(255,145,0,0.1)]"
@@ -82,12 +82,12 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
         {/* Message Content */}
         {message.content ? (
-          <div className="font-sans leading-relaxed">
+          <div className="font-sans leading-relaxed break-words [overflow-wrap:anywhere] min-w-0">
             <MarkdownPreview
               content={message.content}
               variant={isUser ? "cyan" : "amber"}
               hideEmptyPlaceholder
-              className="text-xs"
+              className="text-xs break-words [overflow-wrap:anywhere] min-w-0"
             />
           </div>
         ) : isGenerating ? (

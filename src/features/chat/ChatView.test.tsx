@@ -154,4 +154,55 @@ describe("ChatView Component", () => {
       expect(removeSessionSpy).toHaveBeenCalledWith("sess_to_delete");
     });
   });
+
+  it("renders stop button during generation and allows stopping", async () => {
+    const { chatCoordinator } = await import("./chatCoordinator");
+    const stopSpy = vi.spyOn(chatCoordinator, "stopTurn").mockResolvedValue(undefined);
+
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/FocusHUD AI Agent initialized/i)).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText(/Ask tactical agent/i);
+    fireEvent.change(input, { target: { value: "Run heavy task" } });
+
+    const sendBtn = screen.getByTestId("chat-send-button");
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("chat-stop-button")).toBeInTheDocument();
+    });
+
+    const stopBtn = screen.getByTestId("chat-stop-button");
+    fireEvent.click(stopBtn);
+
+    expect(stopSpy).toHaveBeenCalled();
+  });
+
+  it("queues messages when user sends while agent is generating", async () => {
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/FocusHUD AI Agent initialized/i)).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText(/Ask tactical agent/i);
+    fireEvent.change(input, { target: { value: "First message" } });
+    fireEvent.click(screen.getByTestId("chat-send-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("chat-stop-button")).toBeInTheDocument();
+    });
+
+    // While generating, queue a second message
+    fireEvent.change(input, { target: { value: "Second queued message" } });
+    expect(screen.getByTestId("chat-queue-button")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("chat-queue-button"));
+
+    expect(screen.getByTestId("queued-messages-bar")).toBeInTheDocument();
+    expect(screen.getByText(/QUEUED \(1\):/i)).toBeInTheDocument();
+    expect(screen.getByText(/"Second queued message"/i)).toBeInTheDocument();
+  });
 });

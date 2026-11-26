@@ -356,6 +356,21 @@ export const AITab: React.FC = () => {
             />
             <span className="text-[11px] text-cyan-200">Enable Workspace Tools (Tasks, Goals, Timer)</span>
           </label>
+
+          <div className="flex items-center justify-between p-2 rounded bg-black/40 border border-cyan-500/20">
+            <span className="text-[11px] text-cyan-200">Auto-Compact Chat on Inactivity</span>
+            <select
+              value={settings.autoCompactMinutes ?? 1}
+              onChange={(e) => updateSettings({ autoCompactMinutes: Number(e.target.value) })}
+              className="bg-black/60 border border-cyan-500/40 rounded px-2 py-1 text-[11px] text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer"
+            >
+              <option value={0}>Disabled</option>
+              <option value={1}>1 Minute (Default)</option>
+              <option value={2}>2 Minutes</option>
+              <option value={5}>5 Minutes</option>
+              <option value={10}>10 Minutes</option>
+            </select>
+          </div>
         </div>
       </div>
 
