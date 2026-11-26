@@ -7,6 +7,7 @@ import {
   DEFAULT_AI_SETTINGS,
   ChatSessionItem,
   ChatMessageItem,
+  ChatMessageParam,
   StreamChunkPayload,
   ToolCallItem,
 } from "../types/ai";
@@ -167,7 +168,7 @@ export async function fetchAvailableModels(
 
 export async function streamChat(
   sessionId: string,
-  messages: Array<{ role: string; content: string }>,
+  messages: Array<ChatMessageParam>,
   settings: AiSettingsConfig,
   tools?: any[]
 ): Promise<void> {
@@ -207,6 +208,12 @@ export async function streamChat(
       tools: settings.enableTools ? tools : null,
     },
   });
+}
+
+export async function abortChatStream(sessionId: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    return invoke("abort_chat_stream", { sessionId });
+  }
 }
 
 type StreamChunkCallback = (payload: StreamChunkPayload) => void;
