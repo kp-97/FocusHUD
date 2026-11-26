@@ -5,7 +5,14 @@ use serde_json::Value;
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessageParam {
     pub role: String,
-    pub content: String,
+    #[serde(default)]
+    pub content: Option<String>,
+    #[serde(default)]
+    pub tool_calls: Option<Vec<Value>>,
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,7 +1,31 @@
 use crate::ai::models::{StreamChunkEvent, ToolCallPayload, ToolDefinition};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use std::sync::{LazyLock, Mutex};
 use tauri::{AppHandle, Emitter};
+
+static CANCELLED_SESSIONS: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+pub fn cancel_stream(session_id: &str) {
+    if let Ok(mut set) = CANCELLED_SESSIONS.lock() {
+        set.insert(session_id.to_string());
+    }
+}
+
+pub fn is_stream_cancelled(session_id: &str) -> bool {
+    if let Ok(set) = CANCELLED_SESSIONS.lock() {
+        set.contains(session_id)
+    } else {
+        false
+    }
+}
+
+pub fn clear_cancelled_stream(session_id: &str) {
+    if let Ok(mut set) = CANCELLED_SESSIONS.lock() {
+        set.remove(session_id);
+    }
+}
 
 #[derive(Default)]
 pub struct PendingTool {
@@ -24,6 +48,27 @@ pub fn convert_tools(tools: &[ToolDefinition]) -> Vec<Value> {
             })
         })
         .collect()
+}
+
+pub fn convert_message_param_to_json(msg: &crate::ai::models::ChatMessageParam) -> Value {
+    let mut obj = json!({
+        "role": msg.role,
+    });
+    if let Some(c) = &msg.content {
+        obj["content"] = json!(c);
+    } else {
+        obj["content"] = Value::Null;
+    }
+    if let Some(tcs) = &msg.tool_calls {
+        obj["tool_calls"] = json!(tcs);
+    }
+    if let Some(tcid) = &msg.tool_call_id {
+        obj["tool_call_id"] = json!(tcid);
+    }
+    if let Some(n) = &msg.name {
+        obj["name"] = json!(n);
+    }
+    obj
 }
 
 pub fn flush_pending_tools(

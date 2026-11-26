@@ -91,6 +91,7 @@ pub fn run() {
             commands::move_note_to_folder,
             commands::read_note_file,
             commands::stream_chat_completion,
+            commands::abort_chat_stream,
             commands::get_chat_sessions,
             commands::save_chat_session,
             commands::delete_chat_session,

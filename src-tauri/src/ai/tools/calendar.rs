@@ -379,6 +379,17 @@ pub fn delete_calendar_event(
 ) -> Result<String, String> {
     let id = args["id"].as_str().ok_or("Missing required field 'id'")?;
 
+    if id.starts_with("task_") {
+        crate::db::queries::delete_task(conn, id)
+            .map_err(|e| format!("Failed to delete calendar task: {e}"))?;
+        return Ok(json!({
+            "status": "success",
+            "message": format!("Calendar task '{id}' deleted successfully"),
+            "eventId": id
+        })
+        .to_string());
+    }
+
     db_delete_calendar_event(conn, id)
         .map_err(|e| format!("Failed to delete calendar event: {e}"))?;
 

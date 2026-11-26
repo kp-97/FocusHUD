@@ -2,7 +2,8 @@ use super::ID_COUNTER;
 use crate::db::models::{Goal, Task};
 use crate::db::queries::common::current_timestamp_ms;
 use crate::db::queries::{
-    get_all_calendar_events, get_all_goals, get_all_tasks, get_setting, upsert_goal, upsert_task,
+    delete_task as db_delete_task, get_all_calendar_events, get_all_goals, get_all_tasks,
+    get_setting, upsert_goal, upsert_task,
 };
 use crate::diagnostics;
 use rusqlite::Connection;
@@ -172,6 +173,53 @@ pub fn create_task(conn: &Connection, args: &serde_json::Value) -> Result<String
     Ok(json!({
         "status": "success",
         "message": format!("Task '{title}' created successfully"),
+        "taskId": id
+    })
+    .to_string())
+}
+
+pub fn update_task(conn: &Connection, args: &serde_json::Value) -> Result<String, String> {
+    let id = args["id"].as_str().ok_or("Missing required field 'id'")?;
+    let tasks = get_all_tasks(conn).map_err(|e| format!("Failed to read tasks: {e}"))?;
+    let mut task = tasks
+        .into_iter()
+        .find(|t| t.id == id)
+        .ok_or_else(|| format!("Task '{id}' not found"))?;
+
+    if let Some(title) = args["title"].as_str() {
+        task.title = title.to_string();
+    }
+    if let Some(desc) = args["description"].as_str() {
+        task.description = desc.to_string();
+    }
+    if let Some(status) = args["status"].as_str() {
+        task.status = status.to_string();
+    }
+    if let Some(p) = args["priority"].as_i64() {
+        task.priority = p as i32;
+    }
+    if let Some(due) = args["dueDate"].as_str() {
+        task.due_date = Some(due.to_string());
+    }
+    task.updated_at = current_timestamp_ms();
+
+    upsert_task(conn, &task).map_err(|e| format!("Failed to update task: {e}"))?;
+
+    Ok(json!({
+        "status": "success",
+        "message": format!("Task '{id}' updated successfully"),
+        "taskId": id
+    })
+    .to_string())
+}
+
+pub fn delete_task(conn: &Connection, args: &serde_json::Value) -> Result<String, String> {
+    let id = args["id"].as_str().ok_or("Missing required field 'id'")?;
+    db_delete_task(conn, id).map_err(|e| format!("Failed to delete task: {e}"))?;
+
+    Ok(json!({
+        "status": "success",
+        "message": format!("Task '{id}' deleted successfully"),
         "taskId": id
     })
     .to_string())

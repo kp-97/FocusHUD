@@ -41,6 +41,8 @@ pub fn execute_tool(conn: &Connection, name: &str, arguments: &str) -> Result<St
         "get_goals" => workspace::get_goals(conn, &args),
         "get_pomodoro_status" => workspace::get_pomodoro_status(conn),
         "create_task" => workspace::create_task(conn, &args),
+        "update_task" => workspace::update_task(conn, &args),
+        "delete_task" => workspace::delete_task(conn, &args),
         "create_goal" => workspace::create_goal(conn, &args),
         "get_system_diagnostics" => workspace::get_system_diagnostics(),
         "get_calendar_events" => calendar::get_calendar_events(conn, &args),

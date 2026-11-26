@@ -78,6 +78,33 @@ pub fn get_default_tools() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "update_task".to_string(),
+            description: "Updates an existing task's status, priority, due date, or title".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "ID of the task to update" },
+                    "title": { "type": "string", "description": "Updated title of the task" },
+                    "status": { "type": "string", "description": "Status: 'todo', 'in_progress', or 'done'" },
+                    "priority": { "type": "integer", "description": "Priority: 1-4" },
+                    "dueDate": { "type": "string", "description": "Due date in YYYY-MM-DD format" },
+                    "description": { "type": "string", "description": "Updated details" }
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDefinition {
+            name: "delete_task".to_string(),
+            description: "Deletes a task by ID".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "ID of the task to delete" }
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDefinition {
             name: "create_goal".to_string(),
             description: "Creates a top-level or strategic goal in FocusHUD".to_string(),
             parameters: json!({
