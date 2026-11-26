@@ -78,13 +78,7 @@ export function useSyncEntity<TApp, TDb>({
         fetchDb().then((dbItems) => {
           if (active && dbItems) {
             const adapted = adapter(dbItems);
-            setData((prev) => {
-              const next = mergeFn ? mergeFn(prev, adapted) : adapted;
-              if (saveFn) {
-                saveFn(next);
-              }
-              return next;
-            });
+            setData((prev) => (mergeFn ? mergeFn(prev, adapted) : adapted));
           }
         });
       }
