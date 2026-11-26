@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MessageSquare } from "lucide-react";
 import { RightRailSystemStats } from "./RightRailSystemStats";
+import { RightRailContextMeter } from "./RightRailContextMeter";
 import { RailWindowControls } from "./RailWindowControls";
 import { RailTimerSection } from "./RailTimerSection";
 import { NAV_ICON_MAP } from "../LeftSidebar/LeftSidebar";
@@ -408,6 +409,11 @@ export const RightSidebarCompactRail: React.FC<RightSidebarCompactRailProps> = (
                   </Tooltip>
                 );
               })}
+          </div>
+
+          {/* AI Context Meter Widget */}
+          <div className="w-full pt-1 border-t border-amber-500/20">
+            <RightRailContextMeter />
           </div>
         </div>
 
