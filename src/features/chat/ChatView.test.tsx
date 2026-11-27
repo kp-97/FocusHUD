@@ -205,4 +205,68 @@ describe("ChatView Component", () => {
     expect(screen.getByText(/QUEUED \(1\):/i)).toBeInTheDocument();
     expect(screen.getByText(/"Second queued message"/i)).toBeInTheDocument();
   });
+
+  it("scrolls to user message when pressing Enter", async () => {
+    vi.spyOn(aiService, "streamChat").mockResolvedValue(undefined);
+    const scrollSpy = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollSpy;
+
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/FocusHUD AI Agent initialized/i)).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText(/Ask tactical agent/i);
+    fireEvent.change(input, { target: { value: "Auto-scroll test message" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+
+    expect(screen.getByText("Auto-scroll test message")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(scrollSpy).toHaveBeenCalled();
+    });
+  });
+
+  it("displays active compaction indicator and updates status when clicking compact", async () => {
+    vi.spyOn(aiService, "fetchChatSessions").mockResolvedValue([
+      {
+        id: "sess_compact",
+        title: "Compaction Session",
+        provider: "ollama",
+        model: "llama3.2",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ]);
+    vi.spyOn(aiService, "fetchChatMessages").mockResolvedValue([
+      { id: "m1", sessionId: "sess_compact", role: "user", content: "Query 1", createdAt: 1 },
+      { id: "m2", sessionId: "sess_compact", role: "assistant", content: "Reply 1", createdAt: 2 },
+      { id: "m3", sessionId: "sess_compact", role: "user", content: "Query 2", createdAt: 3 },
+      { id: "m4", sessionId: "sess_compact", role: "assistant", content: "Reply 2", createdAt: 4 },
+    ]);
+
+    render(<ChatView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("chat-compact-button")).toBeInTheDocument();
+    });
+
+    const compactBtn = screen.getByTestId("chat-compact-button");
+    expect(compactBtn).not.toBeDisabled();
+
+    fireEvent.click(compactBtn);
+
+    // Immediately shows active feedback indication
+    expect(screen.getByTestId("compacting-banner")).toBeInTheDocument();
+    expect(screen.getByTestId("compacting-spinner")).toBeInTheDocument();
+
+    // After compaction resolves
+    await waitFor(
+      () => {
+        expect(screen.getByText(/COMPACTED!/i)).toBeInTheDocument();
+      },
+      { timeout: 2000 }
+    );
+  });
 });

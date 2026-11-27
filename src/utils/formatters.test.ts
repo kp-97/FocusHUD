@@ -5,6 +5,7 @@ import {
   formatMinutesSeconds,
   formatMinutesAndSeconds,
   formatDurationHM,
+  formatDurationMs,
 } from "./formatters";
 
 describe("formatters", () => {
@@ -27,6 +28,16 @@ describe("formatters", () => {
     expect(formatDurationHM(60)).toBe("1H 0M");
     expect(formatDurationHM(45)).toBe("0H 45M");
     expect(formatDurationHM(-10)).toBe("0H 0M");
+  });
+
+  it("formats duration in milliseconds (formatDurationMs)", () => {
+    expect(formatDurationMs(45)).toBe("45ms");
+    expect(formatDurationMs(950)).toBe("950ms");
+    expect(formatDurationMs(1200)).toBe("1.2s");
+    expect(formatDurationMs(15400)).toBe("15.4s");
+    expect(formatDurationMs(75000)).toBe("1m 15s");
+    expect(formatDurationMs(0)).toBe("0ms");
+    expect(formatDurationMs(undefined)).toBe("0ms");
   });
 });
 

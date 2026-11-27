@@ -43,3 +43,19 @@ export const formatDurationHM = (minutes: number): string => {
   const m = safeMinutes % 60;
   return `${h}H ${m}M`;
 };
+
+/**
+ * Formats milliseconds into a clean, human-friendly tactical duration string:
+ * - < 1000ms: e.g. "45ms", "320ms"
+ * - 1000ms - 60000ms: e.g. "1.2s", "14.5s"
+ * - >= 60000ms: e.g. "1m 15s"
+ */
+export const formatDurationMs = (ms?: number): string => {
+  if (ms === undefined || ms === null || isNaN(ms) || ms <= 0) return "0ms";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  const totalSecs = Math.floor(ms / 1000);
+  const m = Math.floor(totalSecs / 60);
+  const s = totalSecs % 60;
+  return `${m}m ${s}s`;
+};
