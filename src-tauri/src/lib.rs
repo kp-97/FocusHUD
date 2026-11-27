@@ -164,11 +164,13 @@ pub fn run() {
                     }
                 });
 
-            let tray_builder = if let Some(icon) = app.default_window_icon() {
-                tray_builder.icon(icon.clone())
-            } else {
-                tray_builder
-            };
+            let app_icon = tauri::include_image!("icons/128x128.png");
+            for window in app.webview_windows().values() {
+                let _ = window.set_icon(app_icon.clone());
+            }
+
+            let tray_icon = tauri::include_image!("icons/64x64.png");
+            let tray_builder = tray_builder.icon(tray_icon);
 
             let _ = tray_builder.build(app)?;
 

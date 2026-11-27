@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <radialGradient id="bg1a" cx="50%" cy="50%" r="72%">
+      <stop offset="0%" stop-color="#0E1C2F"/>
+      <stop offset="100%" stop-color="#05080F"/>
+    </radialGradient>
+    <radialGradient id="core1a" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF9A5A"/>
+      <stop offset="100%" stop-color="#FF5722"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg1a)" stroke="#1E3A5F" stroke-width="2.5"/>
+  <!-- 4-Way Symmetric Chamfered HUD Brackets -->
+  <path d="M22 44V30L30 22H44" stroke="#22D3EE" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M84 22H98L106 30V44" stroke="#22D3EE" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M106 84V98L98 106H84" stroke="#22D3EE" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 106H30L22 98V84" stroke="#22D3EE" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 4 Exact Symmetric Diagonal Arcs (r=31, 18deg..72deg per quadrant) -->
+  <path d="M93.48 73.58 A31 31 0 0 1 73.58 93.48" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M54.42 93.48 A31 31 0 0 1 34.52 73.58" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M34.52 54.42 A31 31 0 0 1 54.42 34.52" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M73.58 34.52 A31 31 0 0 1 93.48 54.42" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- 4 Symmetric Cardinal Reticle Lines -->
+  <path d="M64 23V35M64 93V105M23 64H35M93 64H105" stroke="#67E8F9" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Glowing Focus Core -->
+  <circle cx="64" cy="64" r="18" stroke="#FF5722" stroke-width="2" opacity="0.4"/>
+  <circle cx="64" cy="64" r="11" fill="url(#core1a)"/>
+  <path d="M64 58L70 64L64 70L58 64Z" fill="#FFF7ED"/>
+</svg>
