@@ -12,6 +12,7 @@ vi.mock("../../services/aiService", () => ({
     enableTools: true,
   }),
   abortChatStream: vi.fn().mockResolvedValue(undefined),
+  executeAiToolCall: vi.fn().mockResolvedValue(JSON.stringify({ status: "success", count: 0, notes: [] })),
 }));
 
 describe("chatCoordinator", () => {
@@ -82,6 +83,48 @@ describe("chatCoordinator", () => {
         id: "a_3",
         sessionId: "sess_3",
         content: expect.stringContaining("Partial response..."),
+      })
+    );
+  });
+
+  it("ensures lingering executing tool calls are cleanly finalized", async () => {
+    await chatCoordinator.startTurn("sess_4", [{ role: "user", content: "tools" }], "a_4");
+
+    // Emit a tool call in iteration 1
+    chunkHandler({
+      sessionId: "sess_4",
+      chunkType: "tool_call",
+      toolCall: {
+        id: "call_lingering",
+        name: "search_notes",
+        arguments: JSON.stringify({ query: "assignment 1" }),
+      },
+    });
+
+    const active = chatCoordinator.getActiveTurn("sess_4");
+    expect(active?.toolCalls).toHaveLength(1);
+    expect(active?.toolCalls[0].status).toBe("executing");
+
+    // Complete iteration 1 -> triggers next iteration
+    await chunkHandler({ sessionId: "sess_4", chunkType: "done", delta: "" });
+
+    // In iteration 2, model generates final text and emits done
+    chunkHandler({ sessionId: "sess_4", chunkType: "text", delta: "No notes found." });
+    await chunkHandler({ sessionId: "sess_4", chunkType: "done", delta: "" });
+
+    // Verify turn completed and saved tool calls are not left in 'executing'
+    expect(chatCoordinator.getActiveTurn("sess_4")).toBeNull();
+    expect(aiService.persistChatMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "a_4",
+        sessionId: "sess_4",
+        content: "No notes found.",
+        toolCalls: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.stringContaining("call_lingering"),
+            status: "success",
+          }),
+        ]),
       })
     );
   });

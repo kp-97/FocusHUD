@@ -74,4 +74,58 @@ describe("agentLoop - Autonomous multi-step loop logic", () => {
     expect(nextHistory[0].content).toBeNull();
     expect(nextHistory[1].content).toBe(JSON.stringify({ status: "success" }));
   });
+
+  it("stops loop when tool calls repeat the exact same tool and arguments (cycle detection)", () => {
+    const previousTools: ToolCallItem[] = [
+      {
+        id: "call_1",
+        name: "search_notes",
+        arguments: JSON.stringify({ query: "assignment 1" }),
+        status: "success",
+        result: JSON.stringify({ count: 0, notes: [] }),
+      },
+    ];
+
+    const currentTools: ToolCallItem[] = [
+      {
+        id: "call_2",
+        name: "search_notes",
+        arguments: JSON.stringify({ query: "assignment 1" }),
+        status: "executing",
+      },
+    ];
+
+    // Cycle detected: should stop loop to prevent infinite repetitive queries
+    expect(shouldContinueAgentLoop(currentTools, 2, previousTools)).toBe(false);
+
+    // Different query: should allow next iteration
+    const differentQueryTools: ToolCallItem[] = [
+      {
+        id: "call_3",
+        name: "search_notes",
+        arguments: JSON.stringify({ query: "syllabus" }),
+        status: "executing",
+      },
+    ];
+    expect(shouldContinueAgentLoop(differentQueryTools, 2, previousTools)).toBe(true);
+  });
+
+  it("stops loop when assistant already emitted a conversational response asking user for clarification", () => {
+    const previousTools: ToolCallItem[] = [];
+    const currentTools: ToolCallItem[] = [
+      {
+        id: "call_note",
+        name: "search_notes",
+        arguments: JSON.stringify({ query: "assignment 1" }),
+        status: "executing",
+      },
+    ];
+
+    const substantiveResponse =
+      "I couldn't find any notes or tasks specifically labeled 'assignment 1.' Could you tell me a bit more about the assignment?";
+
+    expect(
+      shouldContinueAgentLoop(currentTools, 2, previousTools, substantiveResponse)
+    ).toBe(false);
+  });
 });
