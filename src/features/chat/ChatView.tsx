@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Bot, Radio, History, Plus, Trash2, Square, Clock, X, Archive } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { WaveformVisualizer } from "../../components/ui/WaveformVisualizer";
 import { ChatMessageItem } from "./ChatMessageItem";
 import { ChatSessionDrawer } from "./ChatSessionDrawer";
+import { ChatHeader } from "./ChatHeader";
+import { ChatInputBar } from "./ChatInputBar";
 import type {
   ChatMessageItem as ChatMessageType,
   ChatMessageParam,
@@ -33,11 +35,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const [streamMode, setStreamMode] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const isGeneratingRef = useRef<boolean>(false);
+  isGeneratingRef.current = isGenerating;
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
-  const [confirmDeleteSession, setConfirmDeleteSession] = useState<boolean>(false);
+  const [isCompacting, setIsCompacting] = useState<boolean>(false);
+  const [compactSuccess, setCompactSuccess] = useState<boolean>(false);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantMsgRef = useRef<HTMLDivElement | null>(null);
+  const latestUserMsgRef = useRef<HTMLDivElement | null>(null);
+  const latestUserMsgIdRef = useRef<string | null>(null);
+
   const currentSessionIdRef = useRef(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
   const messagesRef = useRef(messages);
@@ -51,6 +59,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
 
   const scrollToStartOfResponseRef = useRef(scrollToStartOfResponse);
   scrollToStartOfResponseRef.current = scrollToStartOfResponse;
+
+  const scrollToLatestUserMessage = useCallback(() => {
+    if (latestUserMsgRef.current) {
+      latestUserMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, []);
 
   // Initialize or load sessions
   const loadInitialData = useCallback(async () => {
@@ -94,14 +113,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Auto-compaction hook
+  // Threshold-based auto-compaction hook
   const settings = loadAiSettings();
   useAutoCompaction(
     currentSessionId,
     messages,
     isGenerating,
-    settings.autoCompactMinutes ?? 1,
-    (compacted) => setMessages(compacted)
+    settings.autoCompactThresholdPct ?? 70,
+    (compacted) => setMessages(compacted),
+    settings.model,
+    settings.systemPrompt,
+    settings.contextSize,
+    settings.provider
   );
 
   // Handle switching sessions
@@ -179,8 +202,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
 
     localStorage.setItem(LAST_SESSION_STORAGE_KEY, activeSession);
 
+    const userMsgId = "u_" + Date.now();
+    latestUserMsgIdRef.current = userMsgId;
+
     const userMsg: ChatMessageType = {
-      id: "u_" + Date.now(),
+      id: userMsgId,
       sessionId: activeSession,
       role: "user",
       content: text.trim(),
@@ -205,12 +231,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
 
     setMessages([...nextMessages, initialAssistantMsg]);
 
+    // Automatically scroll down to the user's message when they send/press Enter
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollToLatestUserMessage();
+      }, 30);
+    });
+
     const formattedHistory: ChatMessageParam[] = nextMessages
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role, content: m.content }));
 
     await chatCoordinator.startTurn(activeSession, formattedHistory, assistantId);
-  }, []);
+  }, [scrollToLatestUserMessage]);
 
   // Wire up incoming stream chunk listener via chatCoordinator
   useEffect(() => {
@@ -291,11 +324,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
     if (!text) return;
     setInputText("");
 
-    if (isGenerating) {
+    if (isGenerating || isGeneratingRef.current) {
       setQueuedMessages((prev) => [...prev, text]);
       return;
     }
 
+    isGeneratingRef.current = true;
     await executeSend(text);
   };
 
@@ -305,11 +339,21 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
     setIsGenerating(false);
   };
 
-  // Manual compaction button
+  // Manual compaction with active UX indicator
   const handleManualCompact = async () => {
-    if (!currentSessionId || messages.length <= 2 || isGenerating) return;
-    const compacted = await compactSession(currentSessionId, messages);
-    setMessages(compacted);
+    if (!currentSessionId || messages.length <= 2 || isGenerating || isCompacting) return;
+    setIsCompacting(true);
+    try {
+      const [compacted] = await Promise.all([
+        compactSession(currentSessionId, messages),
+        new Promise((resolve) => setTimeout(resolve, 500)), // Visible feedback duration
+      ]);
+      setMessages(compacted);
+      setCompactSuccess(true);
+      setTimeout(() => setCompactSuccess(false), 2000);
+    } finally {
+      setIsCompacting(false);
+    }
   };
 
   return (
@@ -331,103 +375,33 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
         />
       )}
 
-      {/* Header with Streaming Mode Toggle & Sessions Button */}
-      <div
-        className={`w-full flex items-center justify-between border-b border-cyan-500/30 ${
-          isCompact ? "pb-1 mb-1" : "pb-2 mb-2"
-        } text-[10px] font-tech uppercase tracking-wider shrink-0`}
-      >
-        <div className="flex items-center gap-1.5">
-          <Bot className="w-3.5 h-3.5 text-cyan-400" />
-          {!isCompact && <span className="font-bold text-cyan-200">AI AGENT CHAT</span>}
+      {/* Header with Streaming Mode Toggle, Compact Button, and Sessions */}
+      <ChatHeader
+        isCompact={isCompact}
+        streamMode={streamMode}
+        onToggleStreamMode={() => setStreamMode(!streamMode)}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+        onCreateSession={handleCreateSession}
+        onDeleteCurrentSession={() => {
+          if (currentSessionId) handleDeleteSession(currentSessionId);
+        }}
+        onManualCompact={handleManualCompact}
+        isCompacting={isCompacting}
+        compactSuccess={compactSuccess}
+        canCompact={messages.length > 2}
+        isGenerating={isGenerating}
+      />
+
+      {/* Active Compaction HUD Status Banner */}
+      {isCompacting && (
+        <div
+          data-testid="compacting-banner"
+          className="flex items-center justify-center gap-2 py-1 px-3 mb-1.5 rounded bg-cyan-950/80 border border-cyan-400/60 text-cyan-200 text-[10px] font-tech uppercase tracking-wider animate-pulse shadow-[0_0_12px_rgba(0,229,255,0.25)] shrink-0"
+        >
+          <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+          <span className="font-bold">Compacting context checkpoint...</span>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* Compact Button */}
-          <button
-            onClick={handleManualCompact}
-            title="Compact Chat History to Conserve Context Tokens"
-            aria-label="Compact Chat History"
-            disabled={messages.length <= 2 || isGenerating}
-            className="flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/30 hover:border-cyan-400 bg-black/40 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 transition cursor-pointer disabled:opacity-40"
-          >
-            <Archive className="w-3 h-3 text-cyan-400" />
-            {!isCompact && <span>COMPACT</span>}
-          </button>
-
-          {/* New Chat Button */}
-          <button
-            onClick={handleCreateSession}
-            title="Start New Conversation"
-            aria-label="Start New Conversation"
-            className="flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/30 hover:border-cyan-400 bg-black/40 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 transition cursor-pointer"
-          >
-            <Plus className="w-3 h-3 text-cyan-400" />
-            {!isCompact && <span>NEW</span>}
-          </button>
-
-          {/* History/Sessions Drawer Button */}
-          <button
-            onClick={() => setIsDrawerOpen(true)}
-            title="Chat Sessions History"
-            aria-label="Chat Sessions History"
-            className="flex items-center gap-1 px-2 py-0.5 rounded border border-cyan-500/30 hover:border-cyan-400 bg-black/40 hover:bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 transition cursor-pointer"
-          >
-            <History className="w-3 h-3 text-cyan-400" />
-            {!isCompact && <span>LOGS</span>}
-          </button>
-
-          {/* Delete Current Conversation Button */}
-          {confirmDeleteSession ? (
-            <div className="flex items-center gap-1 bg-red-950/80 border border-red-500/50 rounded px-1.5 py-0.5 text-[9px] font-tech text-red-200 select-none">
-              <span>DEL?</span>
-              <button
-                onClick={async () => {
-                  setConfirmDeleteSession(false);
-                  if (currentSessionId) {
-                    await handleDeleteSession(currentSessionId);
-                  }
-                }}
-                aria-label="Confirm Delete Conversation"
-                className="font-bold text-red-400 hover:text-red-200 underline cursor-pointer"
-              >
-                YES
-              </button>
-              <button
-                onClick={() => setConfirmDeleteSession(false)}
-                className="text-cyan-300 hover:text-cyan-100 cursor-pointer ml-0.5"
-              >
-                NO
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmDeleteSession(true)}
-              title="Delete Current Conversation"
-              aria-label="Delete Current Conversation"
-              className="flex items-center p-1 rounded border border-cyan-500/30 hover:border-red-400/60 bg-black/40 hover:bg-red-950/40 text-cyan-400/60 hover:text-red-400 transition cursor-pointer"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
-
-          {/* Streaming Mode Toggle */}
-          <button
-            onClick={() => setStreamMode(!streamMode)}
-            title="Toggle between real-time streaming and complete message dispatch"
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition cursor-pointer ${
-              streamMode
-                ? "bg-cyan-950/60 border-cyan-400/60 text-cyan-200 shadow-[0_0_8px_rgba(0,229,255,0.3)]"
-                : "bg-black/40 border-cyan-500/20 text-cyan-400/70 hover:text-cyan-200"
-            }`}
-          >
-            <Radio
-              className={`w-3 h-3 ${streamMode ? "text-cyan-400 animate-pulse" : "text-neutral-500"}`}
-            />
-            <span>{streamMode ? "STREAM" : "COMPLETE"}</span>
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Voice Waveform Visualizer */}
       <div className={`${isCompact ? "mb-1" : "mb-2"} shrink-0`}>
@@ -444,86 +418,38 @@ export const ChatView: React.FC<ChatViewProps> = ({ isCompact = false }) => {
       >
         {messages.map((msg, idx) => {
           const isLastAssistant = msg.role === "assistant" && idx === messages.length - 1;
+          const isLatestUser = msg.role === "user" && msg.id === latestUserMsgIdRef.current;
           return (
             <ChatMessageItem
               key={msg.id}
               message={msg}
               isGenerating={isLastAssistant && isGenerating}
-              refCallback={isLastAssistant ? (node) => (activeAssistantMsgRef.current = node) : undefined}
+              refCallback={(node) => {
+                if (isLastAssistant) {
+                  activeAssistantMsgRef.current = node;
+                }
+                if (isLatestUser) {
+                  latestUserMsgRef.current = node;
+                }
+              }}
             />
           );
         })}
       </div>
 
-      {/* Queued Messages Notification Bar */}
-      {queuedMessages.length > 0 && (
-        <div
-          data-testid="queued-messages-bar"
-          className="flex items-center gap-1.5 px-2 py-1 mb-1 rounded bg-amber-950/50 border border-amber-500/40 text-[10px] font-tech text-amber-200 shrink-0"
-        >
-          <Clock className="w-3 h-3 text-amber-400 shrink-0 animate-spin" />
-          <span className="font-bold tracking-wider uppercase">QUEUED ({queuedMessages.length}):</span>
-          <span className="truncate flex-1 italic text-amber-300/80 font-mono">"{queuedMessages[0]}"</span>
-          <button
-            onClick={() => setQueuedMessages((prev) => prev.slice(1))}
-            title="Dismiss queued message"
-            aria-label="Dismiss queued message"
-            className="text-amber-400/60 hover:text-red-400 p-0.5 cursor-pointer ml-1"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-
-      {/* Input Box & Action Controls */}
-      <div className="mt-1 pt-1.5 border-t border-cyan-500/30 flex items-center gap-1.5 shrink-0">
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder={isGenerating ? "Agent busy... Type to queue next message" : "Ask tactical agent or request task/goal action..."}
-          aria-label="Ask tactical agent"
-          className="flex-1 bg-black/60 border border-cyan-500/30 rounded px-2.5 py-1.5 text-xs text-cyan-200 placeholder-cyan-500/40 focus:outline-none focus:border-cyan-400 transition"
-        />
-
-        {isGenerating ? (
-          <div className="flex items-center gap-1">
-            {inputText.trim() && (
-              <button
-                onClick={handleSend}
-                title="Queue Message"
-                aria-label="Queue Message"
-                data-testid="chat-queue-button"
-                className="px-2 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-tech font-bold uppercase transition cursor-pointer"
-              >
-                QUEUE
-              </button>
-            )}
-            <button
-              onClick={handleStop}
-              title="Stop Generation"
-              aria-label="Stop Generation"
-              data-testid="chat-stop-button"
-              className="flex items-center gap-1 px-3 py-1.5 rounded bg-red-950/80 hover:bg-red-900 border border-red-500/60 hover:border-red-400 text-red-200 text-xs font-tech font-bold uppercase tracking-wider transition cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.3)] animate-pulse"
-            >
-              <Square className="w-3.5 h-3.5 fill-red-400 text-red-400" />
-              <span>STOP</span>
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleSend}
-            disabled={!inputText.trim()}
-            title="Send Command"
-            aria-label="Send Command"
-            data-testid="chat-send-button"
-            className="p-1.5 rounded bg-cyan-600/30 hover:bg-cyan-500/40 border border-cyan-400/50 hover:border-cyan-300 text-cyan-200 disabled:opacity-40 transition cursor-pointer"
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
+      {/* Expanding Antigravity-Style Prompt Box with Integrated Queue Stack */}
+      <ChatInputBar
+        inputText={inputText}
+        onChangeInputText={setInputText}
+        onSend={handleSend}
+        onStop={handleStop}
+        isGenerating={isGenerating}
+        queuedMessages={queuedMessages}
+        onRemoveQueuedMessage={(idx) =>
+          setQueuedMessages((prev) => prev.filter((_, i) => i !== idx))
+        }
+        onClearQueuedMessages={() => setQueuedMessages([])}
+      />
     </div>
   );
 };

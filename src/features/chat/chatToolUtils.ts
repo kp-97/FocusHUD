@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { ToolCallItem, ChatMessageItem } from "../../types/ai";
 import { executeAiToolCall, persistChatMessage } from "../../services/aiService";
 import { isTauriEnvironment } from "../../services/dbService";
+import { pomodoroActions } from "../../stores/pomodoroStore";
 
 /**
  * Generates user-friendly markdown text if the AI provider completed turn execution
@@ -65,6 +66,20 @@ export function formatToolFallbackResponse(toolCalls?: ToolCallItem[]): string {
             .join("\n");
           parts.push(`Goals (${data.goals.length}):\n${list}`);
         }
+      } else if (data.notes && Array.isArray(data.notes)) {
+        if (data.notes.length === 0) {
+          parts.push("No matching notes found.");
+        } else {
+          const list = data.notes
+            .map(
+              (n: { title: string; relativePath?: string }) =>
+                `* **${n.title}**${n.relativePath ? ` (${n.relativePath})` : ""}`
+            )
+            .join("\n");
+          parts.push(`Notes (${data.notes.length}):\n${list}`);
+        }
+      } else if (data.note && typeof data.note === "object") {
+        parts.push(`### ${data.note.title || "Note"}\n\n${data.note.content || ""}`);
       }
     } catch {
       if (tc.result) parts.push(tc.result);
@@ -131,6 +146,24 @@ export async function handleToolExecution(
       }).catch(() => {});
     }
 
+    if (tool.name.toLowerCase() === "control_pomodoro") {
+      try {
+        const parsedArgs = JSON.parse(tool.arguments || "{}");
+        if (parsedArgs.mode) {
+          const m = String(parsedArgs.mode).toLowerCase().replace("_", "");
+          if (m === "shortbreak") pomodoroActions.switchMode("short_break");
+          else if (m === "longbreak") pomodoroActions.switchMode("long_break");
+          else pomodoroActions.switchMode("focus");
+        }
+        const act = String(parsedArgs.action).toLowerCase();
+        if (act === "start") pomodoroActions.start();
+        else if (act === "pause") pomodoroActions.pause();
+        else if (act === "reset") pomodoroActions.reset();
+        else if (act === "skip") pomodoroActions.skipPhase();
+        else if (act === "stop") pomodoroActions.stop();
+      } catch {}
+    }
+
     if (!isTauriEnvironment() && typeof window !== "undefined") {
       const lowerName = tool.name.toLowerCase();
       const entity = lowerName.includes("calendar")
@@ -139,6 +172,8 @@ export async function handleToolExecution(
         ? "tasks"
         : lowerName.includes("goal")
         ? "goals"
+        : lowerName.includes("note")
+        ? "notes"
         : "all";
       const action = lowerName.startsWith("delete") ? "delete" : "update";
       window.dispatchEvent(

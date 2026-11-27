@@ -1,5 +1,6 @@
 pub mod calendar;
 pub mod definitions;
+pub mod notes;
 pub mod workspace;
 
 pub use definitions::get_default_tools;
@@ -44,6 +45,13 @@ pub fn execute_tool(conn: &Connection, name: &str, arguments: &str) -> Result<St
         "update_task" => workspace::update_task(conn, &args),
         "delete_task" => workspace::delete_task(conn, &args),
         "create_goal" => workspace::create_goal(conn, &args),
+        "update_goal" => workspace::update_goal(conn, &args),
+        "delete_goal" => workspace::delete_goal(conn, &args),
+        "control_pomodoro" => workspace::control_pomodoro(conn, &args),
+        "search_notes" => notes::search_notes(conn, &args),
+        "read_note" => notes::read_note(conn, &args),
+        "create_note" => notes::create_note(conn, &args),
+        "update_note" => notes::update_note(conn, &args),
         "get_system_diagnostics" => workspace::get_system_diagnostics(),
         "get_calendar_events" => calendar::get_calendar_events(conn, &args),
         "create_calendar_event" => calendar::create_calendar_event(conn, &args),

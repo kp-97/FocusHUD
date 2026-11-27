@@ -4,8 +4,8 @@ use crate::db::init_db;
 use crate::db::models::{ChatMessageDb, ChatSession};
 use crate::db::queries::{
     delete_chat_session as db_delete_session, get_chat_messages as db_get_messages,
-    get_chat_sessions as db_get_sessions, save_chat_message as db_save_message,
-    save_chat_session as db_save_session,
+    get_chat_sessions as db_get_sessions, replace_chat_messages as db_replace_messages,
+    save_chat_message as db_save_message, save_chat_session as db_save_session,
 };
 use tauri::{AppHandle, command};
 
@@ -51,6 +51,16 @@ pub fn get_chat_messages(app: AppHandle, session_id: String) -> Result<Vec<ChatM
 pub fn save_chat_message(app: AppHandle, message: ChatMessageDb) -> Result<(), String> {
     let conn = init_db(&app).map_err(|e| e.to_string())?;
     db_save_message(&conn, &message).map_err(|e| e.to_string())
+}
+
+#[command]
+pub fn replace_chat_messages(
+    app: AppHandle,
+    session_id: String,
+    messages: Vec<ChatMessageDb>,
+) -> Result<(), String> {
+    let conn = init_db(&app).map_err(|e| e.to_string())?;
+    db_replace_messages(&conn, &session_id, &messages).map_err(|e| e.to_string())
 }
 
 #[command]
@@ -102,6 +112,26 @@ pub fn execute_ai_tool(app: AppHandle, name: String, arguments: String) -> Resul
                 "create_goal" => {
                     let id = v.get("goalId").and_then(|i| i.as_str()).map(String::from);
                     crate::commands::db::emit_db_change(&app, "goals", "create", id);
+                }
+                "update_goal" => {
+                    let id = v.get("goalId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "goals", "update", id);
+                }
+                "delete_goal" => {
+                    let id = v.get("goalId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "goals", "delete", id);
+                }
+                "create_note" => {
+                    let id = v.get("noteId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "notes", "create", id);
+                }
+                "update_note" => {
+                    let id = v.get("noteId").and_then(|i| i.as_str()).map(String::from);
+                    crate::commands::db::emit_db_change(&app, "notes", "update", id);
+                }
+                "control_pomodoro" => {
+                    use tauri::Emitter;
+                    let _ = app.emit("focushud:pomodoro-control", &v);
                 }
                 _ => {}
             }

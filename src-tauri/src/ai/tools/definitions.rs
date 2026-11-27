@@ -118,6 +118,95 @@ pub fn get_default_tools() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "update_goal".to_string(),
+            description: "Updates an existing strategic goal status, title, description, or target date in FocusHUD".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "ID of the goal to update" },
+                    "title": { "type": "string", "description": "Updated goal title" },
+                    "description": { "type": "string", "description": "Updated details" },
+                    "status": { "type": "string", "description": "Status: 'active', 'completed', or 'archived'" },
+                    "targetDate": { "type": "string", "description": "Target date in YYYY-MM-DD format" },
+                    "progress": { "type": "integer", "description": "Progress percentage (0-100)" }
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDefinition {
+            name: "delete_goal".to_string(),
+            description: "Deletes a strategic goal by ID in FocusHUD".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "ID of the goal to delete" }
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDefinition {
+            name: "control_pomodoro".to_string(),
+            description: "Controls the FocusHUD Pomodoro focus timer (start, pause, reset, skip, or stop)".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "description": "Action: 'start', 'pause', 'reset', 'skip', or 'stop'" },
+                    "mode": { "type": "string", "description": "Optional mode: 'focus', 'short_break', or 'long_break'" },
+                    "durationMinutes": { "type": "integer", "description": "Optional custom duration in minutes" }
+                },
+                "required": ["action"]
+            }),
+        },
+        ToolDefinition {
+            name: "search_notes".to_string(),
+            description: "Searches existing markdown notes in FocusHUD by title or content keywords".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Keyword query to search in note titles and contents" },
+                    "limit": { "type": "integer", "description": "Max number of notes to return (default: 10)" }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "read_note".to_string(),
+            description: "Reads the full content and metadata of a note in FocusHUD by ID or title".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "Unique ID of the note" },
+                    "title": { "type": "string", "description": "Exact or case-insensitive title of the note" }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "create_note".to_string(),
+            description: "Creates a new markdown note document in FocusHUD on disk and in database".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string", "description": "Title of the note document" },
+                    "content": { "type": "string", "description": "Markdown body content of the note" },
+                    "folder": { "type": "string", "description": "Optional subfolder relative path" }
+                },
+                "required": ["title"]
+            }),
+        },
+        ToolDefinition {
+            name: "update_note".to_string(),
+            description: "Updates or appends content to an existing markdown note document in FocusHUD".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "Unique ID of the note to update" },
+                    "title": { "type": "string", "description": "Updated note title" },
+                    "content": { "type": "string", "description": "New content or content to append" },
+                    "append": { "type": "boolean", "description": "If true, appends content to note; if false, overwrites (default: false)" }
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDefinition {
             name: "get_system_diagnostics".to_string(),
             description: "Retrieves real-time system performance telemetry (CPU, RAM, GPU utilization and temperature)".to_string(),
             parameters: json!({

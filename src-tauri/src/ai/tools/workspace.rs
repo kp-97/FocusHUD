@@ -2,8 +2,8 @@ use super::ID_COUNTER;
 use crate::db::models::{Goal, Task};
 use crate::db::queries::common::current_timestamp_ms;
 use crate::db::queries::{
-    delete_task as db_delete_task, get_all_calendar_events, get_all_goals, get_all_tasks,
-    get_setting, upsert_goal, upsert_task,
+    delete_goal as db_delete_goal, delete_task as db_delete_task, get_all_calendar_events,
+    get_all_goals, get_all_tasks, get_setting, set_setting, upsert_goal, upsert_task,
 };
 use crate::diagnostics;
 use rusqlite::Connection;
@@ -255,6 +255,169 @@ pub fn create_goal(conn: &Connection, args: &serde_json::Value) -> Result<String
         "status": "success",
         "message": format!("Goal '{title}' created successfully"),
         "goalId": id
+    })
+    .to_string())
+}
+
+pub fn update_goal(conn: &Connection, args: &serde_json::Value) -> Result<String, String> {
+    let id = args["id"].as_str().ok_or("Missing required field 'id'")?;
+    let all = get_all_goals(conn).map_err(|e| format!("Failed to read goals: {e}"))?;
+    let mut goal = all
+        .into_iter()
+        .find(|g| g.id == id)
+        .ok_or_else(|| format!("Goal with id '{id}' not found"))?;
+
+    if let Some(title) = args["title"].as_str() {
+        goal.title = title.to_string();
+    }
+    if let Some(desc) = args["description"].as_str() {
+        goal.description = desc.to_string();
+    }
+    if let Some(status) = args["status"].as_str() {
+        goal.status = status.to_string();
+    }
+    if let Some(target) = args["targetDate"].as_str() {
+        goal.target_date = Some(target.to_string());
+    }
+    if let Some(prog) = args["progress"].as_i64() {
+        if !goal.description.contains("Progress:") {
+            if goal.description.is_empty() {
+                goal.description = format!("Progress: {prog}%");
+            } else {
+                goal.description = format!("{} (Progress: {prog}%)", goal.description);
+            }
+        }
+    }
+    goal.updated_at = current_timestamp_ms();
+
+    upsert_goal(conn, &goal).map_err(|e| format!("Failed to update goal: {e}"))?;
+
+    Ok(json!({
+        "status": "success",
+        "message": format!("Goal '{id}' updated successfully"),
+        "goalId": id
+    })
+    .to_string())
+}
+
+pub fn delete_goal(conn: &Connection, args: &serde_json::Value) -> Result<String, String> {
+    let id = args["id"].as_str().ok_or("Missing required field 'id'")?;
+    db_delete_goal(conn, id).map_err(|e| format!("Failed to delete goal: {e}"))?;
+
+    Ok(json!({
+        "status": "success",
+        "message": format!("Goal '{id}' deleted successfully"),
+        "goalId": id
+    })
+    .to_string())
+}
+
+pub fn control_pomodoro(conn: &Connection, args: &serde_json::Value) -> Result<String, String> {
+    let action = args["action"]
+        .as_str()
+        .ok_or("Missing required field 'action'")?
+        .trim()
+        .to_lowercase();
+
+    let raw = get_setting(conn, "focushud_pomodoro_state").unwrap_or(None);
+    let mut state: serde_json::Value = raw
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| {
+            json!({
+                "mode": "focus",
+                "isRunning": false,
+                "timeLeft": 1500,
+                "totalSeconds": 1500,
+                "cycle": 1,
+                "totalCycles": 4
+            })
+        });
+
+    if let Some(req_mode) = args["mode"].as_str() {
+        let norm_mode = match req_mode.to_lowercase().replace('_', "").as_str() {
+            "shortbreak" => "short_break",
+            "longbreak" => "long_break",
+            _ => "focus",
+        };
+        let default_secs = match norm_mode {
+            "short_break" => 300,
+            "long_break" => 900,
+            _ => 1500,
+        };
+        state["mode"] = json!(norm_mode);
+        state["totalSeconds"] = json!(default_secs);
+        state["timeLeft"] = json!(default_secs);
+    }
+
+    if let Some(custom_mins) = args["durationMinutes"].as_i64() {
+        let secs = custom_mins.max(1) * 60;
+        state["totalSeconds"] = json!(secs);
+        state["timeLeft"] = json!(secs);
+    }
+
+    let message = match action.as_str() {
+        "start" => {
+            state["isRunning"] = json!(true);
+            let mins = state["timeLeft"].as_i64().unwrap_or(1500) / 60;
+            let mode = state["mode"].as_str().unwrap_or("focus");
+            format!("Pomodoro timer started in {mode} mode ({mins}m remaining).")
+        }
+        "pause" => {
+            state["isRunning"] = json!(false);
+            "Pomodoro timer paused.".to_string()
+        }
+        "reset" => {
+            state["isRunning"] = json!(false);
+            let total = state["totalSeconds"].as_i64().unwrap_or(1500);
+            state["timeLeft"] = json!(total);
+            format!("Pomodoro timer reset to {}m.", total / 60)
+        }
+        "skip" => {
+            state["isRunning"] = json!(false);
+            let cur_mode = state["mode"].as_str().unwrap_or("focus");
+            let cur_cycle = state["cycle"].as_i64().unwrap_or(1);
+            let total_cycles = state["totalCycles"].as_i64().unwrap_or(4);
+
+            let (next_mode, next_cycle, next_secs) = if cur_mode == "focus" {
+                if cur_cycle >= total_cycles {
+                    ("long_break", 1, 900)
+                } else {
+                    ("short_break", cur_cycle + 1, 300)
+                }
+            } else {
+                ("focus", cur_cycle, 1500)
+            };
+
+            state["mode"] = json!(next_mode);
+            state["cycle"] = json!(next_cycle);
+            state["totalSeconds"] = json!(next_secs);
+            state["timeLeft"] = json!(next_secs);
+            format!("Skipped to {next_mode} mode ({cur_cycle}/{total_cycles}).")
+        }
+        "stop" => {
+            state["isRunning"] = json!(false);
+            let total = state["totalSeconds"].as_i64().unwrap_or(1500);
+            state["timeLeft"] = json!(total);
+            "Pomodoro timer stopped.".to_string()
+        }
+        other => {
+            return Err(format!(
+                "Unknown Pomodoro action '{other}'. Must be start, pause, reset, skip, or stop."
+            ));
+        }
+    };
+
+    let serialized = serde_json::to_string(&state).map_err(|e| e.to_string())?;
+    let _ = set_setting(conn, "focushud_pomodoro_state", &serialized);
+
+    Ok(json!({
+        "status": "success",
+        "action": action,
+        "mode": state["mode"],
+        "isRunning": state["isRunning"],
+        "timeLeft": state["timeLeft"],
+        "totalSeconds": state["totalSeconds"],
+        "message": message
     })
     .to_string())
 }

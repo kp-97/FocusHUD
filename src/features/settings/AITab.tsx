@@ -24,6 +24,18 @@ import {
   fetchAvailableModels,
   fetchAiSettingsFromDb,
 } from "../../services/aiService";
+import { getSystemDiagnostics } from "../../services/tauriBridge";
+import {
+  calculateGpuContextRecommendation,
+  getContextDropdownOptions,
+} from "../chat/gpuContextCalculator";
+
+const PROVIDER_LABELS: Record<AiProvider, string> = {
+  ollama: "Ollama (Local)",
+  openai: "OpenAI / LM Studio",
+  anthropic: "Anthropic",
+  gemini: "Google Gemini",
+};
 
 export const AITab: React.FC = () => {
   const [settings, setSettings] = useState<AiSettingsConfig>(() => loadAiSettings());
@@ -34,11 +46,19 @@ export const AITab: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
+  const [vramTotalBytes, setVramTotalBytes] = useState<number | undefined>(undefined);
+  const [gpuName, setGpuName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    fetchAiSettingsFromDb().then((dbSettings) => {
-      setSettings(dbSettings);
-    });
+    getSystemDiagnostics()
+      .then((diag) => {
+        if (diag) {
+          if (typeof diag.vram_total_bytes === "number") setVramTotalBytes(diag.vram_total_bytes);
+          if (diag.gpu_name) setGpuName(diag.gpu_name);
+        }
+      })
+      .catch(() => {});
+    fetchAiSettingsFromDb().then((dbSettings) => setSettings(dbSettings));
   }, []);
 
   // Update settings with immediate persistence to ensure changes are never lost
@@ -117,6 +137,17 @@ export const AITab: React.FC = () => {
     }
   };
 
+  const gpuRec = calculateGpuContextRecommendation(
+    settings.model,
+    settings.provider,
+    vramTotalBytes
+  );
+  const contextOptions = getContextDropdownOptions(
+    settings.model,
+    settings.provider,
+    vramTotalBytes
+  );
+
   return (
     <div className="space-y-4 font-tech text-xs select-none">
       {/* Provider Selector */}
@@ -147,12 +178,6 @@ export const AITab: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
           {(["ollama", "openai", "anthropic", "gemini"] as AiProvider[]).map((prov) => {
             const isSelected = settings.provider === prov;
-            const labels: Record<AiProvider, string> = {
-              ollama: "Ollama (Local)",
-              openai: "OpenAI / LM Studio",
-              anthropic: "Anthropic",
-              gemini: "Google Gemini",
-            };
             return (
               <button
                 key={prov}
@@ -168,7 +193,7 @@ export const AITab: React.FC = () => {
                   <span className="font-bold text-[11px] uppercase">{prov}</span>
                   {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400" />}
                 </div>
-                <span className="text-[10px] opacity-75">{labels[prov]}</span>
+                <span className="text-[10px] opacity-75">{PROVIDER_LABELS[prov]}</span>
               </button>
             );
           })}
@@ -284,6 +309,43 @@ export const AITab: React.FC = () => {
           </div>
         </div>
 
+        {/* Context Window & GPU VRAM Allocation */}
+        <div className="space-y-1.5 pt-1 border-t border-cyan-500/20">
+          <div className="flex items-center justify-between">
+            <label htmlFor="ai-context-size-select" className="text-[11px] text-cyan-300/80 uppercase font-semibold">
+              Context Window & GPU VRAM Allocation
+            </label>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded border ${
+                gpuRec.fitsEntirelyOnGpu
+                  ? "border-emerald-500/40 text-emerald-300 bg-emerald-950/40"
+                  : "border-amber-500/40 text-amber-300 bg-amber-950/40"
+              }`}
+              title={gpuRec.tooltip}
+            >
+              {gpuName ? `${gpuName} · ` : ""}{gpuRec.badgeLabel}
+            </span>
+          </div>
+          <select
+            id="ai-context-size-select"
+            value={settings.contextSize ?? "auto"}
+            onChange={(e) => {
+              const val = e.target.value;
+              updateSettings({ contextSize: val === "auto" ? "auto" : Number(val) });
+            }}
+            className="w-full bg-black/60 border border-cyan-500/30 rounded px-2.5 py-1.5 text-cyan-100 text-xs focus:border-cyan-400 focus:outline-none cursor-pointer"
+          >
+            {contextOptions.map((opt) => (
+              <option key={String(opt.value)} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-cyan-400/60 leading-tight">
+            {gpuRec.tooltip}
+          </p>
+        </div>
+
         {/* API Key (not required for Ollama) */}
         {settings.provider !== "ollama" && (
           <div className="space-y-1 pt-1">
@@ -358,17 +420,23 @@ export const AITab: React.FC = () => {
           </label>
 
           <div className="flex items-center justify-between p-2 rounded bg-black/40 border border-cyan-500/20">
-            <span className="text-[11px] text-cyan-200">Auto-Compact Chat on Inactivity</span>
+            <div className="flex flex-col">
+              <span className="text-[11px] text-cyan-200">Auto-Compact Threshold</span>
+              <span className="text-[9px] text-cyan-400/60">Trigger at % of context window</span>
+            </div>
             <select
-              value={settings.autoCompactMinutes ?? 1}
-              onChange={(e) => updateSettings({ autoCompactMinutes: Number(e.target.value) })}
+              aria-label="Auto-Compact Threshold"
+              value={settings.autoCompactThresholdPct ?? 70}
+              onChange={(e) => updateSettings({ autoCompactThresholdPct: Number(e.target.value) })}
               className="bg-black/60 border border-cyan-500/40 rounded px-2 py-1 text-[11px] text-cyan-200 focus:outline-none focus:border-cyan-400 cursor-pointer"
             >
               <option value={0}>Disabled</option>
-              <option value={1}>1 Minute (Default)</option>
-              <option value={2}>2 Minutes</option>
-              <option value={5}>5 Minutes</option>
-              <option value={10}>10 Minutes</option>
+              <option value={50}>50% of Context</option>
+              <option value={60}>60% of Context</option>
+              <option value={70}>70% (Default)</option>
+              <option value={80}>80% of Context</option>
+              <option value={85}>85% of Context</option>
+              <option value={90}>90% of Context</option>
             </select>
           </div>
         </div>
@@ -388,15 +456,7 @@ export const AITab: React.FC = () => {
           </button>
 
           {testMessage && (
-            <span
-              className={`text-[11px] ${
-                testStatus === "success"
-                  ? "text-green-400"
-                  : testStatus === "error"
-                  ? "text-red-400"
-                  : "text-cyan-300"
-              }`}
-            >
+            <span className={`text-[11px] ${testStatus === "success" ? "text-green-400" : testStatus === "error" ? "text-red-400" : "text-cyan-300"}`}>
               {testMessage}
             </span>
           )}

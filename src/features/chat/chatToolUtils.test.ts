@@ -94,4 +94,36 @@ describe("chatToolUtils - formatToolFallbackResponse", () => {
     expect(res).toContain("Calendar tasks (1)");
     expect(res).toContain("Review PR");
   });
+
+  it("formats notes list and single note results", () => {
+    const listItems: ToolCallItem[] = [
+      {
+        id: "tc_6",
+        name: "search_notes",
+        arguments: "{}",
+        status: "success",
+        result: JSON.stringify({
+          notes: [{ title: "Sprint Backlog", relativePath: "work/sprint.md" }],
+        }),
+      },
+    ];
+    const listRes = formatToolFallbackResponse(listItems);
+    expect(listRes).toContain("Notes (1)");
+    expect(listRes).toContain("Sprint Backlog");
+
+    const singleItem: ToolCallItem[] = [
+      {
+        id: "tc_7",
+        name: "read_note",
+        arguments: "{}",
+        status: "success",
+        result: JSON.stringify({
+          note: { title: "Roadmap", content: "Q1 Launch milestones" },
+        }),
+      },
+    ];
+    const singleRes = formatToolFallbackResponse(singleItem);
+    expect(singleRes).toContain("### Roadmap");
+    expect(singleRes).toContain("Q1 Launch milestones");
+  });
 });

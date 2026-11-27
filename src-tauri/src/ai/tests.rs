@@ -7,7 +7,7 @@ use rusqlite::Connection;
 #[test]
 fn test_get_default_tools_returns_core_tools() {
     let tools = get_default_tools();
-    assert_eq!(tools.len(), 14);
+    assert_eq!(tools.len(), 21);
 
     let names: Vec<String> = tools.into_iter().map(|t| t.name).collect();
     assert!(names.contains(&"get_current_time".to_string()));
@@ -15,10 +15,17 @@ fn test_get_default_tools_returns_core_tools() {
     assert!(names.contains(&"update_task".to_string()));
     assert!(names.contains(&"delete_task".to_string()));
     assert!(names.contains(&"create_goal".to_string()));
+    assert!(names.contains(&"update_goal".to_string()));
+    assert!(names.contains(&"delete_goal".to_string()));
     assert!(names.contains(&"get_tasks".to_string()));
     assert!(names.contains(&"get_goals".to_string()));
     assert!(names.contains(&"get_workspace_summary".to_string()));
     assert!(names.contains(&"get_pomodoro_status".to_string()));
+    assert!(names.contains(&"control_pomodoro".to_string()));
+    assert!(names.contains(&"search_notes".to_string()));
+    assert!(names.contains(&"read_note".to_string()));
+    assert!(names.contains(&"create_note".to_string()));
+    assert!(names.contains(&"update_note".to_string()));
     assert!(names.contains(&"get_system_diagnostics".to_string()));
     assert!(names.contains(&"get_calendar_events".to_string()));
     assert!(names.contains(&"create_calendar_event".to_string()));
@@ -210,11 +217,13 @@ fn test_chat_request_and_event_serialization() {
         }],
         temperature: Some(0.7),
         tools: None,
+        context_size: Some(8192),
     };
 
     let serialized = serde_json::to_string(&req).unwrap();
     let deserialized: ChatCompletionRequest = serde_json::from_str(&serialized).unwrap();
     assert_eq!(deserialized.model, "llama3.2");
+    assert_eq!(deserialized.context_size, Some(8192));
 
     let event = StreamChunkEvent {
         session_id: "s1".to_string(),
@@ -434,60 +443,4 @@ fn test_execute_tool_delete_calendar_event() {
 
     let events = get_all_calendar_events(&conn).unwrap();
     assert_eq!(events.len(), 0);
-}
-
-#[test]
-fn test_execute_tool_update_and_delete_task() {
-    let mut conn = Connection::open_in_memory().unwrap();
-    run_migrations(&mut conn).unwrap();
-
-    let create_res = execute_tool(
-        &conn,
-        "create_task",
-        r#"{"title": "Initial Task", "priority": 3}"#,
-    )
-    .unwrap();
-    let task_id = serde_json::from_str::<serde_json::Value>(&create_res).unwrap()["taskId"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    // Update status to in_progress
-    let update_args = format!(
-        r#"{{"id": "{}", "status": "in_progress", "title": "Updated Task"}}"#,
-        task_id
-    );
-    let update_res = execute_tool(&conn, "update_task", &update_args).unwrap();
-    assert!(update_res.contains("success"));
-
-    let tasks = crate::db::queries::get_all_tasks(&conn).unwrap();
-    assert_eq!(tasks[0].title, "Updated Task");
-    assert_eq!(tasks[0].status, "in_progress");
-
-    // Delete task
-    let delete_args = format!(r#"{{"id": "{}"}}"#, task_id);
-    let delete_res = execute_tool(&conn, "delete_task", &delete_args).unwrap();
-    assert!(delete_res.contains("success"));
-
-    let remaining = crate::db::queries::get_all_tasks(&conn).unwrap();
-    assert_eq!(remaining.len(), 0);
-}
-
-#[test]
-fn test_execute_tool_delete_calendar_event_supports_task_ids() {
-    let mut conn = Connection::open_in_memory().unwrap();
-    run_migrations(&mut conn).unwrap();
-
-    let create_res = execute_tool(&conn, "create_task", r#"{"title": "Calendar Task"}"#).unwrap();
-    let task_id = serde_json::from_str::<serde_json::Value>(&create_res).unwrap()["taskId"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    let delete_args = format!(r#"{{"id": "{}"}}"#, task_id);
-    let delete_res = execute_tool(&conn, "delete_calendar_event", &delete_args).unwrap();
-    assert!(delete_res.contains("Calendar task"));
-
-    let remaining = crate::db::queries::get_all_tasks(&conn).unwrap();
-    assert_eq!(remaining.len(), 0);
 }

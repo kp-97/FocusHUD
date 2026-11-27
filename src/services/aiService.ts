@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { isTauriEnvironment } from "./dbService";
 import { formatDateToISO } from "../utils/formatters";
+import { resolveEffectiveContextLimit } from "../features/chat/gpuContextCalculator";
 import {
   AiSettingsConfig,
   DEFAULT_AI_SETTINGS,
@@ -99,14 +100,51 @@ export async function fetchChatMessages(sessionId: string): Promise<ChatMessageI
     }
   }
   const rawList = await invoke<any[]>("get_chat_messages", { sessionId });
-  return rawList.map((m) => ({
-    id: m.id,
-    sessionId: m.sessionId,
-    role: m.role,
-    content: m.content,
-    createdAt: m.createdAt,
-    toolCalls: m.toolCalls ? parseToolCalls(m.toolCalls) : undefined,
-  }));
+  return rawList.map((m) => {
+    const parsed = parseToolCallsMetadata(m.toolCalls);
+    return {
+      id: m.id,
+      sessionId: m.sessionId,
+      role: m.role,
+      content: m.content,
+      createdAt: m.createdAt,
+      toolCalls: parsed.toolCalls,
+      durationMs: parsed.durationMs,
+    };
+  });
+}
+
+function serializeToolCallsPayload(
+  toolCalls?: ToolCallItem[],
+  durationMs?: number
+): string | null {
+  if (!toolCalls?.length && durationMs === undefined) return null;
+  return JSON.stringify({
+    toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
+    durationMs,
+  });
+}
+
+function parseToolCallsMetadata(raw?: string | null): {
+  toolCalls?: ToolCallItem[];
+  durationMs?: number;
+} {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return { toolCalls: parsed };
+    }
+    if (parsed && typeof parsed === "object") {
+      return {
+        toolCalls: Array.isArray(parsed.toolCalls) ? parsed.toolCalls : undefined,
+        durationMs: typeof parsed.durationMs === "number" ? parsed.durationMs : undefined,
+      };
+    }
+    return {};
+  } catch {
+    return {};
+  }
 }
 
 export async function persistChatMessage(msg: ChatMessageItem): Promise<void> {
@@ -127,18 +165,37 @@ export async function persistChatMessage(msg: ChatMessageItem): Promise<void> {
       sessionId: msg.sessionId,
       role: msg.role,
       content: msg.content,
-      toolCalls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
+      toolCalls: serializeToolCallsPayload(msg.toolCalls, msg.durationMs),
       createdAt: msg.createdAt,
     },
   });
 }
 
-function parseToolCalls(raw: string): ToolCallItem[] | undefined {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
+export async function replaceChatMessages(
+  sessionId: string,
+  messages: ChatMessageItem[]
+): Promise<void> {
+  if (!isTauriEnvironment()) {
+    try {
+      localStorage.setItem(
+        `focushud_mock_chat_messages_${sessionId}`,
+        JSON.stringify(messages)
+      );
+    } catch {}
+    return;
   }
+  const dbMessages = messages.map((m) => ({
+    id: m.id,
+    session_id: sessionId,
+    role: m.role,
+    content: m.content || null,
+    tool_calls: serializeToolCallsPayload(m.toolCalls, m.durationMs),
+    created_at: m.createdAt,
+  }));
+  return invoke("replace_chat_messages", {
+    sessionId,
+    messages: dbMessages,
+  });
 }
 
 export async function executeAiToolCall(name: string, args: string): Promise<string> {
@@ -194,6 +251,11 @@ export async function streamChat(
   const timeContext = `Current System Date & Time: ${dateStr}, ${timeStr} (local time). Today's local date (YYYY-MM-DD): ${localIso}. When querying or scheduling for "today", use date "${localIso}".`;
   const basePrompt = settings.systemPrompt?.trim() || "You are FocusHUD Tactical AI Assistant.";
   const effectiveSystemPrompt = `${basePrompt}\n\n${timeContext}`;
+  const effectiveContextSize = resolveEffectiveContextLimit(
+    settings.contextSize,
+    settings.model,
+    settings.provider
+  );
 
   return invoke("stream_chat_completion", {
     request: {
@@ -206,6 +268,7 @@ export async function streamChat(
       messages,
       temperature: settings.temperature,
       tools: settings.enableTools ? tools : null,
+      contextSize: effectiveContextSize,
     },
   });
 }

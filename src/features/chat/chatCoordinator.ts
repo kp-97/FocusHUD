@@ -23,6 +23,7 @@ export interface ActiveTurnState {
   isGenerating: boolean;
   iteration: number;
   baseHistory: ChatMessageParam[];
+  startTime: number;
 }
 
 type TurnSubscriber = (state: ActiveTurnState | null) => void;
@@ -41,7 +42,7 @@ class ChatCoordinator {
     this.isInitialized = true;
 
     onStreamChunk((payload: StreamChunkPayload) => {
-      this.handleChunk(payload).catch(() => {});
+      return this.handleChunk(payload).catch(() => {});
     });
   }
 
@@ -83,6 +84,7 @@ class ChatCoordinator {
       isGenerating: true,
       iteration: 1,
       baseHistory: history,
+      startTime: Date.now(),
     };
 
     this.notifySubscribers();
@@ -110,7 +112,7 @@ class ChatCoordinator {
       : "*[Generation stopped by operator]*";
 
     await abortChatStream(currentSessionId).catch(() => {});
-    this.finalizeTurn(content, assistantId);
+    await this.finalizeTurn(content, assistantId);
   }
 
   private async handleChunk(payload: StreamChunkPayload): Promise<void> {
@@ -124,11 +126,20 @@ class ChatCoordinator {
       this.notifySubscribers();
     } else if (payload.chunkType === "tool_call" && payload.toolCall) {
       const tool = payload.toolCall;
+      const callId =
+        tool.id && tool.id.trim() && !tool.id.startsWith("tc_")
+          ? `${tool.id}_s${this.activeTurn.iteration}`
+          : `tc_${this.activeTurn.iteration}_${Math.random().toString(36).slice(2, 7)}`;
+      const normalizedTool = { ...tool, id: callId };
+      const toolStartTime = Date.now();
+      const currentStep = this.activeTurn.iteration;
+
       const tcItem: ToolCallItem = {
-        id: tool.id,
+        id: callId,
         name: tool.name,
         arguments: tool.arguments,
         status: "executing",
+        step: currentStep,
       };
 
       const existing = this.activeTurn.toolCalls;
@@ -140,24 +151,32 @@ class ChatCoordinator {
       const p = (async () => {
         const dummySetMessages = () => {};
         const result = await handleToolExecution(
-          tool,
+          normalizedTool,
           assistantId,
           dummySetMessages,
           this.activeTurn?.sessionId || null
         );
 
+        const durationMs = Math.max(1, Date.now() - toolStartTime);
+        const isError = result.includes('"status":"error"') || result.includes('"error":');
+        const status = isError ? ("error" as const) : ("success" as const);
+
         if (this.activeTurn && this.activeTurn.assistantId === assistantId) {
           this.activeTurn.toolCalls = this.activeTurn.toolCalls.map((t) =>
-            t.id === tool.id ? { ...t, status: "success" as const, result } : t
+            t.id === callId
+              ? { ...t, status, result, durationMs, step: t.step ?? currentStep }
+              : t
           );
           this.notifySubscribers();
         }
 
         return {
-          id: tool.id,
+          id: callId,
           name: tool.name,
           arguments: tool.arguments,
           result,
+          durationMs,
+          step: currentStep,
         };
       })();
 
@@ -168,9 +187,15 @@ class ChatCoordinator {
 
       if (this.isAborted || !this.activeTurn || this.activeTurn.assistantId !== assistantId) return;
 
+      const allPreviousTools = this.activeTurn.toolCalls.filter(
+        (t) => !executedTools.some((curr) => curr.id === t.id)
+      );
+
       const shouldContinue = shouldContinueAgentLoop(
-        executedTools.length,
-        this.activeTurn.iteration
+        executedTools.map((t) => ({ ...t, status: "success" as const })),
+        this.activeTurn.iteration,
+        allPreviousTools,
+        this.activeTurn.accumulatedContent
       );
 
       if (shouldContinue) {
@@ -191,26 +216,31 @@ class ChatCoordinator {
         try {
           await streamChat(payload.sessionId, nextHistory, settings, toolsToOffer);
         } catch {
-          this.finalizeTurn(this.activeTurn.accumulatedContent || "Agent execution failed.");
+          await this.finalizeTurn(this.activeTurn.accumulatedContent || "Agent execution failed.");
         }
       } else {
         const finalContent = this.activeTurn.accumulatedContent.trim()
           ? this.activeTurn.accumulatedContent
           : formatToolFallbackResponse(this.activeTurn.toolCalls);
-        this.finalizeTurn(finalContent);
+        await this.finalizeTurn(finalContent);
       }
     } else if (payload.chunkType === "error") {
       const errMsg = payload.delta || "AI streaming connection encountered an error.";
-      this.finalizeTurn(this.activeTurn.accumulatedContent || errMsg);
+      await this.finalizeTurn(this.activeTurn.accumulatedContent || errMsg);
     }
   }
 
-  private finalizeTurn(content: string, overrideAssistantId?: string): void {
+  private async finalizeTurn(content: string, overrideAssistantId?: string): Promise<void> {
     if (!this.activeTurn) return;
 
     const targetAssistantId = overrideAssistantId || this.activeTurn.assistantId;
     const sessionId = this.activeTurn.sessionId;
-    const toolCalls = this.activeTurn.toolCalls;
+    const totalDurationMs = Math.max(1, Date.now() - (this.activeTurn.startTime || Date.now()));
+    const toolCalls = this.activeTurn.toolCalls.map((tc) =>
+      tc.status === "executing"
+        ? { ...tc, status: "success" as const, durationMs: tc.durationMs ?? 10 }
+        : tc
+    );
 
     const finalMessage: ChatMessageItem = {
       id: targetAssistantId,
@@ -218,10 +248,11 @@ class ChatCoordinator {
       role: "assistant",
       content,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      durationMs: totalDurationMs,
       createdAt: Date.now(),
     };
 
-    persistChatMessage(finalMessage).catch(() => {});
+    await persistChatMessage(finalMessage).catch(() => {});
 
     this.activeTurn = null;
     this.notifySubscribers();

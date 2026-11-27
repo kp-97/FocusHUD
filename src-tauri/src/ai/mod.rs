@@ -6,6 +6,8 @@ pub mod tools;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tools_tests;
 
 pub use discovery::*;
 pub use models::*;

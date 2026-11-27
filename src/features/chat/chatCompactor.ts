@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessageItem } from "../../types/ai";
-import { persistChatMessage } from "../../services/aiService";
+import type { ChatMessageItem, AiProvider } from "../../types/ai";
+import { DEFAULT_AI_TOOLS } from "../../types/ai";
+import { replaceChatMessages } from "../../services/aiService";
+import { calculateContextBreakdown } from "./tokenCounter";
+import { resolveEffectiveContextLimit } from "./gpuContextCalculator";
 
 export function generateCompactSummary(messages: ChatMessageItem[]): string {
   const userPrompts: string[] = [];
@@ -57,8 +60,6 @@ export async function compactSession(
     createdAt: Date.now(),
   };
 
-  await persistChatMessage(checkpointMsg).catch(() => {});
-
   // Keep checkpoint + latest user turn if applicable
   const latestUser = [...messages].reverse().find((m) => m.role === "user");
   const latestAssistant = messages[messages.length - 1]?.role === "assistant"
@@ -73,43 +74,82 @@ export async function compactSession(
     compacted.push(latestAssistant);
   }
 
+  // Atomically replace the stored messages in SQLite/localStorage so old bloated messages don't re-emerge
+  await replaceChatMessages(sessionId, compacted).catch(() => {});
+
   return compacted;
+}
+
+export function shouldTriggerThresholdCompaction(
+  messages: ChatMessageItem[],
+  thresholdPct: number,
+  model = "llama3.2",
+  systemPrompt = "",
+  contextSize?: number | "auto",
+  provider: AiProvider = "ollama"
+): boolean {
+  if (thresholdPct <= 0 || messages.length <= 2) return false;
+  const maxTokens = resolveEffectiveContextLimit(contextSize, model, provider);
+  const breakdown = calculateContextBreakdown(
+    messages,
+    model,
+    systemPrompt,
+    DEFAULT_AI_TOOLS,
+    maxTokens
+  );
+  return breakdown.pctUsed >= thresholdPct;
 }
 
 export function useAutoCompaction(
   sessionId: string | null,
   messages: ChatMessageItem[],
   isGenerating: boolean,
-  autoCompactMinutes = 1,
-  onCompacted?: (compacted: ChatMessageItem[]) => void
+  thresholdPct = 70,
+  onCompacted?: (compacted: ChatMessageItem[]) => void,
+  model = "llama3.2",
+  systemPrompt = "",
+  contextSize?: number | "auto",
+  provider: AiProvider = "ollama"
 ): void {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isCompactingRef = useRef(false);
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (!sessionId || isGenerating || autoCompactMinutes <= 0 || messages.length <= 3) {
+    if (!sessionId || isGenerating || thresholdPct <= 0 || messages.length <= 2) {
       return;
     }
+    if (isCompactingRef.current) return;
 
-    const ms = autoCompactMinutes * 60 * 1000;
-    timerRef.current = setTimeout(async () => {
-      try {
-        const compacted = await compactSession(sessionId, messages);
-        if (onCompacted) {
-          onCompacted(compacted);
-        }
-      } catch {}
-    }, ms);
+    const shouldCompact = shouldTriggerThresholdCompaction(
+      messages,
+      thresholdPct,
+      model,
+      systemPrompt,
+      contextSize,
+      provider
+    );
 
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [sessionId, messages, isGenerating, autoCompactMinutes, onCompacted]);
+    if (shouldCompact) {
+      isCompactingRef.current = true;
+      compactSession(sessionId, messages)
+        .then((compacted) => {
+          if (onCompacted) {
+            onCompacted(compacted);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          isCompactingRef.current = false;
+        });
+    }
+  }, [
+    sessionId,
+    messages,
+    isGenerating,
+    thresholdPct,
+    onCompacted,
+    model,
+    systemPrompt,
+    contextSize,
+    provider,
+  ]);
 }

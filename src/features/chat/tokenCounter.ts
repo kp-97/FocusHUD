@@ -50,9 +50,13 @@ export function calculateContextBreakdown(
   messages: ChatMessageItem[],
   modelName: string,
   systemPrompt?: string,
-  tools: typeof DEFAULT_AI_TOOLS = DEFAULT_AI_TOOLS
+  tools: typeof DEFAULT_AI_TOOLS = DEFAULT_AI_TOOLS,
+  explicitMaxTokens?: number
 ): ContextBreakdown {
-  const maxTokens = getModelContextLimit(modelName);
+  const maxTokens =
+    explicitMaxTokens && explicitMaxTokens > 0
+      ? explicitMaxTokens
+      : getModelContextLimit(modelName);
 
   // 1. System Prompt + time context tokens
   const baseSystemText = systemPrompt || "You are FocusHUD Tactical AI Assistant.";

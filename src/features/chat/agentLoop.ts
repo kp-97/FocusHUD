@@ -7,14 +7,70 @@ import type { ChatMessageParam, ToolCallItem } from "../../types/ai";
 export const MAX_AGENT_DEPTH = 5;
 
 /**
+ * Normalizes tool arguments JSON for deterministic comparison in cycle detection.
+ */
+export function normalizeToolArgs(args?: string): string {
+  if (!args) return "{}";
+  try {
+    const parsed = JSON.parse(args.trim());
+    return JSON.stringify(parsed, Object.keys(parsed).sort());
+  } catch {
+    return args.trim().toLowerCase();
+  }
+}
+
+/**
  * Evaluates whether the autonomous agent loop should continue into the next step.
+ * Prevents:
+ * 1. Infinite recursion depth exceeding MAX_AGENT_DEPTH.
+ * 2. Repetitive cycles where the model calls the exact same tool with identical arguments.
+ * 3. Runaway tool calls when the model has already formulated a complete conversational reply to the user.
  */
 export function shouldContinueAgentLoop(
-  toolCallsCount: number,
+  toolCallsOrCount: number | ToolCallItem[],
   depth: number,
+  allPreviousTools: ToolCallItem[] = [],
+  assistantContent = "",
   maxDepth = MAX_AGENT_DEPTH
 ): boolean {
-  return toolCallsCount > 0 && depth < maxDepth;
+  const toolCount = typeof toolCallsOrCount === "number" ? toolCallsOrCount : toolCallsOrCount.length;
+  if (toolCount === 0 || depth >= maxDepth) {
+    return false;
+  }
+
+  if (Array.isArray(toolCallsOrCount)) {
+    const executedTools = toolCallsOrCount;
+
+    // Cycle detection: If every tool called in this iteration has already been executed
+    // with identical name and arguments in prior iterations of this turn, stop immediately.
+    const isAllDuplicate = executedTools.every((tc) =>
+      allPreviousTools.some(
+        (prev) =>
+          prev.name.toLowerCase() === tc.name.toLowerCase() &&
+          normalizeToolArgs(prev.arguments) === normalizeToolArgs(tc.arguments)
+      )
+    );
+
+    const hasAnyDuplicate = executedTools.some((tc) =>
+      allPreviousTools.some(
+        (prev) =>
+          prev.name.toLowerCase() === tc.name.toLowerCase() &&
+          normalizeToolArgs(prev.arguments) === normalizeToolArgs(tc.arguments)
+      )
+    );
+
+    if (isAllDuplicate || (hasAnyDuplicate && assistantContent.trim().length > 40)) {
+      return false;
+    }
+
+    // Conversational conclusion detection: If the assistant has already streamed substantive
+    // content (e.g. explaining notes were not found and asking the user for details), stop looping.
+    if (assistantContent.trim().length > 60 && executedTools.length <= 1) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**

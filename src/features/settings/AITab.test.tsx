@@ -90,4 +90,28 @@ describe("AITab Component", () => {
     fireEvent.click(modelBadge);
     expect(screen.getByLabelText(/Model Identifier/i)).toHaveValue("mistral");
   });
+
+  it("allows selecting context window size and auto-saves", () => {
+    render(<AITab />);
+
+    const select = screen.getByLabelText(/Context Window & GPU VRAM Allocation/i);
+    expect(select).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: "16384" } });
+
+    const saved = aiService.loadAiSettings();
+    expect(saved.contextSize).toBe(16384);
+  });
+
+  it("allows selecting auto-compact context threshold and auto-saves", () => {
+    render(<AITab />);
+
+    const select = screen.getByLabelText(/Auto-Compact Threshold/i);
+    expect(select).toBeInTheDocument();
+    expect(select).toHaveValue("70");
+
+    fireEvent.change(select, { target: { value: "80" } });
+
+    const saved = aiService.loadAiSettings();
+    expect(saved.autoCompactThresholdPct).toBe(80);
+  });
 });
