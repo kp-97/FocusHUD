@@ -97,6 +97,7 @@ pub fn run() {
             commands::delete_chat_session,
             commands::get_chat_messages,
             commands::save_chat_message,
+            commands::replace_chat_messages,
             commands::execute_ai_tool,
             commands::get_ai_tools,
             commands::fetch_ai_models,

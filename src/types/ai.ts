@@ -10,6 +10,8 @@ export interface AiSettingsConfig {
   enableTools: boolean;
   enableContext: boolean;
   autoCompactMinutes?: number;
+  autoCompactThresholdPct?: number;
+  contextSize?: number | "auto";
 }
 
 export const DEFAULT_AI_SETTINGS: AiSettingsConfig = {
@@ -22,7 +24,9 @@ export const DEFAULT_AI_SETTINGS: AiSettingsConfig = {
   temperature: 0.7,
   enableTools: true,
   enableContext: true,
-  autoCompactMinutes: 1,
+  autoCompactMinutes: 0,
+  autoCompactThresholdPct: 70,
+  contextSize: "auto",
 };
 
 export const PROVIDER_DEFAULT_MODELS: Record<AiProvider, { defaultModel: string; endpoint?: string }> = {
@@ -58,6 +62,8 @@ export interface ToolCallItem {
   arguments: string;
   result?: string;
   status?: "pending" | "executing" | "success" | "error";
+  durationMs?: number;
+  step?: number;
 }
 
 export interface ChatMessageItem {
@@ -67,6 +73,7 @@ export interface ChatMessageItem {
   content: string;
   toolCalls?: ToolCallItem[];
   createdAt: number;
+  durationMs?: number;
 }
 
 export interface ChatMessageParam {
@@ -208,6 +215,106 @@ export const DEFAULT_AI_TOOLS = [
         targetDate: { type: "string", description: "Target completion date in YYYY-MM-DD format" },
       },
       required: ["title"],
+    },
+  },
+  {
+    name: "update_goal",
+    description: "Update an existing strategic goal status, title, description, or target date in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the goal to update" },
+        title: { type: "string", description: "Updated goal title" },
+        description: { type: "string", description: "Updated details" },
+        status: { type: "string", description: "Status: 'active', 'completed', or 'archived'" },
+        targetDate: { type: "string", description: "Target date in YYYY-MM-DD format" },
+        progress: { type: "integer", description: "Progress percentage (0-100)" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_goal",
+    description: "Delete a strategic goal by ID in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the goal to delete" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "control_pomodoro",
+    description: "Control the FocusHUD Pomodoro focus timer (start, pause, reset, skip, or stop)",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          description: "Action to perform: 'start', 'pause', 'reset', 'skip', or 'stop'",
+          enum: ["start", "pause", "reset", "skip", "stop"],
+        },
+        mode: {
+          type: "string",
+          description: "Optional mode: 'focus', 'short_break', or 'long_break'",
+          enum: ["focus", "short_break", "long_break"],
+        },
+        durationMinutes: {
+          type: "integer",
+          description: "Optional custom duration in minutes",
+        },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "search_notes",
+    description: "Search existing markdown notes in FocusHUD by title or content keywords",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Keyword query to search in note titles and contents" },
+        limit: { type: "integer", description: "Max number of notes to return (default: 10)" },
+      },
+    },
+  },
+  {
+    name: "read_note",
+    description: "Read the full markdown content and metadata of a note in FocusHUD by ID or title",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Unique ID of the note" },
+        title: { type: "string", description: "Exact or case-insensitive title of the note" },
+      },
+    },
+  },
+  {
+    name: "create_note",
+    description: "Create a new markdown note document in FocusHUD on disk and in database",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Title of the note document" },
+        content: { type: "string", description: "Markdown body content of the note" },
+        folder: { type: "string", description: "Optional subfolder relative path" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "update_note",
+    description: "Update or append markdown content to an existing note document in FocusHUD",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Unique ID of the note to update" },
+        title: { type: "string", description: "Updated note title" },
+        content: { type: "string", description: "New content or content to append" },
+        append: { type: "boolean", description: "If true, appends content; if false, overwrites (default: false)" },
+      },
+      required: ["id"],
     },
   },
   {

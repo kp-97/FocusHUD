@@ -96,3 +96,29 @@ pub fn save_chat_message(conn: &Connection, msg: &ChatMessageDb) -> Result<()> {
     )?;
     Ok(())
 }
+
+pub fn replace_chat_messages(
+    conn: &Connection,
+    session_id: &str,
+    messages: &[ChatMessageDb],
+) -> Result<()> {
+    conn.execute(
+        "DELETE FROM chat_messages WHERE session_id = ?1",
+        params![session_id],
+    )?;
+    let mut stmt = conn.prepare(
+        "INSERT INTO chat_messages (id, session_id, role, content, tool_calls, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    )?;
+    for msg in messages {
+        stmt.execute(params![
+            msg.id,
+            msg.session_id,
+            msg.role,
+            msg.content,
+            msg.tool_calls,
+            msg.created_at,
+        ])?;
+    }
+    Ok(())
+}
