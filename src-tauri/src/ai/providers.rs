@@ -365,6 +365,17 @@ async fn stream_ollama(
         "messages": messages_json,
         "stream": true
     });
+    let mut options = serde_json::Map::new();
+    if let Some(ctx) = request.context_size {
+        options.insert("num_ctx".to_string(), json!(ctx));
+    }
+    if let Some(temp) = request.temperature {
+        options.insert("temperature".to_string(), json!(temp));
+    }
+    if !options.is_empty() {
+        payload["options"] = Value::Object(options);
+    }
+
     if let Some(tools) = &request.tools {
         if !tools.is_empty() {
             payload["tools"] = json!(convert_tools(tools));

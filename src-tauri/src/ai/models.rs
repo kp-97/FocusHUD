@@ -52,6 +52,7 @@ pub struct ChatCompletionRequest {
     pub messages: Vec<ChatMessageParam>,
     pub temperature: Option<f32>,
     pub tools: Option<Vec<ToolDefinition>>,
+    pub context_size: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

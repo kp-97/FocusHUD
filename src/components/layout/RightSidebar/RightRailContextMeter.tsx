@@ -4,6 +4,7 @@ import {
   calculateContextBreakdown,
   ContextBreakdown,
 } from "../../../features/chat/tokenCounter";
+import { resolveEffectiveContextLimit } from "../../../features/chat/gpuContextCalculator";
 import {
   fetchChatSessions,
   fetchChatMessages,
@@ -16,6 +17,7 @@ export const RightRailContextMeter: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [model, setModel] = useState<string>("gpt-4o");
   const [systemPrompt, setSystemPrompt] = useState<string>("");
+  const [explicitMaxTokens, setExplicitMaxTokens] = useState<number | undefined>(undefined);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const detailsRef = useRef<HTMLDivElement | null>(null);
 
@@ -24,6 +26,12 @@ export const RightRailContextMeter: React.FC = () => {
       const settings = loadAiSettings();
       setModel(settings.model || "gpt-4o");
       setSystemPrompt(settings.systemPrompt || "");
+      const resolvedMax = resolveEffectiveContextLimit(
+        settings.contextSize,
+        settings.model,
+        settings.provider
+      );
+      setExplicitMaxTokens(resolvedMax);
 
       const activeTurn = chatCoordinator.getActiveTurn();
       let targetSessionId = activeTurn?.sessionId;
@@ -117,7 +125,9 @@ export const RightRailContextMeter: React.FC = () => {
   const breakdown: ContextBreakdown = calculateContextBreakdown(
     messages,
     model,
-    systemPrompt
+    systemPrompt,
+    undefined,
+    explicitMaxTokens
   );
 
   const formatTok = (n: number) => {

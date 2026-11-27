@@ -57,4 +57,9 @@ describe("tokenCounter", () => {
     expect(breakdown.maxTokens).toBe(128000);
     expect(breakdown.pctChatOfUsed + breakdown.pctToolOfUsed + breakdown.pctSystemOfUsed).toBe(100);
   });
+
+  it("honors explicitMaxTokens override", () => {
+    const breakdown = calculateContextBreakdown([], "gpt-4o", "Prompt", undefined, 16384);
+    expect(breakdown.maxTokens).toBe(16384);
+  });
 });
